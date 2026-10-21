@@ -343,10 +343,15 @@ end
 # ─── GAL Format I/O ──────────────────────────────────────────────────
 
 """
-    read_gal(path) → (W, ids)
+    read_gal(path; ids=nothing) → (W, ids)
 
-Read a GeoDa GAL contiguity weights file. Returns the sparse weight matrix
-and the observation ID vector.
+Read a GeoDa GAL contiguity weights file. Returns the row-standardized sparse
+weight matrix and the observation ID vector, where row `i` of `W` corresponds
+to `ids[i]`.
+
+The ordering comes from the file's observation records, in record order. Pass
+`ids` to impose an external table's ordering instead. A neighbour id with no
+observation record raises an error.
 """
 function read_gal(path::AbstractString; ids::Union{Nothing, AbstractVector}=nothing)
     lines = readlines(path)
@@ -443,9 +448,14 @@ end
 # ─── GWT Format I/O ──────────────────────────────────────────────────
 
 """
-    read_gwt(path) → (W, ids)
+    read_gwt(path; ids=nothing) → (W, ids)
 
-Read a GeoDa GWT (general weights) file. Returns sparse weight matrix and IDs.
+Read a GeoDa GWT (general weights) file. Returns the sparse weight matrix and
+the observation ID vector, where row `i` of `W` corresponds to `ids[i]`.
+
+A GWT file is only an edge list and carries no ordering of its own, so the ids
+found in it are sorted — numerically when they all parse as integers, else
+lexicographically. Pass `ids` to impose an external table's ordering instead.
 """
 function read_gwt(path::AbstractString; ids::Union{Nothing, AbstractVector}=nothing)
     lines = readlines(path)
