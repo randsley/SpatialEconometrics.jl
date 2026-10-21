@@ -2,5 +2,8 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 SpatialEconometrics = "a8e52d14-7b3c-4f91-9a2e-6d8c1f0e3b5a"
 
+[sources]
+SpatialEconometrics = {path = ".."}
+
 [compat]
 Documenter = "1"

@@ -70,6 +70,41 @@ read_gwt
 write_gwt
 ```
 
+## Higher-Order Models
+
+```@docs
+fit_slx
+fit_sac
+fit_sdem
+```
+
+## Regime Models
+
+```@docs
+fit_spatial_regime
+skater_regimes
+regime_chow_test
+```
+
+## Simulation
+
+```@docs
+simulate_spatial
+monte_carlo_spatial
+power_analysis
+```
+
+## Output & Tables
+
+```@docs
+coeftable
+summary_stats
+to_latex
+to_csv
+to_markdown
+regression_table
+```
+
 ## Grid Weights
 
 | Function | Description |

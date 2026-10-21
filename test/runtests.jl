@@ -414,7 +414,197 @@ using NearestNeighbors
         @test ht.df > 0
     end
 
-    @testset "15. Gravity / Flow Models (PPML & NB)" begin
+    @testset "15. Higher-Order Spatial Models (SLX, SAC, SDEM)" begin
+        rng = MersenneTwister(1500); W = make_rook_weights(15); N = size(W, 1)
+        X = randn(rng, N, 2)
+
+        # SLX: y = Xβ + WXθ + ε
+        θ_true = [0.6, -0.3]
+        y_slx = fill(1.0, N) .+ X * [1.5, -0.8] .+ (W * X) * θ_true .+ 0.4 .* randn(rng, N)
+        m_slx = fit_slx(W, X, y_slx; varnames=["x1", "x2"])
+        @test length(coef(m_slx)) == 5  # intercept + 2β + 2θ
+        @test coefnames(m_slx) == ["(Intercept)", "x1", "x2", "W_x1", "W_x2"]
+        @test length(residuals(m_slx)) == N
+        @test isfinite(loglikelihood(m_slx))
+
+        # SAC: y = ρW₁y + Xβ + u, u = λW₂u + ε
+        ρ_true = 0.4; λ_true = 0.3
+        IN = sparse(1.0I, N, N)
+        ε_sac = 0.5 .* randn(rng, N)
+        u_sac = (IN - λ_true * W) \ ε_sac
+        y_sac = (IN - ρ_true * W) \ (fill(1.0, N) .+ X * [1.5, -0.8] .+ u_sac)
+        m_sac = fit_sac(W, W, X, y_sac; varnames=["x1", "x2"])
+        @test length(coef(m_sac)) == 5  # intercept + 2β + ρ + λ
+        @test coefnames(m_sac) == ["(Intercept)", "x1", "x2", "ρ", "λ"]
+        @test isfinite(loglikelihood(m_sac))
+        @test nobs(m_sac) == N
+        @test isapprox(m_sac.rho, ρ_true; atol=0.20)
+
+        # SDEM: y = Xβ + WXθ + u, u = λWu + ε
+        λ_sdem = 0.45
+        u_sdem = (IN - λ_sdem * W) \ (0.4 .* randn(rng, N))
+        y_sdem = fill(1.0, N) .+ X * [1.5, -0.8] .+ (W * X) * [0.5, -0.3] .+ u_sdem
+        m_sdem = fit_sdem(W, X, y_sdem; varnames=["x1", "x2"])
+        @test length(coef(m_sdem)) == 6  # intercept + 2β + 2θ + λ
+        @test coefnames(m_sdem) == ["(Intercept)", "x1", "x2", "W_x1", "W_x2", "λ"]
+        @test isfinite(loglikelihood(m_sdem))
+        @test isapprox(m_sdem.lambda, λ_sdem; atol=0.20)
+
+        # StatsAPI interface completeness
+        for m in (m_slx, m_sac, m_sdem)
+            @test length(stderror(m)) == length(coef(m))
+            @test size(vcov(m)) == (length(coef(m)), length(coef(m)))
+            @test dof_residual(m) == nobs(m) - length(coef(m))
+        end
+    end
+
+    @testset "16. Spatial Regime Models" begin
+        rng = MersenneTwister(1600); W = make_rook_weights(15); N = size(W, 1)
+        X = randn(rng, N, 2); ρ_true = 0.4
+        IN = sparse(1.0I, N, N)
+
+        # Create two regimes: left half vs right half of grid
+        labels = [((i - 1) % 15) < 8 ? 1 : 2 for i in 1:N]
+        regimes = ExogenousRegimes(labels)
+
+        # DGP with different coefficients per regime
+        β_r1 = [2.0, 1.0, -0.5]; β_r2 = [0.5, -0.8, 1.2]
+        y = zeros(N)
+        for i in 1:N
+            β = labels[i] == 1 ? β_r1 : β_r2
+            y[i] = β[1] + X[i, :]' * β[2:3]
+        end
+        y .+= 0.5 .* randn(rng, N)
+        y = (IN - ρ_true * W) \ y
+
+        # Fit regime model with spatial lag
+        m_reg = fit_spatial_regime(W, X, y, regimes; spatial_lag=true, varnames=["x1", "x2"])
+        @test m_reg.n_regimes == 2
+        @test m_reg.has_spatial_lag
+        @test length(coef(m_reg)) == 7  # 2 regimes × 3 params + ρ
+        @test isfinite(loglikelihood(m_reg))
+
+        # Fit without spatial lag
+        m_ols = fit_spatial_regime(W, X, y, regimes; spatial_lag=false, varnames=["x1", "x2"])
+        @test !m_ols.has_spatial_lag
+        @test length(coef(m_ols)) == 6  # 2 regimes × 3 params
+
+        # Regime Chow test
+        m_pooled = fit_spatial(CrossSection.SAR(), W, X, y)
+        ct = regime_chow_test(m_pooled, m_reg)
+        @test ct.stat >= 0.0
+        @test 0.0 <= ct.p_value <= 1.0
+        @test ct.df == length(coef(m_reg)) - length(coef(m_pooled))
+
+        # SKATER regimes
+        coords = hcat(repeat(1.0:15, 15), repeat(1.0:15, inner=15))
+        sr = skater_regimes(W, coords, 3)
+        @test maximum(sr.labels) == 3
+        @test length(sr.labels) == N
+        @test minimum(sr.labels) == 1
+    end
+
+    @testset "17. Spatial Simulation & Monte Carlo" begin
+        rng = MersenneTwister(1700); L = 10; N = L * L
+        W = make_rook_weights(L)
+
+        # SAR DGP
+        dgp_sar = SAR_DGP(0.5, [1.5, -0.8], 0.5)
+        X = randn(rng, N, 2)
+        y, _ = simulate_spatial(dgp_sar, W, X; rng=rng)
+        @test length(y) == N
+        @test all(isfinite, y)
+
+        # SEM DGP
+        dgp_sem = SEM_DGP(0.4, [1.0, -0.5], 0.6)
+        y_sem, _ = simulate_spatial(dgp_sem, W, X; rng=rng)
+        @test length(y_sem) == N
+
+        # SDM DGP
+        dgp_sdm = SDM_DGP(0.3, [1.0, -0.5], [0.4, -0.2], 0.5)
+        y_sdm, _ = simulate_spatial(dgp_sdm, W, X; rng=rng)
+        @test length(y_sdm) == N
+
+        # SLX DGP
+        dgp_slx = SLX_DGP([1.0, -0.5], [0.3, -0.1], 0.4)
+        y_slx, _ = simulate_spatial(dgp_slx, W, X; rng=rng)
+        @test length(y_slx) == N
+
+        # SAC DGP
+        dgp_sac = SAC_DGP(0.3, 0.2, [1.0, -0.5], 0.5)
+        y_sac, _ = simulate_spatial(dgp_sac, W, X; rng=rng)
+        @test length(y_sac) == N
+
+        # SDEM DGP
+        dgp_sdem = SDEM_DGP(0.4, [1.0, -0.5], [0.3, -0.2], 0.5)
+        y_sdem, _ = simulate_spatial(dgp_sdem, W, X; rng=rng)
+        @test length(y_sdem) == N
+
+        # Monte Carlo with few reps (just checking it runs)
+        mc = monte_carlo_spatial(
+            SAR_DGP(0.5, [1.5, -0.8], 0.5), W, N, 2,
+            (W, X, y) -> fit_spatial(CrossSection.SAR(), W, X, y);
+            config=MonteCarloConfig(n_replications=10, seed=42)
+        )
+        @test length(mc.param_means) == 3  # β1, β2, ρ
+        @test length(mc.param_bias) == 3
+        @test all(isfinite, mc.param_rmse)
+        @test haskey(mc.rejection_rates, "moran_05")
+    end
+
+    @testset "18. Spatial Tables & Output" begin
+        rng = MersenneTwister(1800); W = make_rook_weights(10); N = size(W, 1)
+        X = randn(rng, N, 2)
+        y = (I - 0.4 * W) \ (fill(1.0, N) .+ X * [1.5, -0.8] .+ 0.5 .* randn(rng, N))
+
+        m = fit_spatial(CrossSection.SAR(), W, X, y)
+
+        # CoefTable
+        ct = coeftable(m)
+        @test length(ct.names) == length(coef(m))
+        @test length(ct.estimate) == length(coef(m))
+        @test all(isfinite, ct.z_stat)
+        @test all(p -> 0.0 <= p <= 1.0, ct.p_value)
+        @test all(ct.ci_lower .<= ct.ci_upper)
+
+        # Tables.jl interface
+        @test Tables.istable(typeof(ct))
+        @test :name in Tables.columnnames(ct)
+        @test :estimate in Tables.columnnames(ct)
+        col = Tables.getcolumn(ct, :estimate)
+        @test length(col) == length(coef(m))
+
+        # Export formats
+        latex = to_latex(ct)
+        @test occursin("\\begin{tabular}", latex)
+        @test occursin("\\end{tabular}", latex)
+
+        csv = to_csv(ct)
+        @test occursin("name,estimate,std_error", csv)
+        lines = split(strip(csv), '\n')
+        @test length(lines) == length(coef(m)) + 1  # header + rows
+
+        md = to_markdown(ct)
+        @test occursin("| Variable |", md)
+
+        # Summary stats
+        ss = summary_stats(m; model_type="SAR")
+        @test ss.n == N
+        @test ss.k == length(coef(m))
+        @test isfinite(ss.aic)
+        @test isfinite(ss.bic)
+        @test 0.0 <= ss.r2 <= 1.0
+
+        # Multi-model regression table
+        m_sem = fit_spatial_error(W, X, y)
+        rt = regression_table(m, m_sem; model_names=["SAR", "SEM"])
+        @test occursin("SAR", rt)
+        @test occursin("SEM", rt)
+        @test occursin("N", rt)
+        @test occursin("Log-Lik", rt)
+    end
+
+    @testset "19. Gravity / Flow Models (PPML & NB)" begin
         rng = MersenneTwister(1212)
         N_orig = 15; N_dest = 12; N_obs = N_orig * N_dest
         origin_id = repeat(1:N_orig, inner=N_dest)

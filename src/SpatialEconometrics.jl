@@ -27,6 +27,10 @@ include("FormulaDSL.jl")
 include("SpatialWeights.jl")
 include("SpatialModelSelection.jl")
 include("SpatialPanelDiagnostics.jl")
+include("HigherOrderSpatial.jl")
+include("SpatialRegimeModels.jl")
+include("SpatialSimulation.jl")
+include("SpatialTables.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -44,6 +48,10 @@ const DSLMod        = FormulaDSL
 const WeightsMod    = SpatialWeights
 const SelectionMod  = SpatialModelSelection
 const PanelDiagMod  = SpatialPanelDiagnostics
+const HigherMod     = HigherOrderSpatial
+const RegimeMod     = SpatialRegimeModels
+const SimMod        = SpatialSimulation
+const TablesMod     = SpatialTables
 
 import .SpatialEconometricsPrototype: SpatialRegressionModel, fit_spatial
 import .SpatialPanelEconometrics: SpatialPanelModel, LeeYuTransformation, DirectQML, fit_spatial_panel
@@ -60,6 +68,10 @@ import .FormulaDSL: @formula, slag, fe, endo, ParsedSpatialFormula, extract_pane
 import .SpatialWeights: knn_weights, distance_weights, band_weights, block_diagonal_weights, row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!, SpatialConnectivity, spatial_connectivity, read_gal, write_gal, read_gwt, write_gwt
 import .SpatialModelSelection: spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test, CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, model_comparison_table
 import .SpatialPanelDiagnostics: HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test, PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran
+import .HigherOrderSpatial: SLXModel, fit_slx, SACModel, fit_sac, SDEMModel, fit_sdem
+import .SpatialRegimeModels: SpatialRegimeModel, fit_spatial_regime, ExogenousRegimes, skater_regimes, ChowRegimeTest, regime_chow_test
+import .SpatialSimulation: SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP, simulate_spatial, MonteCarloConfig, monte_carlo_spatial, MonteCarloResult, PowerAnalysisResult, power_analysis
+import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to_markdown, regression_table
 
 function robust_vcov(m::SpatialRegressionModel, spec::ConleySpatialHAC)
     Z_eff, bread_inv = SpatialHAC.extract_spatial_jacobian_scores(m.X_aug, m.W, m.coef, m.rho, m.sigma2, m.vcov, length(m.y), 1)
@@ -169,6 +181,22 @@ export
     CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, model_comparison_table,
     # SpatialPanelDiagnostics
     HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test,
-    PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran
+    PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran,
+    # HigherOrderSpatial
+    HigherOrderSpatial, HigherMod,
+    SLXModel, fit_slx, SACModel, fit_sac, SDEMModel, fit_sdem,
+    # SpatialRegimeModels
+    SpatialRegimeModels, RegimeMod,
+    SpatialRegimeModel, fit_spatial_regime, ExogenousRegimes, skater_regimes,
+    ChowRegimeTest, regime_chow_test,
+    # SpatialSimulation
+    SpatialSimulation, SimMod,
+    SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP,
+    simulate_spatial, MonteCarloConfig, monte_carlo_spatial,
+    MonteCarloResult, PowerAnalysisResult, power_analysis,
+    # SpatialTables
+    SpatialTables, TablesMod,
+    CoefTable, coeftable, summary_stats,
+    to_latex, to_csv, to_markdown, regression_table
 
 end # module

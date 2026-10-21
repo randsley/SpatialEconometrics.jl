@@ -21,6 +21,10 @@ makedocs(
             "GWR & MGWR" => "models/gwr.md",
             "Gravity Models" => "models/gravity.md",
         ],
+        "Higher-Order Models" => [
+            "SLX, SAC, SDEM" => "models/higher_order.md",
+            "Regime Models" => "models/regime.md",
+        ],
         "Diagnostics" => [
             "Spatial Diagnostics" => "diagnostics/spatial.md",
             "Panel Diagnostics" => "diagnostics/panel.md",
@@ -28,6 +32,8 @@ makedocs(
         ],
         "Weight Matrices" => "weights.md",
         "Robust Inference" => "robust.md",
+        "Simulation" => "simulation.md",
+        "Output & Tables" => "tables.md",
         "API Reference" => "api.md",
     ],
 )
