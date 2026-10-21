@@ -2,7 +2,7 @@
 
 A comprehensive spatial and structural econometrics suite in Julia, built around sparse linear algebra, multiple dispatch and automatic differentiation. The package provides 22 submodules covering cross-sectional, panel and higher-order spatial models, spatial discrete choice, eigenvector spatial filtering, regime models, spatial and panel diagnostics, model selection, non-parametric spatial regression, gravity models, HAC-robust inference, weight-matrix construction, input-output calibration, Monte Carlo simulation and publication-ready output — all with a unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** (registered) — 466 test assertions across 23 testsets, passing on Julia 1.13.1. See [Validation Status](#validation-status) for Monte Carlo results.
+> **Version 0.3.0** (registered) — 492 test assertions across 26 testsets (527 with the two package extensions installed), passing on Julia 1.13.2. See [Validation Status](#validation-status) for Monte Carlo results.
 
 ---
 
@@ -50,7 +50,7 @@ Pkg.test()
 
 **Dependencies:** `ChainRulesCore`, `ForwardDiff`, `NearestNeighbors`, `StatsAPI`, `StatsModels`, `Tables`, plus standard libraries (`LinearAlgebra`, `SparseArrays`, `Statistics`, `Random`, `Printf`). Julia 1.10 or later.
 
-**Optional extensions:** `Turing.jl` + `Distributions.jl` (Bayesian), `Makie.jl` (visualization) — loaded automatically when these packages are available.
+**Optional extensions:** `Turing.jl` + `Distributions.jl` (Bayesian), `Makie.jl` (visualization) — loaded automatically when these packages are available. See [Package Extensions](#package-extensions).
 
 ---
 
@@ -618,31 +618,115 @@ m = fit_gravity(PoissonGravity(),
 
 ## Package Extensions
 
-### Bayesian Spatial Econometrics (Turing.jl)
+Two optional feature sets ship as Julia package extensions. Neither is
+installed with the package; each activates automatically once its trigger
+packages are in the session.
+
+| Extension | Trigger | Provides | Verified against |
+|---|---|---|---|
+| `SpatialEconometricsMakieExt` | `Makie` | 5 plotting functions | Makie 0.22.10, 0.24.16 |
+| `SpatialEconometricsTuringExt` | `Turing` + `Distributions` | 3 Bayesian estimators | Turing 0.44.5, 0.49.0 |
+
+All eight function names are declared and exported by `SpatialEconometrics`
+itself; the extensions only add methods to them. Nothing ever writes
+`using SpatialEconometricsMakieExt`, so a function an extension declared on
+its own would be unreachable — you therefore import nothing but the parent.
+Calling one before its trigger packages are loaded names the package to
+load rather than raising a bare `MethodError`:
 
 ```julia
-using Turing, Distributions
-using SpatialEconometrics
+julia> using SpatialEconometrics
 
-result = bayesian_sar(W, X, y; n_samples=1000, n_chains=2)
-result = bayesian_sdm(W, X, y; n_samples=1000)
-result = bayesian_sem(W, X, y; n_samples=1000)
-# result.chain: MCMCChains.Chains object
-# result.posterior_mean, result.posterior_std
+julia> plot_coefficients(m)
+ERROR: plot_coefficients requires Makie: run `using Makie` to load the
+SpatialEconometricsMakieExt extension, then call it again.
 ```
 
 ### Visualization (Makie.jl)
 
-```julia
-using CairoMakie  # or GLMakie
-using SpatialEconometrics
+Install a backend rather than `Makie` itself — `CairoMakie` writes files
+headlessly, `GLMakie` opens a window:
 
-plot_coefficients(m)                          # coefficient CI plot
-plot_moran_scatter(y, W)                      # Moran scatterplot
-plot_local_moran(lisa, coords)                # LISA cluster map
-plot_gwr_coefficients(m_gwr, "temperature")   # GWR coefficient map
-plot_spatial_effects(effects)                 # effects bar chart
+```julia
+using Pkg; Pkg.add("CairoMakie")
 ```
+
+```julia
+using SpatialEconometrics, CairoMakie
+
+save("coefs.png",   plot_coefficients(m))                 # 95% CI by default
+save("coefs99.png", plot_coefficients(m; level = 0.99))   # level is honoured
+save("moran.png",   plot_moran_scatter(y, W))             # slope = Moran's I
+save("lisa.png",    plot_local_moran(moran_local(y, W), coords))
+save("gwr.png",     plot_gwr_coefficients(m_gwr, "income"))
+save("effects.png", plot_spatial_effects(spatial_effects(m)))
+```
+
+Every function returns a `Makie.Figure`, so the results compose with the
+rest of Makie. `level` outside `(0, 1)`, a `varname` the GWR model does not
+carry, or `coords` that do not match the LISA result each raise an error
+rather than producing a misleading picture.
+
+### Bayesian Spatial Econometrics (Turing.jl)
+
+```julia
+using Pkg; Pkg.add(["Turing", "Distributions"])
+```
+
+```julia
+using SpatialEconometrics, Turing, Distributions
+
+r = bayesian_sar(W, X, y; n_samples = 1000, n_chains = 2,
+                 varnames = ["income", "density"], rng = MersenneTwister(11))
+r = bayesian_sem(W, X, y)    # dependence in the errors
+r = bayesian_sdm(W, X, y)    # design augmented with WX
+
+r.posterior_mean    # aligned with r.coefnames
+r.posterior_std
+r.chain             # the raw chain object
+```
+
+An intercept is added for you, so `X` holds the covariates only. Sampling is
+by NUTS, with diffuse priors — `β ~ N(0, 10I)`, `ρ, λ ~ U(-0.99, 0.99)`,
+`σ ~ truncated(Normal(0, 5), 0, Inf)` — which is why the posterior mean
+lands on the maximum-likelihood estimate for the same data:
+
+```text
+  parameter    post. mean   post. SD   MLE          MLE SE
+  (Intercept)  1.0377       0.086      1.0364       0.0842
+  income       1.4918       0.0425     1.4902       0.0407
+  density      -0.7794      0.0324     -0.7798      0.0332
+  ρ            0.4707       0.0368     0.4713       0.0359
+  σ            0.4327       0.0262     —            —
+```
+
+The priors are not configurable, and they are not offered as a considered
+prior for any particular application. What the posterior buys you is the
+joint distribution: statements such as `P(ρ > 0.6) = 0.0015` need no normal
+approximation and no delta method.
+
+Each likelihood evaluation needs `log|I - ρW|`, which NUTS asks for
+thousands of times at a new `ρ` every time; the extension uses the Chebyshev
+approximation, exact to several decimals across the parameter space, so this
+is the likelihood rather than a stand-in for it.
+
+**`result.chain` is not version-stable.** Turing returns an
+`MCMCChains.Chains` before v0.45 and a `FlexiChains.FlexiChain` from v0.45
+on, and the two index differently for vector-valued parameters.
+`posterior_mean` and `posterior_std` are stable across both — prefer them
+unless you need the draws themselves.
+
+### Running the extension tests
+
+Testsets 25 and 26 cover the extensions. They skip themselves when the
+trigger packages are absent, so a plain `Pkg.test()` does not have to build
+Makie and Turing; the `extensions` CI job installs them and runs the suite
+again with both live.
+
+See `docs/src/extensions.md` for the full reference,
+`examples/18_visualization.jl` and `examples/19_bayesian.jl` for runnable
+walk-throughs, and `notebooks/interactive_extensions_explorer.jl` for an
+interactive version.
 
 ---
 
@@ -702,7 +786,9 @@ SpatialEconometrics/
 │   ├── 14_output_tables.jl             # LaTeX / CSV / Markdown export
 │   ├── 15_weight_matrices.jl           # knn/distance/band, standardization, GeoDa I/O
 │   ├── 16_model_selection.jl           # AIC/BIC, LR, Vuong, common factor, Wald
-│   └── 17_panel_diagnostics.jl         # Hausman, panel LM, Chow, panel Moran
+│   ├── 17_panel_diagnostics.jl         # Hausman, panel LM, Chow, panel Moran
+│   ├── 18_visualization.jl             # Makie extension — all five plots
+│   └── 19_bayesian.jl                  # Turing extension — NUTS vs the MLE
 └── notebooks/
     ├── 01_getting_started.ipynb        # Jupyter
     ├── 02_spatial_panels.ipynb         # Jupyter
@@ -711,7 +797,8 @@ SpatialEconometrics/
     ├── interactive_gwr_explorer.jl            # Pluto
     ├── interactive_filtering_explorer.jl      # Pluto — ESF / RE-ESF
     ├── interactive_probit_explorer.jl         # Pluto — GMM vs Gibbs probit
-    └── interactive_higher_order_explorer.jl   # Pluto — SLX/SAC/SDEM + regimes
+    ├── interactive_higher_order_explorer.jl   # Pluto — SLX/SAC/SDEM + regimes
+    └── interactive_extensions_explorer.jl     # Pluto — Makie + Turing extensions
 ```
 
 Run an example with `julia --project=. examples/12_spatial_filtering.jl`. Open a

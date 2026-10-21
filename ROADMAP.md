@@ -2,8 +2,9 @@
 
 > **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 466 test assertions in 23 testsets, 17 examples, 8 notebooks,
-> 2 package extensions, CI/CD and 22 Documenter.jl pages. **Phases 4, 5 and 6
+> 22 submodules, 492 test assertions in 26 testsets (527 with both package
+> extensions installed), 19 examples, 9 notebooks, 2 package extensions,
+> CI/CD and 21 Documenter.jl pages. **Phases 4, 5 and 6
 > are complete except item #10 (Performance)**, which is the next piece of work.
 > Tiers 1 and 2 are otherwise finished; Tier 3 is untouched.
 >
@@ -152,12 +153,14 @@ end
 ```
 
 **Key functions:**
-- `fit_spatial_probit(W, X, y; method=:linearized_gmm)` → `SpatialProbitModel`
-- `fit_spatial_probit(W, X, y; method=:bayesian, n_samples=2000)` — requires Turing extension
+- `fit_spatial_probit(W, X, y; instrument_lags=2)` → `SpatialProbitModel` (linearized GMM)
+- `fit_bayesian_spatial_probit(W, X, y; n_samples=2000, burnin=500)` — Albert–Chib Gibbs, no weak dependency
 - `fit_spatial_ordered_probit(W, X, y_ordered; ...)` → `SpatialOrderedProbitModel`
 - `marginal_effects(m::SpatialProbitModel)` → direct/indirect/total
 
-**Dependencies:** None for GMM; Bayesian version in the Turing extension
+**Dependencies:** None. The Albert–Chib sampler is implemented in
+`SpatialDiscreteChoice.jl` itself; the Turing extension covers SAR, SEM and
+SDM only, and is not involved here.
 
 ---
 
@@ -507,15 +510,16 @@ Rows above the rule are measured; rows below are estimates.
 | Milestone | Modules | Test assertions | Lines of `src/` |
 |---|---|---|---|
 | **v0.3.0** (registered) | 13 | 54 | ~6,500 |
-| **master** (Phases 4–6 bar #10) | 22 | 466 | 8,817 |
+| **master** (Phases 4–6 bar #10) | 22 | 527 | 8,902 |
 | — | | | |
-| **v0.4.0** (next release) | 22–23 | ~470 | ~9,400 |
+| **v0.4.0** (next release) | 22–23 | ~530 | ~9,400 |
 | **v1.0.0** (Phase 7) | 26–27 | ~600 | ~13,000 |
 
-Measured on master: 22 submodules plus the umbrella across 8,817 lines of
-`src/`, 1,149 lines of tests (466 assertions in 23 testsets), 1,946 lines of
-examples across 17 scripts, 318 lines of package extensions, 22 documentation
-pages and 8 notebooks.
+Measured on master: 22 submodules plus the umbrella across 8,902 lines of
+`src/`, 1,348 lines of tests (492 assertions in 26 testsets, 527 with both
+package extensions installed), 2,351 lines of examples across 19 scripts,
+398 lines of package extensions, 21 documentation pages and 9 notebooks
+(3 Jupyter, 6 Pluto).
 
 The earlier per-release projections (v0.4.0 at 16 modules, v0.5.0 at 20,
 v0.6.0 at 23) were overtaken: Phases 4, 5 and 6 all landed on the 0.4.0
