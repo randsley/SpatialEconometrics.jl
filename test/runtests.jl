@@ -10,6 +10,7 @@ using StatsAPI
 import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames, loglikelihood, dof_residual
 using StatsModels
 using Tables
+using NearestNeighbors
 
 @testset "SpatialEconometrics.jl Full Suite Verification" begin
 
@@ -243,7 +244,177 @@ using Tables
         @test size(m_mgwr.coef_local) == (N, 3)
     end
 
-    @testset "12. Gravity / Flow Models (PPML & NB)" begin
+    @testset "12. Spatial Weights Construction" begin
+        rng = MersenneTwister(1200)
+        N = 100
+        coords = hcat(rand(rng, N) .* 10, rand(rng, N) .* 10)
+
+        # knn weights
+        W_knn = knn_weights(coords, 5)
+        @test size(W_knn) == (N, N)
+        @test all(abs.(vec(sum(W_knn, dims=2)) .- 1.0) .< 1e-10)  # row-standardized
+
+        # knn binary + symmetric
+        W_knn_sym = knn_weights(coords, 4; binary=true, symmetrize=true, row_standardize=false)
+        @test issymmetric(W_knn_sym) || norm(W_knn_sym - W_knn_sym', Inf) < 1e-10
+        @test all(nonzeros(W_knn_sym) .== 1.0)
+
+        # distance-decay weights
+        W_dist = distance_weights(coords, 3.0; decay=:inverse)
+        @test size(W_dist) == (N, N)
+        sc_dist = spatial_connectivity(W_dist)
+        @test sc_dist.N == N
+        @test sc_dist.avg_neighbors > 0
+
+        # bisquare decay
+        W_bisq = distance_weights(coords, 4.0; decay=:bisquare, row_standardize=false)
+        @test all(nonzeros(W_bisq) .>= 0.0)
+        @test all(nonzeros(W_bisq) .<= 1.0)
+
+        # distance band
+        W_band = band_weights(coords, 1.0, 3.0)
+        @test size(W_band) == (N, N)
+
+        # block-diagonal
+        W1 = make_rook_weights(4); W2 = make_rook_weights(5)
+        W_block = block_diagonal_weights([W1, W2])
+        @test size(W_block) == (16 + 25, 16 + 25)
+        @test nnz(W_block) == nnz(W1) + nnz(W2)
+
+        # standardization
+        W_raw = knn_weights(coords, 3; row_standardize=false)
+        W_rs = row_standardize(W_raw)
+        row_sums = vec(sum(W_rs, dims=2))
+        @test all(s -> s ≈ 0.0 || s ≈ 1.0, row_sums)
+
+        W_spec = spectral_standardize(W_raw)
+        @test size(W_spec) == (N, N)
+
+        W_mm = minmax_standardize(W_raw)
+        @test size(W_mm) == (N, N)
+
+        # connectivity diagnostics
+        sc = spatial_connectivity(W_knn)
+        @test sc.N == N
+        @test sc.n_islands == 0
+        @test sc.avg_neighbors ≈ 5.0 atol=0.5
+        @test sc.spectral_radius > 0
+
+        # GAL I/O round-trip
+        gal_path = tempname() * ".gal"
+        ids = string.(1:N)
+        W_for_gal = make_rook_weights(10)
+        write_gal(gal_path, W_for_gal, string.(1:100))
+        W_read, ids_read = read_gal(gal_path)
+        @test size(W_read) == size(W_for_gal)
+        @test length(ids_read) == 100
+
+        # GWT I/O round-trip
+        gwt_path = tempname() * ".gwt"
+        write_gwt(gwt_path, W_for_gal, string.(1:100))
+        W_read2, ids_read2 = read_gwt(gwt_path)
+        @test size(W_read2) == size(W_for_gal)
+    end
+
+    @testset "13. Model Selection & Comparison" begin
+        rng = MersenneTwister(1300); W = make_rook_weights(15); N = size(W, 1)
+        X = randn(rng, N, 2)
+        y = (I - 0.5 * W) \ (fill(1.0, N) .+ X * [1.5, -0.8] .+ (W * X) * [0.6, -0.3] .+ 0.5 .* randn(rng, N))
+
+        m_sar = fit_spatial(CrossSection.SAR(), W, X, y)
+        m_sdm = fit_spatial(CrossSection.SDM(), W, X, y)
+
+        # AIC/BIC
+        aic_sar = spatial_aic(m_sar); aic_sdm = spatial_aic(m_sdm)
+        bic_sar = spatial_bic(m_sar); bic_sdm = spatial_bic(m_sdm)
+        @test isfinite(aic_sar) && isfinite(aic_sdm)
+        @test isfinite(bic_sar) && isfinite(bic_sdm)
+
+        # LR test (SAR nested in SDM)
+        lr = lr_test(m_sar, m_sdm)
+        @test lr.stat >= 0.0
+        @test 0.0 <= lr.p_value <= 1.0
+        @test lr.df == 2  # SDM adds 2 WX terms
+
+        # Vuong test
+        m_sem = fit_spatial_error(W, X, y)
+        vt = vuong_test(m_sar, m_sem)
+        @test isfinite(vt.stat)
+        @test 0.0 <= vt.p_value <= 1.0
+        @test vt.preference in (:model1, :model2, :indistinguishable)
+
+        # Wald test (H₀: β₂ = 0)
+        R = zeros(1, length(coef(m_sar)))
+        R[1, 3] = 1.0  # third coef = β₂
+        r = [0.0]
+        wt = wald_test(m_sar, R, r)
+        @test wt.stat >= 0.0
+        @test 0.0 <= wt.p_value <= 1.0
+
+        # Common factor test
+        β_sdm = coef(m_sdm)
+        K = 2  # number of X variables
+        beta_slope = β_sdm[2:K+1]
+        theta = β_sdm[K+2:2K+1]
+        rho = m_sdm.rho
+        cft = common_factor_test(beta_slope, theta, rho, vcov(m_sdm))
+        @test cft.stat >= 0.0
+        @test 0.0 <= cft.p_value <= 1.0
+
+        # Comparison table
+        tbl = model_comparison_table(m_sar, m_sdm, m_sem; names=["SAR", "SDM", "SEM"])
+        @test occursin("SAR", tbl)
+        @test occursin("SDM", tbl)
+        @test occursin("SEM", tbl)
+        @test occursin("AIC", tbl)
+    end
+
+    @testset "14. Spatial Panel Diagnostics" begin
+        rng = MersenneTwister(1400); L = 10; N = L * L; T_per = 8; NT = N * T_per
+        W = make_rook_weights(L)
+        X = randn(rng, NT, 2); β_true = [1.5, -0.8]; ρ_true = 0.45
+        μ_i = randn(rng, N); ξ_t = randn(rng, T_per)
+        S_lu = lu(sparse(1.0I, N, N) - ρ_true * W)
+        y = zeros(NT)
+        for t in 1:T_per
+            idx = ((t-1)*N+1):(t*N)
+            y[idx] = S_lu \ (μ_i .+ ξ_t[t] .+ X[idx, :] * β_true .+ 0.5 .* randn(rng, N))
+        end
+
+        # Spatial Chow test
+        ct = spatial_chow_test(y, X, W, N, T_per, 4)
+        @test ct.stat >= 0.0
+        @test 0.0 <= ct.p_value <= 1.0
+        @test ct.break_period == 4
+
+        # Joint LM tests
+        X_with_const = hcat(ones(NT), X)
+        plm = panel_lm_tests(y, X_with_const, W, N, T_per)
+        @test plm.joint_stat >= 0.0
+        @test plm.lag_stat >= 0.0
+        @test plm.error_stat >= 0.0
+        @test plm.re_stat >= 0.0
+        @test 0.0 <= plm.joint_p <= 1.0
+        # Should detect spatial dependence
+        @test plm.lag_p < 0.10 || plm.error_p < 0.10
+
+        # Panel Moran's I
+        m_pan = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T_per)
+        pm = panel_moran(residuals(m_pan), W, N, T_per)
+        @test pm.T_periods == T_per
+        @test length(pm.period_results) == T_per
+        @test isfinite(pm.pooled.I_stat)
+
+        # Hausman test (compare two panel models with different FE)
+        m_fe = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.IndivFE(), W, X, y, N, T_per)
+        m_twfe = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T_per)
+        ht = spatial_hausman_test(m_fe, m_twfe)
+        @test ht.stat >= 0.0
+        @test 0.0 <= ht.p_value <= 1.0
+        @test ht.df > 0
+    end
+
+    @testset "15. Gravity / Flow Models (PPML & NB)" begin
         rng = MersenneTwister(1212)
         N_orig = 15; N_dest = 12; N_obs = N_orig * N_dest
         origin_id = repeat(1:N_orig, inner=N_dest)

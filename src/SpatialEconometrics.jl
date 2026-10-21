@@ -24,6 +24,9 @@ include("SpatialErrorModel.jl")
 include("GWREstimation.jl")
 include("SpatialGravityModels.jl")
 include("FormulaDSL.jl")
+include("SpatialWeights.jl")
+include("SpatialModelSelection.jl")
+include("SpatialPanelDiagnostics.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -38,6 +41,9 @@ const SEMMod        = SpatialErrorModel
 const GWRMod        = GWREstimation
 const GravityMod    = SpatialGravityModels
 const DSLMod        = FormulaDSL
+const WeightsMod    = SpatialWeights
+const SelectionMod  = SpatialModelSelection
+const PanelDiagMod  = SpatialPanelDiagnostics
 
 import .SpatialEconometricsPrototype: SpatialRegressionModel, fit_spatial
 import .SpatialPanelEconometrics: SpatialPanelModel, LeeYuTransformation, DirectQML, fit_spatial_panel
@@ -51,6 +57,9 @@ import .SpatialErrorModel: SpatialErrorRegressionModel, SpatialErrorPanelModel, 
 import .GWREstimation: GWRModel, MGWRModel, fit_gwr, fit_mgwr, BandwidthType, FixedBandwidth, AdaptiveBandwidth, KernelFunction, GaussianKernel, BisquareKernel, ExponentialKernel
 import .SpatialGravityModels: GravityModel, GravityVariant, PoissonGravity, NegBinGravity, GravityFE, OriginFE, DestinationFE, BilateralFE, fit_gravity, multilateral_resistance
 import .FormulaDSL: @formula, slag, fe, endo, ParsedSpatialFormula, extract_panel_permutation
+import .SpatialWeights: knn_weights, distance_weights, band_weights, block_diagonal_weights, row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!, SpatialConnectivity, spatial_connectivity, read_gal, write_gal, read_gwt, write_gwt
+import .SpatialModelSelection: spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test, CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, model_comparison_table
+import .SpatialPanelDiagnostics: HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test, PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran
 
 function robust_vcov(m::SpatialRegressionModel, spec::ConleySpatialHAC)
     Z_eff, bread_inv = SpatialHAC.extract_spatial_jacobian_scores(m.X_aug, m.W, m.coef, m.rho, m.sigma2, m.vcov, length(m.y), 1)
@@ -130,6 +139,9 @@ export
     GWREstimation, GWRMod,
     SpatialGravityModels, GravityMod,
     FormulaDSL, DSLMod,
+    SpatialWeights, WeightsMod,
+    SpatialModelSelection, SelectionMod,
+    SpatialPanelDiagnostics, PanelDiagMod,
 
     SpatialRegressionModel, SpatialPanelModel, DynamicSpatialPanelModel, DynamicSpatialEffectsResult, GS2SLSModel, SystemGMMModel, CalibrationResult, SpatialErrorRegressionModel, SpatialErrorPanelModel,
     LeeYuTransformation, DirectQML, SARAR, GMMVariant, DifferenceGMM, SystemGMM,
@@ -146,6 +158,17 @@ export
     MoranResult, LISAResult, LMTestResult, GearyCResult,
     moran_global, moran_local, geary_c,
     lm_test_lag, lm_test_error, lm_test_robust_lag, lm_test_robust_error, lm_tests,
-    make_rook_weights, make_queen_weights
+    make_rook_weights, make_queen_weights,
+    # SpatialWeights
+    knn_weights, distance_weights, band_weights, block_diagonal_weights,
+    row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!,
+    SpatialConnectivity, spatial_connectivity,
+    read_gal, write_gal, read_gwt, write_gwt,
+    # SpatialModelSelection
+    spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test,
+    CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, model_comparison_table,
+    # SpatialPanelDiagnostics
+    HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test,
+    PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran
 
 end # module
