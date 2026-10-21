@@ -151,6 +151,51 @@ function make_queen_weights(L::Int; T::Type{<:AbstractFloat}=Float64)
     return sparse(I_idx, J_idx, V_val, N, N)
 end
 
+
+# ─── Extension entry points ──────────────────────────────────────────
+#
+# A package extension can only add METHODS to functions that already
+# exist in the parent; a function it defines itself is unreachable,
+# because nothing ever `using`s the extension module. These declarations
+# are those functions. The extensions in `ext/` add methods to them.
+
+"""
+    AbstractBayesianSpatialResult
+
+Supertype for the result of a Bayesian spatial fit. The concrete type is
+defined by the Turing extension, so user code can dispatch on this
+without depending on Turing.
+"""
+abstract type AbstractBayesianSpatialResult end
+
+# Raised when a stub is called and no extension method matched.
+function _extension_required(fname::Symbol, pkg::String, ext::Symbol)
+    if isnothing(Base.get_extension(@__MODULE__, ext))
+        error("$(fname) requires $(pkg): run `using $(pkg)` to load the " *
+              "$(ext) extension, then call it again.")
+    else
+        error("$(fname): the $(ext) extension is loaded, but no method " *
+              "matches those argument types.")
+    end
+end
+
+for (f, pkg, ext) in ((:plot_coefficients,      "Makie",  :SpatialEconometricsMakieExt),
+                      (:plot_moran_scatter,     "Makie",  :SpatialEconometricsMakieExt),
+                      (:plot_local_moran,       "Makie",  :SpatialEconometricsMakieExt),
+                      (:plot_gwr_coefficients,  "Makie",  :SpatialEconometricsMakieExt),
+                      (:plot_spatial_effects,   "Makie",  :SpatialEconometricsMakieExt),
+                      (:bayesian_sar,           "Turing", :SpatialEconometricsTuringExt),
+                      (:bayesian_sdm,           "Turing", :SpatialEconometricsTuringExt),
+                      (:bayesian_sem,           "Turing", :SpatialEconometricsTuringExt))
+    # The catch-all is deliberately the least specific method, so any
+    # typed method the extension adds takes precedence over it.
+    @eval begin
+        function $f(args...; kwargs...)
+            _extension_required($(QuoteNode(f)), $pkg, $(QuoteNode(ext)))
+        end
+    end
+end
+
 export
     SpatialEconometricsPrototype, CrossSection,
     SpatialPanelEconometrics, StaticPanel,
@@ -221,6 +266,11 @@ export
     SpatialFiltering, FilterMod,
     SpatialEigen, spatial_eigenvectors, moran_coefficient,
     ESFModel, fit_esf, selected_eigenvectors,
-    REESFModel, fit_re_esf
+    REESFModel, fit_re_esf,
+    # Extension entry points (methods live in ext/)
+    AbstractBayesianSpatialResult,
+    bayesian_sar, bayesian_sdm, bayesian_sem,
+    plot_coefficients, plot_moran_scatter, plot_local_moran,
+    plot_gwr_coefficients, plot_spatial_effects
 
 end # module

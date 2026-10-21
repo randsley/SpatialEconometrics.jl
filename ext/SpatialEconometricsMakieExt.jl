@@ -3,24 +3,36 @@ module SpatialEconometricsMakieExt
 using SpatialEconometrics
 using Makie
 using Statistics
+using LinearAlgebra
+using SparseArrays
+using StatsAPI
 
-export plot_coefficients, plot_moran_scatter, plot_local_moran, plot_gwr_coefficients, plot_spatial_effects
+# Methods are added to the stubs declared in the parent package. An
+# extension cannot introduce reachable functions of its own: nothing ever
+# `using`s this module, so a function defined here would be invisible.
+import SpatialEconometrics: plot_coefficients, plot_moran_scatter,
+    plot_local_moran, plot_gwr_coefficients, plot_spatial_effects
+
+const _qnorm = SpatialEconometrics.SpatialTables._qnorm
 
 """
-    plot_coefficients(m; kwargs...)
+    plot_coefficients(m; level=0.95, kwargs...)
 
-Horizontal coefficient plot with confidence intervals for any `RegressionModel`.
+Horizontal coefficient plot with confidence intervals for any
+`StatsAPI.RegressionModel`. `kwargs` are forwarded to `Figure`.
 """
-function plot_coefficients(m::StatsAPI.RegressionModel; level::Float64=0.95, kwargs...)
+function plot_coefficients(m::StatsAPI.RegressionModel; level::Real=0.95, kwargs...)
+    0 < level < 1 || throw(ArgumentError("level must be in (0, 1), got $level"))
     β = StatsAPI.coef(m)
     se = StatsAPI.stderror(m)
     names = StatsAPI.coefnames(m)
-    z_crit = 1.96  # ~95% CI
+    z_crit = _qnorm(1 - (1 - level) / 2)
 
     K = length(β)
     fig = Figure(; size=(600, max(300, 40 * K)), kwargs...)
-    ax = Axis(fig[1, 1], xlabel="Estimate", title="Coefficient Plot")
-    ax.yticks = (1:K, names)
+    ax = Axis(fig[1, 1], xlabel="Estimate",
+              title="Coefficient Plot ($(round(100 * level; digits=1))% CI)")
+    ax.yticks = (1:K, String.(names))
 
     for i in 1:K
         lo = β[i] - z_crit * se[i]
@@ -35,66 +47,67 @@ end
 """
     plot_moran_scatter(y, W; kwargs...)
 
-Moran scatterplot: y vs. Wy (standardized), with quadrant shading.
+Moran scatterplot: standardized `y` against its spatial lag `Wy`, with the
+slope — Moran's I when `W` is row-standardized — drawn through it.
 """
 function plot_moran_scatter(y::AbstractVector, W::AbstractSparseMatrix; kwargs...)
-    ȳ = mean(y)
-    z = (y .- ȳ) ./ std(y)
+    z = (y .- mean(y)) ./ std(y)
     Wz = W * z
+    slope = dot(z, Wz) / dot(z, z)
 
     fig = Figure(; size=(500, 500), kwargs...)
-    ax = Axis(fig[1, 1], xlabel="z (standardized)", ylabel="Wz (spatial lag)", title="Moran Scatterplot")
+    ax = Axis(fig[1, 1], xlabel="z (standardized)", ylabel="Wz (spatial lag)",
+              title="Moran Scatterplot (slope = $(round(slope; digits=3)))")
 
     scatter!(ax, z, Wz; color=:steelblue, markersize=5, alpha=0.6)
     hlines!(ax, [0.0]; color=:gray, linewidth=1)
     vlines!(ax, [0.0]; color=:gray, linewidth=1)
 
-    # Regression line
-    slope = dot(z, Wz) / dot(z, z)
-    x_range = range(minimum(z), maximum(z); length=100)
-    lines!(ax, collect(x_range), slope .* collect(x_range); color=:red, linewidth=2)
-
+    x_range = collect(range(minimum(z), maximum(z); length=100))
+    lines!(ax, x_range, slope .* x_range; color=:red, linewidth=2)
     return fig
 end
 
 """
     plot_local_moran(lisa, coords; kwargs...)
 
-LISA cluster map showing HH, LL, HL, LH, and ns classifications.
+LISA cluster map showing HH, LL, HL, LH and non-significant units.
 """
-function plot_local_moran(lisa::SpatialEconometrics.LISAResult, coords::AbstractMatrix; kwargs...)
-    N = length(lisa.local_I)
-    colors = map(lisa.cluster_type) do ct
-        ct === :HH ? :red :
-        ct === :LL ? :blue :
-        ct === :HL ? :pink :
-        ct === :LH ? :lightblue :
-        :gray80
-    end
+function plot_local_moran(lisa::SpatialEconometrics.LISAResult,
+                          coords::AbstractMatrix; kwargs...)
+    size(coords, 1) == length(lisa.local_I) || throw(DimensionMismatch(
+        "coords has $(size(coords, 1)) rows but lisa covers $(length(lisa.local_I)) units"))
+
+    palette = (HH=:red, LL=:blue, HL=:pink, LH=:lightblue, ns=:gray80)
+    colors = map(ct -> get(palette, ct, palette.ns), lisa.cluster_type)
 
     fig = Figure(; size=(600, 500), kwargs...)
     ax = Axis(fig[1, 1], xlabel="X", ylabel="Y", title="LISA Cluster Map")
     scatter!(ax, coords[:, 1], coords[:, 2]; color=colors, markersize=8)
 
-    # Legend
-    elems = [MarkerElement(; color=c, marker=:circle, markersize=12) for c in [:red, :blue, :pink, :lightblue, :gray80]]
+    elems = [MarkerElement(; color=c, marker=:circle, markersize=12)
+             for c in (palette.HH, palette.LL, palette.HL, palette.LH, palette.ns)]
     Legend(fig[1, 2], elems, ["HH", "LL", "HL", "LH", "n.s."])
     return fig
 end
 
 """
-    plot_gwr_coefficients(m::GWRModel, varname::String; kwargs...)
+    plot_gwr_coefficients(m, varname; kwargs...)
 
-Spatial map of a single GWR local coefficient.
+Map of a single GWR local coefficient over the estimation coordinates.
 """
-function plot_gwr_coefficients(m::SpatialEconometrics.GWRModel, varname::String; kwargs...)
-    idx = findfirst(==(varname), m.coefnames)
-    isnothing(idx) && error("Variable '$varname' not found in model")
+function plot_gwr_coefficients(m::SpatialEconometrics.GWRModel,
+                               varname::AbstractString; kwargs...)
+    idx = findfirst(==(String(varname)), String.(m.coefnames))
+    isnothing(idx) && error(
+        "variable \"$(varname)\" is not in the model (has: $(m.coefnames))")
 
     vals = m.coef_local[:, idx]
     fig = Figure(; size=(600, 500), kwargs...)
-    ax = Axis(fig[1, 1], xlabel="X", ylabel="Y", title="GWR: Local β for $varname")
-    sc = scatter!(ax, m.coords[:, 1], m.coords[:, 2]; color=vals, markersize=8, colormap=:RdBu)
+    ax = Axis(fig[1, 1], xlabel="X", ylabel="Y",
+              title="GWR: local β for $(varname)")
+    sc = scatter!(ax, m.coords[:, 1], m.coords[:, 2];
+                  color=vals, markersize=8, colormap=:RdBu)
     Colorbar(fig[1, 2], sc; label="β")
     return fig
 end
@@ -102,20 +115,24 @@ end
 """
     plot_spatial_effects(effects; kwargs...)
 
-Grouped bar chart of direct, indirect, and total spatial effects.
+Grouped bar chart of direct, indirect and total spatial effects.
 """
-function plot_spatial_effects(e::SpatialEconometrics.SpatialEconometricsPrototype.SpatialEffectsResult; kwargs...)
+function plot_spatial_effects(
+    e::SpatialEconometrics.SpatialEconometricsPrototype.SpatialEffectsResult;
+    kwargs...
+)
     K = length(e.varnames)
     positions = repeat(1:K, 3)
     dodges = vcat(fill(1, K), fill(2, K), fill(3, K))
     values = vcat(e.direct, e.indirect, e.total)
-    errors = vcat(e.direct_se, e.indirect_se, e.total_se)
 
     fig = Figure(; size=(max(400, 120 * K), 400), kwargs...)
-    ax = Axis(fig[1, 1], xticks=(1:K, e.varnames), ylabel="Effect", title="Spatial Effects")
-    barplot!(ax, positions, values; dodge=dodges, color=dodges, colormap=[:steelblue, :orange, :green])
+    ax = Axis(fig[1, 1], xticks=(1:K, String.(e.varnames)), ylabel="Effect",
+              title="Spatial Effects")
+    barplot!(ax, positions, values; dodge=dodges, color=dodges,
+             colormap=[:steelblue, :orange, :green])
 
-    elems = [PolyElement(; color=c) for c in [:steelblue, :orange, :green]]
+    elems = [PolyElement(; color=c) for c in (:steelblue, :orange, :green)]
     Legend(fig[1, 2], elems, ["Direct", "Indirect", "Total"])
     return fig
 end
