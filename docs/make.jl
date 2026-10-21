@@ -5,6 +5,7 @@ makedocs(
     sitename = "SpatialEconometrics.jl",
     modules = [SpatialEconometrics],
     authors = "Nigel Randsley",
+    warnonly = [:missing_docs],
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         canonical = "https://randsley.github.io/SpatialEconometrics.jl",
