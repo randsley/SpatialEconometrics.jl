@@ -19,3 +19,6 @@ Thumbs.db
 
 # Backup
 _backup*/
+
+# CI scratch environment for the extension tests
+ext-test-env/

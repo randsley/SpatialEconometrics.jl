@@ -49,3 +49,42 @@ jobs:
           files: lcov.info
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # The weak dependencies are deliberately absent from [targets].test, so a
+  # plain `Pkg.test()` does not have to build Makie and Turing. Testsets 25
+  # and 26 skip themselves when those packages are missing, so this job runs
+  # the suite in an environment that installs them, alongside the direct
+  # dependencies runtests.jl needs in order to `using` them.
+  extensions:
+    name: Package extensions (Makie + Turing)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+          arch: x64
+      - uses: julia-actions/cache@v2
+      - name: Build an environment with both weak dependencies
+        run: |
+          mkdir -p ext-test-env
+          julia --project=ext-test-env -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path = pwd()))
+            Pkg.add(["Test", "ForwardDiff", "ChainRulesCore", "StatsAPI",
+                     "StatsModels", "Tables", "NearestNeighbors",
+                     "Makie", "Turing", "Distributions"])
+            Pkg.instantiate()'
+      # Without this guard a failure to precompile either extension would
+      # merely skip testsets 25 and 26 and leave the job green.
+      - name: Check that both extensions actually load
+        run: |
+          julia --project=ext-test-env -e '
+            using SpatialEconometrics, Makie, Turing, Distributions
+            for ext in (:SpatialEconometricsMakieExt, :SpatialEconometricsTuringExt)
+                isnothing(Base.get_extension(SpatialEconometrics, ext)) &&
+                    error("$ext did not load")
+            end
+            @info "extensions loaded" makie = pkgversion(Makie) turing = pkgversion(Turing)'
+      - name: Run the full suite with the extensions live
+        run: julia --project=ext-test-env test/runtests.jl
