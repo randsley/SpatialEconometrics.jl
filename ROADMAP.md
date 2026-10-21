@@ -2,7 +2,7 @@
 
 > **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 453 test assertions in 23 testsets, 17 examples, 8 notebooks,
+> 22 submodules, 466 test assertions in 23 testsets, 17 examples, 8 notebooks,
 > 2 package extensions, CI/CD and 22 Documenter.jl pages. **Phases 4, 5 and 6
 > are complete except item #10 (Performance)**, which is the next piece of work.
 > Tiers 1 and 2 are otherwise finished; Tier 3 is untouched.
@@ -507,13 +507,13 @@ Rows above the rule are measured; rows below are estimates.
 | Milestone | Modules | Test assertions | Lines of `src/` |
 |---|---|---|---|
 | **v0.3.0** (registered) | 13 | 54 | ~6,500 |
-| **master** (Phases 4–6 bar #10) | 22 | 453 | 8,817 |
+| **master** (Phases 4–6 bar #10) | 22 | 466 | 8,817 |
 | — | | | |
 | **v0.4.0** (next release) | 22–23 | ~470 | ~9,400 |
 | **v1.0.0** (Phase 7) | 26–27 | ~600 | ~13,000 |
 
 Measured on master: 22 submodules plus the umbrella across 8,817 lines of
-`src/`, 1,149 lines of tests (453 assertions in 23 testsets), 1,946 lines of
+`src/`, 1,149 lines of tests (466 assertions in 23 testsets), 1,946 lines of
 examples across 17 scripts, 318 lines of package extensions, 22 documentation
 pages and 8 notebooks.
 

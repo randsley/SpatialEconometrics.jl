@@ -966,6 +966,60 @@ using NearestNeighbors
         # Diagnostics ran rather than being skipped by the estimator's `continue`.
         @test mc.rejection_rates["moran_05"] > 0.5
         @test !isempty(sprint(show, mc))
+
+        # ── spatial_hausman_test must match coefficients by NAME ──
+        # It aligned the two coefficient vectors by position, so comparing an
+        # FE fit (no intercept) with a pooled fit (intercept) contrasted
+        # β_income with the intercept and returned a statistic of 7.8e6: a
+        # decisive-looking rejection assembled from unrelated parameters.
+        let
+            rngh = MersenneTwister(1717)
+            Lh = 8; Nh = Lh * Lh; Th = 5; NTh = Nh * Th
+            Wh = make_rook_weights(Lh)
+            Sh = lu(sparse(1.0I, Nh, Nh) - 0.4 * Wh)
+            Xh = randn(rngh, NTh, 2)
+            yh = zeros(NTh)
+            μh = 2.0 .* randn(rngh, Nh)
+            for t in 1:Th
+                idx = ((t - 1) * Nh + 1):(t * Nh)
+                yh[idx] = Sh \ (μh .+ Xh[idx, :] * [1.0, -0.5] .+ 0.5 .* randn(rngh, Nh))
+            end
+            fp(fe) = fit_spatial_panel(StaticPanel.SAR(), fe, Wh, Xh, yh, Nh, Th;
+                                       varnames = ["a", "b"])
+            m_feh = fp(StaticPanel.IndivFE())
+            m_pooh = fp(StaticPanel.NoFE())
+
+            # The premise of the bug: the two layouts genuinely differ.
+            @test coefnames(m_feh) == ["a", "b", "ρ"]
+            @test coefnames(m_pooh) == ["(Intercept)", "a", "b", "ρ"]
+
+            ht = spatial_hausman_test(m_feh, m_pooh)
+            # The pooled intercept has no FE counterpart, so it drops out.
+            @test ht.coefnames == ["a", "b", "ρ"]
+            @test ht.df == 3
+            @test ht.stat >= 0.0
+            @test 0.0 <= ht.p_value <= 1.0
+
+            # Swapping the arguments compares the same set of names.
+            @test spatial_hausman_test(m_pooh, m_feh).coefnames == ["a", "b", "ρ"]
+
+            # Comparing a model with itself is the degenerate case: identical
+            # coefficients, so the statistic must be zero and p must be 1.
+            ht_self = spatial_hausman_test(m_feh, m_feh)
+            @test ht_self.stat ≈ 0.0 atol = 1e-6
+            @test ht_self.p_value ≈ 1.0 atol = 1e-8
+
+            # `names` restricts the comparison to a chosen subset.
+            ht_sl = spatial_hausman_test(m_feh, m_pooh; names = ["a", "b"])
+            @test ht_sl.coefnames == ["a", "b"]
+            @test ht_sl.df == 2
+
+            # An unknown name is an error, not a silently smaller comparison.
+            @test_throws ErrorException spatial_hausman_test(m_feh, m_pooh;
+                                                            names = ["nope"])
+            # The compared names appear in the printed output.
+            @test occursin("a, b, ρ", sprint(show, ht))
+        end
     end
 
     @testset "23. Regressions found by the full sweep" begin

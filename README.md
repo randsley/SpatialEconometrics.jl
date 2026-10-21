@@ -2,7 +2,7 @@
 
 A comprehensive spatial and structural econometrics suite in Julia, built around sparse linear algebra, multiple dispatch and automatic differentiation. The package provides 22 submodules covering cross-sectional, panel and higher-order spatial models, spatial discrete choice, eigenvector spatial filtering, regime models, spatial and panel diagnostics, model selection, non-parametric spatial regression, gravity models, HAC-robust inference, weight-matrix construction, input-output calibration, Monte Carlo simulation and publication-ready output — all with a unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** (registered) — 453 test assertions across 23 testsets, passing on Julia 1.13.1. See [Validation Status](#validation-status) for Monte Carlo results.
+> **Version 0.3.0** (registered) — 466 test assertions across 23 testsets, passing on Julia 1.13.1. See [Validation Status](#validation-status) for Monte Carlo results.
 
 ---
 
@@ -681,7 +681,7 @@ SpatialEconometrics/
 │   ├── SpatialEconometricsTuringExt.jl # Bayesian extension
 │   └── SpatialEconometricsMakieExt.jl  # visualization extension
 ├── test/
-│   └── runtests.jl                     # 453 assertions, 23 testsets
+│   └── runtests.jl                     # 466 assertions, 23 testsets
 ├── validation/
 │   ├── mc_sdm.jl                       # Monte Carlo validation
 │   └── mc_sdm_output.txt

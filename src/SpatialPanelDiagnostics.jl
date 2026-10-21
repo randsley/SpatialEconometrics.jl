@@ -5,7 +5,7 @@ using SparseArrays
 using Statistics
 using Printf
 using StatsAPI
-import StatsAPI: coef, vcov, nobs, dof_residual
+import StatsAPI: coef, vcov, nobs, dof_residual, coefnames
 
 import ..SpatialUtils: _normcdf, _chi2_sf, _loggamma, FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
     within_transform, within_transform!, panel_spatial_lag!
@@ -23,6 +23,7 @@ struct HausmanTestResult
     stat::Float64
     df::Int
     p_value::Float64
+    coefnames::Vector{String}
 end
 
 function Base.show(io::IO, r::HausmanTestResult)
@@ -30,6 +31,7 @@ function Base.show(io::IO, r::HausmanTestResult)
     println(io, "───────────────────────────────")
     @printf(io, "  Hausman statistic: %.4f\n", r.stat)
     @printf(io, "  Degrees of freedom: %d\n", r.df)
+    println(io, "  Compared:          ", join(r.coefnames, ", "))
     @printf(io, "  p-value:           %.6f %s\n", r.p_value,
         r.p_value < 0.001 ? "***" : r.p_value < 0.01 ? "**" : r.p_value < 0.05 ? "*" : "")
     verdict = r.p_value < 0.05 ? "Reject H₀ → FE preferred" : "Fail to reject H₀ → RE consistent"
@@ -37,24 +39,57 @@ function Base.show(io::IO, r::HausmanTestResult)
 end
 
 """
-    spatial_hausman_test(m_fe, m_re)
+    spatial_hausman_test(m_fe, m_re; names=nothing)
 
-Spatial Hausman test comparing spatial FE and RE estimators.
-Under H₀ (RE is consistent), both estimators are consistent but RE is efficient.
-Under H₁, only FE is consistent.
+Spatial Hausman test comparing two spatial panel estimators.
+Under H₀ the second model is consistent and efficient; under H₁ only the
+first is consistent, so a rejection favours `m_fe`.
 
-Both models must have the same dependent variable, covariates, and W.
+Coefficients are matched **by name**, using the names the two models share,
+in the order they appear in `m_fe`. The names actually compared are returned
+in the result. Pass `names` to restrict the comparison to a chosen subset.
+The models should otherwise share the same dependent variable, covariates
+and `W`.
+
+Matching by name matters. A `NoFE` panel fit carries an intercept that an FE
+fit does not, so the first position is the intercept in one model and the
+first slope in the other. Comparing those positionally builds a statistic
+out of unrelated parameters: it looks like a decisive rejection and means
+nothing.
 """
-function spatial_hausman_test(m_fe::StatsAPI.RegressionModel, m_re::StatsAPI.RegressionModel)
-    β_fe = coef(m_fe)
-    β_re = coef(m_re)
+function spatial_hausman_test(
+    m_fe::StatsAPI.RegressionModel,
+    m_re::StatsAPI.RegressionModel;
+    names::Union{Nothing, AbstractVector{<:AbstractString}}=nothing
+)
+    nm_fe = String.(coefnames(m_fe))
+    nm_re = String.(coefnames(m_re))
 
-    n_common = min(length(β_fe), length(β_re))
-    β_fe_c = β_fe[1:n_common]
-    β_re_c = β_re[1:n_common]
+    shared = if isnothing(names)
+        [n for n in nm_fe if n in nm_re]
+    else
+        req = String.(names)
+        for n in req
+            n in nm_fe ||
+                error("coefficient $(n) is not in the first model (has: $(nm_fe))")
+            n in nm_re ||
+                error("coefficient $(n) is not in the second model (has: $(nm_re))")
+        end
+        req
+    end
+    unique!(shared)
+    isempty(shared) && error(
+        "the two models share no coefficient names, so there is nothing to " *
+        "compare: $(nm_fe) vs $(nm_re)")
 
-    V_fe = vcov(m_fe)[1:n_common, 1:n_common]
-    V_re = vcov(m_re)[1:n_common, 1:n_common]
+    i_fe = Int[findfirst(==(n), nm_fe) for n in shared]
+    i_re = Int[findfirst(==(n), nm_re) for n in shared]
+
+    β_fe_c = coef(m_fe)[i_fe]
+    β_re_c = coef(m_re)[i_re]
+
+    V_fe = vcov(m_fe)[i_fe, i_fe]
+    V_re = vcov(m_re)[i_re, i_re]
 
     V_diff = V_fe .- V_re
     V_diff_sym = Symmetric(V_diff)
@@ -73,10 +108,10 @@ function spatial_hausman_test(m_fe::StatsAPI.RegressionModel, m_re::StatsAPI.Reg
 
     stat = dot(diff, V_inv * diff)
     stat = max(stat, 0.0)
-    df = n_common
+    df = length(shared)
     p_value = _chi2_sf(stat, df)
 
-    return HausmanTestResult(stat, df, p_value)
+    return HausmanTestResult(stat, df, p_value, shared)
 end
 
 # ─── Spatial Chow Test ───────────────────────────────────────────────

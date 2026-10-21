@@ -3,12 +3,12 @@
 # ═══════════════════════════════════════════════════════════════════════
 #
 # Demonstrates:
-#   - Spatial Hausman test for the fixed-effects specification
+#   - Spatial Hausman test: fixed effects against pooled
 #   - Joint LM tests for spatial lag, spatial error and random effects
 #   - Spatial Chow test for a structural break across periods
 #   - Period-by-period and pooled Moran's I on panel residuals
 #
-# Each test is run twice: once on data that violate the null and once on
+# Every test is run twice: once on data that violate the null and once on
 # data that satisfy it, so both the power and the size of the test are
 # visible rather than asserted.
 
@@ -24,82 +24,87 @@ W = make_rook_weights(L)
 S_lu = lu(sparse(1.0I, N, N) - 0.45 * W)
 
 β_true = [1.5, -0.8]
-
-# ─── Panel with individual fixed effects and a spatial lag ───────────
-
 X = randn(rng, NT, 2)
-μ_i = 2.0 .* randn(rng, N)          # individual effects, correlated with nothing
-y = zeros(NT)
-for t in 1:T_per
-    idx = ((t - 1) * N + 1):(t * N)
-    y[idx] = S_lu \ (μ_i .+ X[idx, :] * β_true .+ 0.5 .* randn(rng, N))
+
+# Build a panel from a spatial-lag DGP with the given individual effects.
+function make_panel(μ)
+    out = zeros(NT)
+    for t in 1:T_per
+        idx = ((t - 1) * N + 1):(t * N)
+        out[idx] = S_lu \ (μ .+ X[idx, :] * β_true .+ 0.5 .* randn(rng, N))
+    end
+    return out
 end
 
+y      = make_panel(2.0 .* randn(rng, N))   # genuine individual effects
+y_nofe = make_panel(zeros(N))               # same DGP, no individual effects
+
 println("Panel: N = $N units × T = $T_per periods = $NT observations")
-println("DGP:   spatial lag ρ = 0.45, individual FE, β = $β_true")
+println("DGP:   spatial lag ρ = 0.45, β = $β_true")
 println()
+
+fit_panel(fe, yy) = fit_spatial_panel(SP.SAR(), fe, W, X, yy, N, T_per;
+    varnames = ["income", "density"])
+
+# Pick coefficients out by NAME, never by position: the two specifications
+# do not carry the same terms.
+function slopes(m)
+    nm = String.(coefnames(m))
+    return [coef(m)[findfirst(==(n), nm)] for n in ("income", "density")]
+end
 
 # ─── Spatial Hausman test ────────────────────────────────────────────
 
 println("═══ Spatial Hausman Test ═══")
-println("  The test contrasts two coefficient vectors POSITIONALLY — it does")
-println("  not match on names. Compare specifications that share a layout.")
-println("  A NoFE fit carries an intercept that the FE fits do not, so FE")
-println("  against NoFE would silently compare β₁ with the intercept.")
-println()
-for (lbl, fe) in [("IndivFE", SP.IndivFE()), ("NoFE", SP.NoFE())]
-    mm = fit_spatial_panel(SP.SAR(), fe, W, X, y, N, T_per;
-        varnames = ["income", "density"])
-    println("    ", rpad(lbl, 10), " coefnames = ", coefnames(mm))
-end
+
+m_fe   = fit_panel(SP.IndivFE(), y)
+m_pool = fit_panel(SP.NoFE(), y)
+
+println("  The test matches coefficients BY NAME, and the two specifications")
+println("  do not carry the same terms:")
+println("    IndivFE: ", coefnames(m_fe))
+println("    NoFE:    ", coefnames(m_pool))
+println("  The pooled intercept has no fixed-effects counterpart, so it is")
+println("  left out. Matching positionally would contrast β_income with the")
+println("  intercept and manufacture a huge statistic from unrelated terms.")
 println()
 
-# Individual against two-way effects: both expose [income, density, ρ], so
-# the contrast is well posed. Here the DGP has no time effects, so the two
-# should agree and the test should stay quiet.
-m_fe  = fit_spatial_panel(SP.SAR(), SP.IndivFE(), W, X, y, N, T_per;
-    varnames = ["income", "density"])
-m_two = fit_spatial_panel(SP.SAR(), SP.TwoWayFE(), W, X, y, N, T_per;
-    varnames = ["income", "density"])
-ht = spatial_hausman_test(m_fe, m_two)
-println("  No time effects in the DGP:")
-println("    IndivFE  β̂ = ", round.(coef(m_fe)[1:2]; digits = 4),
+ht = spatial_hausman_test(m_fe, m_pool)
+println("  Data WITH individual effects:")
+println("    FE     β̂ = ", round.(slopes(m_fe); digits = 4),
         "   ρ̂ = ", round(m_fe.rho; digits = 4))
-println("    TwoWayFE β̂ = ", round.(coef(m_two)[1:2]; digits = 4),
-        "   ρ̂ = ", round(m_two.rho; digits = 4))
-println("    stat = ", round(ht.stat; digits = 3), " on ", ht.df,
-        " df,  p = ", round(ht.p_value; sigdigits = 4), "  → ",
-        ht.p_value < 0.05 ? "reject" : "correctly quiet")
+println("    Pooled β̂ = ", round.(slopes(m_pool); digits = 4),
+        "   ρ̂ = ", round(m_pool.rho; digits = 4))
+println("    compared: ", ht.coefnames)
+println("    stat = ", round(ht.stat; digits = 2), " on ", ht.df,
+        " df,  p = ", round(ht.p_value; sigdigits = 4))
+println("    → ", ht.p_value < 0.05 ? "reject: keep the fixed effects" :
+                                      "no divergence between the two")
+println()
+println("    Omitting the individual effects is not merely inefficient here:")
+println("    they reach the spatial lag through (I - ρW)⁻¹, which makes Wy")
+println("    endogenous and the pooled estimator inconsistent.")
 println()
 
-# Now a DGP where the time effect is correlated with the regressors, so
-# omitting it genuinely biases the individual-effects estimator.
-X_t = copy(X)
-y_t = zeros(NT)
-for t in 1:T_per
-    idx = ((t - 1) * N + 1):(t * N)
-    shift = 1.5 * (t - (T_per + 1) / 2)          # period-specific mean in X
-    X_t[idx, 1] .+= shift
-    ξ_t = 3.0 * shift                             # ... and in the outcome
-    y_t[idx] = S_lu \ (μ_i .+ ξ_t .+ X_t[idx, :] * β_true .+ 0.5 .* randn(rng, N))
-end
-m_fe_t  = fit_spatial_panel(SP.SAR(), SP.IndivFE(), W, X_t, y_t, N, T_per;
-    varnames = ["income", "density"])
-m_two_t = fit_spatial_panel(SP.SAR(), SP.TwoWayFE(), W, X_t, y_t, N, T_per;
-    varnames = ["income", "density"])
-ht_t = spatial_hausman_test(m_fe_t, m_two_t)
-println("  Time effects correlated with X (IndivFE is misspecified):")
-println("    IndivFE  β̂ = ", round.(coef(m_fe_t)[1:2]; digits = 4),
-        "   ρ̂ = ", round(m_fe_t.rho; digits = 4))
-println("    TwoWayFE β̂ = ", round.(coef(m_two_t)[1:2]; digits = 4),
-        "   ρ̂ = ", round(m_two_t.rho; digits = 4), "   (true β = ", β_true, ")")
-println("    stat = ", round(ht_t.stat; digits = 3), " on ", ht_t.df,
-        " df,  p = ", round(ht_t.p_value; sigdigits = 4), "  → ",
-        ht_t.p_value < 0.05 ? "reject: add the time effects" : "missed")
+# Size: the same DGP with no individual effects at all. Pooled is now
+# correctly specified, FE is merely wasteful, and the test should be quiet.
+ht0 = spatial_hausman_test(fit_panel(SP.IndivFE(), y_nofe),
+                           fit_panel(SP.NoFE(), y_nofe))
+println("  Data with NO individual effects:")
+println("    stat = ", round(ht0.stat; digits = 3), " on ", ht0.df,
+        " df,  p = ", round(ht0.p_value; sigdigits = 4))
+println("    → ", ht0.p_value < 0.05 ? "false positive" :
+                                       "correctly quiet: FE are not needed")
+println()
+
+# `names` restricts the comparison — here to the slopes, excluding ρ.
+ht_sl = spatial_hausman_test(m_fe, m_pool; names = ["income", "density"])
+println("  Restricted to the slopes: compared ", ht_sl.coefnames,
+        ", stat = ", round(ht_sl.stat; digits = 2), " on ", ht_sl.df, " df")
 println()
 println("  Note: this package has no spatial random-effects estimator, so the")
-println("  classic FE-vs-RE Hausman comparison is not available here; the same")
-println("  machinery applies to any two nested specifications.")
+println("  textbook FE-vs-RE contrast is not available; the same machinery")
+println("  applies to any two specifications that share coefficient names.")
 println()
 
 # ─── Joint LM tests ──────────────────────────────────────────────────
@@ -108,21 +113,20 @@ println("═══ Joint LM Tests (Baltagi, Song & Koh 2003) ═══")
 X_c = hcat(ones(NT), X)          # these tests want an explicit intercept
 
 plm = panel_lm_tests(y, X_c, W, N, T_per)
-println("  On the spatially-lagged panel above:")
+println("  On the spatially-lagged panel with individual effects:")
 println("    joint (χ², df = 3) = ", round(plm.joint_stat; digits = 2))
 println("    lag                = ", round(plm.lag_stat; digits = 2))
 println("    error              = ", round(plm.error_stat; digits = 2))
 println("    random effects     = ", round(plm.re_stat; digits = 2))
 
-# A panel with no spatial dependence at all: the statistics should drop
-# to the order of their degrees of freedom.
+# A panel with no spatial dependence at all.
 y_iid = zeros(NT)
 for t in 1:T_per
     idx = ((t - 1) * N + 1):(t * N)
     y_iid[idx] = 1.0 .+ X[idx, :] * β_true .+ 0.5 .* randn(rng, N)
 end
 plm0 = panel_lm_tests(y_iid, X_c, W, N, T_per)
-println("  On an i.i.d. panel (no spatial structure, no FE):")
+println("  On an i.i.d. panel (no spatial structure, no individual effects):")
 println("    joint = ", round(plm0.joint_stat; digits = 2),
         "   lag = ", round(plm0.lag_stat; digits = 2),
         "   error = ", round(plm0.error_stat; digits = 2),
@@ -135,12 +139,13 @@ println()
 # ─── Spatial Chow test ───────────────────────────────────────────────
 
 println("═══ Spatial Chow Test (structural break) ═══")
-# Build a panel whose slopes change at t = 4.
+# A panel whose slopes change at t = 4.
 y_brk = zeros(NT)
+μ_brk = 2.0 .* randn(rng, N)
 for t in 1:T_per
     idx = ((t - 1) * N + 1):(t * N)
     β_t = t < 4 ? β_true : [-1.0, 1.6]       # a decisive break
-    y_brk[idx] = S_lu \ (μ_i .+ X[idx, :] * β_t .+ 0.5 .* randn(rng, N))
+    y_brk[idx] = S_lu \ (μ_brk .+ X[idx, :] * β_t .+ 0.5 .* randn(rng, N))
 end
 
 ct_brk = spatial_chow_test(y_brk, X_c, W, N, T_per, 4)
@@ -174,7 +179,7 @@ println("  Pooled (meta-analytic): I = ", round(pm.pooled.I_stat; digits = 4),
         ",  p = ", round(pm.pooled.p_value; sigdigits = 4))
 println()
 
-# The same diagnostic on residuals from the correctly specified FE model.
+# The same diagnostic on residuals from the spatial FE model.
 pm_fe = panel_moran(residuals(m_fe), W, N, T_per)
 println("  Spatial FE residuals, pooled: I = ",
         round(pm_fe.pooled.I_stat; digits = 4),
