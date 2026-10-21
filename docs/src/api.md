@@ -86,6 +86,15 @@ skater_regimes
 regime_chow_test
 ```
 
+## Discrete Choice
+
+```@docs
+fit_spatial_probit
+fit_bayesian_spatial_probit
+fit_spatial_ordered_probit
+marginal_effects
+```
+
 ## Simulation
 
 ```@docs

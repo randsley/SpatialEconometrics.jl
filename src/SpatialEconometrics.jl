@@ -31,6 +31,7 @@ include("HigherOrderSpatial.jl")
 include("SpatialRegimeModels.jl")
 include("SpatialSimulation.jl")
 include("SpatialTables.jl")
+include("SpatialDiscreteChoice.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -52,6 +53,7 @@ const HigherMod     = HigherOrderSpatial
 const RegimeMod     = SpatialRegimeModels
 const SimMod        = SpatialSimulation
 const TablesMod     = SpatialTables
+const DiscreteMod   = SpatialDiscreteChoice
 
 import .SpatialEconometricsPrototype: SpatialRegressionModel, fit_spatial
 import .SpatialPanelEconometrics: SpatialPanelModel, LeeYuTransformation, DirectQML, fit_spatial_panel
@@ -72,6 +74,7 @@ import .HigherOrderSpatial: SLXModel, fit_slx, SACModel, fit_sac, SDEMModel, fit
 import .SpatialRegimeModels: SpatialRegimeModel, fit_spatial_regime, ExogenousRegimes, skater_regimes, ChowRegimeTest, regime_chow_test
 import .SpatialSimulation: SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP, simulate_spatial, MonteCarloConfig, monte_carlo_spatial, MonteCarloResult, PowerAnalysisResult, power_analysis
 import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to_markdown, regression_table
+import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianSpatialProbitModel, fit_bayesian_spatial_probit, SpatialOrderedProbitModel, fit_spatial_ordered_probit, SpatialProbitEffects, marginal_effects
 
 function robust_vcov(m::SpatialRegressionModel, spec::ConleySpatialHAC)
     Z_eff, bread_inv = SpatialHAC.extract_spatial_jacobian_scores(m.X_aug, m.W, m.coef, m.rho, m.sigma2, m.vcov, length(m.y), 1)
@@ -197,6 +200,12 @@ export
     # SpatialTables
     SpatialTables, TablesMod,
     CoefTable, coeftable, summary_stats,
-    to_latex, to_csv, to_markdown, regression_table
+    to_latex, to_csv, to_markdown, regression_table,
+    # SpatialDiscreteChoice
+    SpatialDiscreteChoice, DiscreteMod,
+    SpatialProbitModel, fit_spatial_probit,
+    BayesianSpatialProbitModel, fit_bayesian_spatial_probit,
+    SpatialOrderedProbitModel, fit_spatial_ordered_probit,
+    SpatialProbitEffects, marginal_effects
 
 end # module

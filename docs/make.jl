@@ -24,6 +24,7 @@ makedocs(
         "Higher-Order Models" => [
             "SLX, SAC, SDEM" => "models/higher_order.md",
             "Regime Models" => "models/regime.md",
+            "Discrete Choice" => "models/discrete_choice.md",
         ],
         "Diagnostics" => [
             "Spatial Diagnostics" => "diagnostics/spatial.md",
