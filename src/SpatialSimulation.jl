@@ -5,6 +5,8 @@ using SparseArrays
 using Statistics
 using Random
 using Printf
+using StatsAPI
+import StatsAPI: coef
 
 import ..SpatialDiagnostics: moran_global, lm_test_lag, lm_test_error, lm_test_robust_lag, lm_test_robust_error, MoranResult, LMTestResult
 
@@ -153,6 +155,8 @@ struct MonteCarloResult{T<:AbstractFloat}
     param_rmse::Vector{T}
     param_names::Vector{String}
     rejection_rates::Dict{String, T}
+    n_successful::Int
+    n_replications::Int
 end
 
 """
@@ -161,6 +165,21 @@ end
 Run a Monte Carlo experiment. `estimator` is a function `(W, X, y) -> model` returning
 a StatsAPI.RegressionModel. Returns `MonteCarloResult` with bias, RMSE, and test
 rejection rates.
+
+The DGPs generate `y` without an intercept while the estimators fit one, so a
+leading `(Intercept)` coefficient is dropped before comparison; the remainder
+lines up with the DGP's parameter ordering for all six DGPs.
+
+!!! warning "Rows are labelled by the DGP, not the estimator"
+    `param_names` comes from `dgp`, so the table is only fully meaningful when
+    the estimator matches the DGP. Deliberately fitting a misspecified model
+    still reports useful bias and RMSE for the `β` rows, but a trailing row
+    labelled `ρ` or `λ` holds whichever parameter the estimator happens to
+    return in that position — for an SLX fitted to SAR data, for instance, it
+    is the `W_x1` coefficient.
+
+Replications whose estimator throws are excluded and reported rather than
+averaged in; `n_successful` records how many contributed.
 """
 function monte_carlo_spatial(
     dgp::SpatialDGP,
@@ -178,6 +197,8 @@ function monte_carlo_spatial(
     true_params = _extract_true_params(dgp)
     n_params = length(true_params)
     param_store = zeros(T, config.n_replications, n_params)
+    succeeded = falses(config.n_replications)
+    n_diag = 0
     moran_reject = 0
     lm_lag_reject = 0
     lm_err_reject = 0
@@ -188,10 +209,11 @@ function monte_carlo_spatial(
 
         try
             m = estimator(W, X_sim, y_sim)
-            c = _coef_vector(m)
+            c = _coef_vector(m, n_params)
             for j in 1:min(n_params, length(c))
                 param_store[rep, j] = c[j]
             end
+            succeeded[rep] = true
         catch
             continue
         end
@@ -206,24 +228,37 @@ function monte_carlo_spatial(
             lt_lag.p_value < T(0.05) && (lm_lag_reject += 1)
             lt_err = lm_test_error(y_sim, X_ols, W)
             lt_err.p_value < T(0.05) && (lm_err_reject += 1)
+            n_diag += 1
         catch
         end
     end
 
-    means = vec(mean(param_store, dims=1))
-    stds = vec(std(param_store, dims=1))
+    # Summarise only the replications that actually produced an estimate.
+    # Averaging in the failures would silently drag every mean toward zero and
+    # report that as bias, which looks like a result rather than a malfunction.
+    n_ok = count(succeeded)
+    n_ok == 0 && error("monte_carlo_spatial: all $(config.n_replications) " *
+                       "replications failed — the estimator threw on every draw")
+    n_ok < config.n_replications &&
+        @warn "monte_carlo_spatial: $(config.n_replications - n_ok) of " *
+              "$(config.n_replications) replications failed and were excluded"
+
+    kept = @view param_store[succeeded, :]
+    means = vec(mean(kept, dims=1))
+    stds = n_ok > 1 ? vec(std(kept, dims=1)) : zeros(T, n_params)
     bias = means .- true_params
     rmse = sqrt.(bias .^ 2 .+ stds .^ 2)
     pnames = _param_names(dgp)
 
-    R = T(config.n_replications)
+    D = T(max(n_diag, 1))
     rej = Dict{String, T}(
-        "moran_05" => moran_reject / R,
-        "lm_lag_05" => lm_lag_reject / R,
-        "lm_error_05" => lm_err_reject / R
+        "moran_05" => moran_reject / D,
+        "lm_lag_05" => lm_lag_reject / D,
+        "lm_error_05" => lm_err_reject / D
     )
 
-    return MonteCarloResult{T}(means, stds, bias, rmse, pnames, rej)
+    return MonteCarloResult{T}(means, stds, bias, rmse, pnames, rej,
+                               n_ok, config.n_replications)
 end
 
 function _extract_true_params(dgp::SAR_DGP{T}) where {T}
@@ -264,12 +299,44 @@ function _param_names(dgp::SDEM_DGP)
     return vcat(["β$i" for i in 1:length(dgp.beta)], ["θ$i" for i in 1:length(dgp.theta)], ["λ"])
 end
 
-_coef_vector(m) = collect(Float64, StatsAPI.coef(m))
+# Align an estimator's coefficient vector with the DGP's true-parameter vector.
+#
+# The DGPs in this module generate y without an intercept (y = Xb + ...), but
+# every estimator here fits one and reports it first. Taking the leading
+# n_params coefficients therefore compares the intercept against beta_1, beta_1
+# against beta_2, and so on — a silent off-by-one that shows up as enormous
+# bias with a tiny standard deviation. Drop the leading intercept and the rest
+# lines up for all six DGPs, because each estimator orders its output as
+# [intercept, beta..., theta..., spatial params...].
+function _coef_vector(m, n_params::Int)
+    c = collect(Float64, StatsAPI.coef(m))
+    names = try
+        String.(StatsAPI.coefnames(m))
+    catch
+        String[]
+    end
+    drop = if !isempty(names) && occursin("Intercept", first(names))
+        true
+    else
+        length(c) == n_params + 1      # fallback when names are unavailable
+    end
+    return drop && length(c) > 1 ? c[2:end] : c
+end
 
 function Base.show(io::IO, r::MonteCarloResult{T}) where {T}
     println(io, "Monte Carlo Simulation Results")
     println(io, "══════════════════════════════")
     println(io, "")
+    if r.n_successful == r.n_replications
+        @printf(io, "  %d replications
+
+", r.n_replications)
+    else
+        @printf(io, "  %d of %d replications succeeded (%d failed and excluded)
+
+",
+            r.n_successful, r.n_replications, r.n_replications - r.n_successful)
+    end
     @printf(io, "  %-10s %10s %10s %10s %10s\n", "Param", "Mean", "Std", "Bias", "RMSE")
     println(io, "  ", "─"^50)
     for i in eachindex(r.param_names)

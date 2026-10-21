@@ -7,6 +7,8 @@ using Random
 using Printf
 using ForwardDiff
 using StatsAPI
+import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
+       loglikelihood, dof_residual, fitted, predict
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,

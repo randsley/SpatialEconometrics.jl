@@ -403,25 +403,53 @@ SpatialEconometrics/
 │   ├── SpatialErrorModel.jl            # SEM (cross-section + panel)
 │   ├── GWREstimation.jl                # GWR + MGWR
 │   ├── SpatialGravityModels.jl         # PPML + NB gravity
+│   ├── SpatialWeights.jl               # KNN / distance / band weights, I/O
+│   ├── SpatialModelSelection.jl        # LR, Vuong, Wald, common factor
+│   ├── SpatialPanelDiagnostics.jl      # Hausman, panel LM, panel Moran
+│   ├── HigherOrderSpatial.jl           # SLX, SAC/SARAR, SDEM
+│   ├── SpatialRegimeModels.jl          # regime models + SKATER
+│   ├── SpatialSimulation.jl            # DGPs, Monte Carlo, power analysis
+│   ├── SpatialTables.jl                # coefficient / regression tables
+│   ├── SpatialDiscreteChoice.jl        # spatial probit (GMM + Bayesian)
+│   ├── SpatialFiltering.jl             # ESF / RE-ESF
 │   └── FormulaDSL.jl                   # @formula interface
 ├── ext/
 │   ├── SpatialEconometricsTuringExt.jl # Bayesian extension
 │   └── SpatialEconometricsMakieExt.jl  # visualization extension
 ├── test/
-│   └── runtests.jl                     # 54 assertions, 12 testsets
+│   └── runtests.jl                     # 337 assertions, 22 testsets
 ├── validation/
 │   ├── mc_sdm.jl                       # Monte Carlo validation
 │   └── mc_sdm_output.txt
-└── examples/
-    ├── 01_cross_section.jl             # SAR, SDM, diagnostics
-    ├── 02_spatial_panels.jl            # static + dynamic panels
-    ├── 03_sem_diagnostics.jl           # SEM workflow with diagnostics
-    ├── 04_gwr_mgwr.jl                 # GWR + MGWR
-    ├── 05_gravity_models.jl            # PPML + NB gravity
-    ├── 06_gs2sls_gmm.jl               # SARAR + System GMM
-    ├── 07_gras_calibration.jl          # SAM balancing
-    └── 08_hac_robust.jl               # HAC-robust inference
+├── examples/
+│   ├── 01_cross_section.jl             # SAR, SDM, diagnostics
+│   ├── 02_spatial_panels.jl            # static + dynamic panels
+│   ├── 03_sem_diagnostics.jl           # SEM workflow with diagnostics
+│   ├── 04_gwr_mgwr.jl                  # GWR + MGWR
+│   ├── 05_gravity_models.jl            # PPML + NB gravity
+│   ├── 06_gs2sls_gmm.jl                # SARAR + System GMM
+│   ├── 07_gras_calibration.jl          # SAM balancing
+│   ├── 08_hac_robust.jl                # HAC-robust inference
+│   ├── 09_higher_order.jl              # SLX, SAC, SDEM + specification choice
+│   ├── 10_spatial_regimes.jl           # regimes, SKATER, Chow test
+│   ├── 11_discrete_choice.jl           # spatial probit, ordered, marg. effects
+│   ├── 12_spatial_filtering.jl         # ESF families + RE-ESF diagnostics
+│   ├── 13_simulation_power.jl          # six DGPs, Monte Carlo, power curves
+│   └── 14_output_tables.jl             # LaTeX / CSV / Markdown export
+└── notebooks/
+    ├── 01_getting_started.ipynb        # Jupyter
+    ├── 02_spatial_panels.ipynb         # Jupyter
+    ├── 03_gwr_gravity.ipynb            # Jupyter
+    ├── interactive_spatial_explorer.jl        # Pluto
+    ├── interactive_gwr_explorer.jl            # Pluto
+    ├── interactive_filtering_explorer.jl      # Pluto — ESF / RE-ESF
+    ├── interactive_probit_explorer.jl         # Pluto — GMM vs Gibbs probit
+    └── interactive_higher_order_explorer.jl   # Pluto — SLX/SAC/SDEM + regimes
 ```
+
+Run an example with `julia --project=. examples/12_spatial_filtering.jl`. Open a
+Pluto notebook with `using Pluto; Pluto.run()` and navigate to the file; each one
+activates this project itself.
 
 ---
 

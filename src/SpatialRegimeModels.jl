@@ -6,7 +6,8 @@ using Statistics
 using Random
 using Printf
 using StatsAPI
-import StatsAPI: loglikelihood, coef, coefnames
+import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
+       loglikelihood, dof_residual, fitted, predict
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
@@ -31,10 +32,20 @@ struct ExogenousRegimes <: RegimeAssignment
 end
 
 """
-    skater_regimes(W, X, n_regimes; rng=Random.default_rng())
+    skater_regimes(W, X, n_regimes; min_size=1, rng=Random.default_rng())
 
-Spatially constrained clustering via SKATER-like minimum spanning tree partitioning.
-Returns an `ExogenousRegimes` assignment with `n_regimes` contiguous groups.
+Spatially constrained clustering via SKATER minimum spanning tree partitioning.
+Returns an `ExogenousRegimes` assignment with `n_regimes` contiguous groups, each
+guaranteed to be a connected region of `W`.
+
+A minimum spanning tree is built over the contiguity graph with edge weights given
+by Euclidean distance between the standardised rows of `X`. The tree is then split
+`n_regimes - 1` times, each time choosing the edge whose removal most reduces the
+within-group sum of squared deviations.
+
+`min_size` is the smallest admissible region; cuts that would leave a smaller
+component are skipped. Raise it when the regions feed a regime regression, which
+needs enough units per region to identify its own coefficients.
 
 Assunção et al. (2006) "Efficient regionalization techniques for socio‐economic
 geographical units using minimum spanning trees."
@@ -43,11 +54,14 @@ function skater_regimes(
     W::AbstractSparseMatrix{T},
     X::AbstractMatrix{T},
     n_regimes::Int;
+    min_size::Int=1,
     rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat}
 
     N = size(W, 1)
     @assert n_regimes >= 2 && n_regimes <= N
+    @assert min_size >= 1 "min_size must be at least 1"
+    @assert n_regimes * min_size <= N "n_regimes * min_size exceeds the number of units"
 
     X_std = copy(X)
     for j in axes(X_std, 2)
@@ -92,20 +106,88 @@ function skater_regimes(
         end
     end
 
-    sort!(mst_edges, by=e -> -e[3])
-    cuts = min(n_regimes - 1, length(mst_edges))
-
-    parent .= 1:N
-    rank .= 0
-    kept_edges = @view mst_edges[(cuts + 1):end]
-    for (i, j, _) in kept_edges
-        union!(i, j)
+    # Adjacency of the spanning tree, for locating the two sides of a cut.
+    adj = [Int[] for _ in 1:N]
+    for (i, j, _) in mst_edges
+        push!(adj[i], j)
+        push!(adj[j], i)
     end
 
-    roots = [find_root(i) for i in 1:N]
-    unique_roots = unique(roots)
-    label_map = Dict(r => k for (k, r) in enumerate(unique_roots))
-    labels = [label_map[r] for r in roots]
+    # Within-group sum of squared deviations, summed over the clustering variables.
+    function ssd(nodes)
+        n = length(nodes)
+        n <= 1 && return zero(T)
+        total = zero(T)
+        for j in axes(X_std, 2)
+            m = zero(T)
+            for v in nodes; m += X_std[v, j]; end
+            m /= T(n)
+            for v in nodes; total += (X_std[v, j] - m)^2; end
+        end
+        return total
+    end
+
+    # The component containing `u` after edge (u, v) is removed. In a tree this
+    # is exactly one side of the cut, so a traversal from `u` that refuses to
+    # cross (u, v) finds it.
+    function cut_side(u::Int, v::Int, inset::Set{Int})
+        seen = Set{Int}((u,))
+        stack = [u]
+        while !isempty(stack)
+            a = pop!(stack)
+            for b in adj[a]
+                ((a == u && b == v) || (a == v && b == u)) && continue
+                (b in inset && !(b in seen)) || continue
+                push!(seen, b)
+                push!(stack, b)
+            end
+        end
+        return seen
+    end
+
+    # Top-down SKATER: repeatedly split the component whose division yields the
+    # largest reduction in within-group SSD, subject to `min_size`.
+    #
+    # Selecting the LONGEST edge instead (single-linkage style) is what produces
+    # degenerate singleton regions: the longest tree edge is usually the one
+    # attaching an outlying leaf, so cutting it peels off one unit and leaves the
+    # downstream regime regression rank-deficient. Splitting off a single
+    # observation barely reduces SSD, so this criterion avoids that by
+    # construction.
+    components = Set{Int}[Set(1:N)]
+
+    for _ in 1:(n_regimes - 1)
+        best_gain = typemin(T)
+        best = nothing
+
+        for (ci, comp) in enumerate(components)
+            length(comp) < 2 * min_size && continue
+            parent_ssd = ssd(comp)
+
+            for (i, j, _) in mst_edges
+                (i in comp && j in comp) || continue
+                A = cut_side(i, j, comp)
+                length(A) < min_size && continue
+                length(comp) - length(A) < min_size && continue
+                B = setdiff(comp, A)
+                gain = parent_ssd - ssd(A) - ssd(B)
+                if gain > best_gain
+                    best_gain = gain
+                    best = (ci, A, B)
+                end
+            end
+        end
+
+        best === nothing && break      # no admissible cut left
+        ci, A, B = best
+        components[ci] = A
+        push!(components, B)
+    end
+
+    labels = zeros(Int, N)
+    for (k, comp) in enumerate(components)
+        for v in comp; labels[v] = k; end
+    end
 
     return ExogenousRegimes(labels)
 end
@@ -270,27 +352,70 @@ function regime_chow_test(
     return ChowRegimeTest{T}(stat, df, p, ll_p, ll_r)
 end
 
+# Upper tail of the chi-squared distribution, i.e. Q(k/2, x/2).
+#
+# The lower-incomplete-gamma SERIES only converges for z < a + 1; past that its
+# terms keep growing for roughly z iterations before they decay, so a truncated
+# series silently returns a tiny partial sum and the survival function comes back
+# near 1. That turns a decisive rejection into "fail to reject". Switch to the
+# continued fraction for the upper tail once z >= a + 1 (Numerical Recipes).
 function _chi2_sf(x::T, k::Int) where {T<:AbstractFloat}
-    k <= 0 && return one(T)
+    k <= zero(k) && return one(T)
     x <= zero(T) && return one(T)
     a = T(k) / T(2)
     z = x / T(2)
-    s = zero(T); term = exp(-z) * z^a / _gamma(a + one(T))
-    for n in 0:200
-        s += term
-        term *= z / (a + T(n + 1))
-        abs(term) < T(1e-15) * abs(s) && break
-    end
-    return max(zero(T), one(T) - s)
+    return z < a + one(T) ? max(zero(T), one(T) - _gamma_series(a, z)) :
+                            max(zero(T), _gamma_cf(a, z))
 end
 
-function _gamma(z::T) where {T<:AbstractFloat}
+# Regularized lower incomplete gamma P(a, z) by series. Valid for z < a + 1.
+function _gamma_series(a::T, z::T) where {T<:AbstractFloat}
+    z <= zero(T) && return zero(T)
+    ap = a
+    s = one(T) / a
+    del = s
+    for _ in 1:1000
+        ap += one(T)
+        del *= z / ap
+        s += del
+        abs(del) < abs(s) * T(1e-14) && break
+    end
+    return s * exp(-z + a * log(z) - _loggamma(a))
+end
+
+# Regularized upper incomplete gamma Q(a, z) by continued fraction. Valid for
+# z >= a + 1, where the series above fails.
+function _gamma_cf(a::T, z::T) where {T<:AbstractFloat}
+    tiny = T(1e-300)
+    b = z + one(T) - a
+    c = one(T) / tiny
+    d = one(T) / b
+    h = d
+    for i in 1:1000
+        an = -T(i) * (T(i) - a)
+        b += T(2)
+        d = an * d + b
+        abs(d) < tiny && (d = tiny)
+        c = b + an / c
+        abs(c) < tiny && (c = tiny)
+        d = one(T) / d
+        del = d * c
+        h *= del
+        abs(del - one(T)) < T(1e-14) && break
+    end
+    return exp(-z + a * log(z) - _loggamma(a)) * h
+end
+
+# log Gamma(z) by the Lanczos approximation (Numerical Recipes `gammln`, in the
+# x = z - 1 shifted form). Kept in the log domain: Gamma(z) itself overflows
+# Float64 past z ~ 171, which a chi-squared test with large df would reach.
+function _loggamma(z::T) where {T<:AbstractFloat}
     coefs = T.([76.18009172947146, -86.50532032941677, 24.01409824083091,
                  -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5])
     x = z - one(T); t = x + T(5.5); t -= (x + T(0.5)) * log(t)
     ser = T(1.000000000190015)
     for (j, c) in enumerate(coefs); ser += c / (x + T(j)); end
-    return exp(-t + log(T(2.5066282746310005) * ser / z))
+    return -t + log(T(2.5066282746310005) * ser)
 end
 
 function Base.show(io::IO, t::ChowRegimeTest)
