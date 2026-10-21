@@ -61,7 +61,7 @@ begin
     β2_const = fill(-0.5, n_obs)
     y_gwr = 2.0 .+ β1_local .* X_gwr[:, 1] .+ β2_const .* X_gwr[:, 2] .+ σ_gwr .* randn(rng_gwr, n_obs)
 
-    md"**Data**: $(n_obs) observations, β₁ ∈ [$(round(minimum(β1_local); digits=2)), $(round(maximum(β1_local); digits=2))], β₂ = -0.5 (constant)"
+    Markdown.parse("**Data**: $(n_obs) observations, β₁ ∈ [$(round(minimum(β1_local); digits=2)), $(round(maximum(β1_local); digits=2))], β₂ = -0.5 (constant)")
 end
 
 # ╔═╡ aa77bb88
@@ -83,7 +83,7 @@ begin
         kernel = kern,
         varnames = ["variable_x1", "constant_x2"])
 
-    md"""
+    Markdown.parse("""
     ### GWR Results (k=$(bw_k), kernel=$(kernel_choice))
 
     | Metric | Value |
@@ -101,7 +101,7 @@ begin
     | x2 (constant) | $(round(mean(m_gwr.coef_local[:,3]); digits=3)) | $(round(std(m_gwr.coef_local[:,3]); digits=3)) | $(round(minimum(m_gwr.coef_local[:,3]); digits=3)) | $(round(maximum(m_gwr.coef_local[:,3]); digits=3)) |
 
     **Correlation**(true β₁, estimated β₁) = **$(round(cor(β1_local, m_gwr.coef_local[:, 2]); digits=3))**
-    """
+    """)
 end
 
 # ╔═╡ cc99ddaa

@@ -123,7 +123,7 @@ begin
     Xo = hcat(ones(Nv), Xv)
     b_ols = Xo \ yv
 
-    md"""
+    Markdown.parse("""
     **Selected $(length(sel.indices)) of $(maxev_sl) allowed** (criterion: `$(crit_sl)`)
 
     | | Intercept | x1 | x2 |
@@ -134,7 +134,7 @@ begin
     Residual Moran coefficient: **$(round(sel.moran_initial; digits=4)) → $(round(sel.moran_final; digits=4))**
 
     Selected indices: $(sel.indices)
-    """
+    """)
 end
 
 # ╔═╡ f1a0000b

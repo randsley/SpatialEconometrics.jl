@@ -62,7 +62,7 @@ begin
 
     y = (I - ρ_val * W) \ (β_true[1] .+ X * β_true[2:3] .+ σ_val .* randn(rng, N))
 
-    md"**Data generated**: N=$(N), mean(y)=$(round(mean(y); digits=2)), std(y)=$(round(std(y); digits=2))"
+    Markdown.parse("**Data generated**: N=$(N), mean(y)=$(round(mean(y); digits=2)), std(y)=$(round(std(y); digits=2))")
 end
 
 # ╔═╡ a7b8c9d0
