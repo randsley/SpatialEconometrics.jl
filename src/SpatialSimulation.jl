@@ -398,6 +398,11 @@ function power_analysis(
         for (ri, ρ) in enumerate(rho_values)
             dgp = dgp_constructor(ρ)
             rej_m = 0; rej_lag = 0; rej_err = 0
+            # Count the replications each test actually evaluated. Dividing by
+            # n_reps regardless would understate power whenever a test throws,
+            # and report 0.0 — indistinguishable from "no power" — if every
+            # replication failed.
+            ok_m = 0; ok_lag = 0; ok_err = 0
 
             for _ in 1:n_reps
                 X_sim = randn(rng, T, N, _n_covariates(dgp))
@@ -410,22 +415,31 @@ function power_analysis(
                 try
                     mr = moran_global(res_ols, W)
                     mr.p_value < alpha && (rej_m += 1)
+                    ok_m += 1
                 catch; end
 
                 try
                     lt = lm_test_lag(y_sim, X_ols, W)
                     lt.p_value < alpha && (rej_lag += 1)
+                    ok_lag += 1
                 catch; end
 
                 try
                     lt = lm_test_error(y_sim, X_ols, W)
                     lt.p_value < alpha && (rej_err += 1)
+                    ok_err += 1
                 catch; end
             end
 
-            power_m[si, ri] = rej_m / n_reps
-            power_lag[si, ri] = rej_lag / n_reps
-            power_err[si, ri] = rej_err / n_reps
+            if min(ok_m, ok_lag, ok_err) < n_reps
+                @warn "power_analysis: some diagnostics failed at N=$(N), rho=$(ρ)" *
+                      " (Moran $(ok_m)/$(n_reps), LM-lag $(ok_lag)/$(n_reps)," *
+                      " LM-error $(ok_err)/$(n_reps)); rates use the successful ones"
+            end
+
+            power_m[si, ri] = ok_m > 0 ? rej_m / ok_m : T(NaN)
+            power_lag[si, ri] = ok_lag > 0 ? rej_lag / ok_lag : T(NaN)
+            power_err[si, ri] = ok_err > 0 ? rej_err / ok_err : T(NaN)
         end
     end
 

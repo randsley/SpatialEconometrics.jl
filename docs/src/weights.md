@@ -69,3 +69,17 @@ W, ids = read_gal("weights.gal")
 write_gwt("weights.gwt", W, ids)
 W, ids = read_gwt("weights.gwt")
 ```
+
+Both readers return the unit ids alongside the matrix, and row `i` of `W`
+corresponds to `ids[i]`. A GAL file carries its own ordering in its observation
+records, so `read_gal` uses that. A GWT file does not — it is only an edge list —
+so `read_gwt` sorts the ids it finds (numerically when they all parse as
+integers). Pass `ids` to either reader to impose the ordering of an external
+table instead:
+
+```julia
+W, _ = read_gwt("weights.gwt"; ids = df.region_code)
+```
+
+An id appearing in a neighbour list but in no observation record is treated as a
+malformed file and raises an error rather than being given an invented index.

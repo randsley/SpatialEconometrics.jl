@@ -348,52 +348,66 @@ end
 Read a GeoDa GAL contiguity weights file. Returns the sparse weight matrix
 and the observation ID vector.
 """
-function read_gal(path::AbstractString)
+function read_gal(path::AbstractString; ids::Union{Nothing, AbstractVector}=nothing)
     lines = readlines(path)
     isempty(lines) && error("Empty GAL file")
 
     header = split(strip(lines[1]))
     N = length(header) >= 2 ? parse(Int, header[2]) : parse(Int, header[1])
 
-    id_map = Dict{String, Int}()
-    ids = String[]
-    I_idx = Int[]; J_idx = Int[]
-
+    # Pass 1: collect the observation records. A record is an "id count" line
+    # followed by a line listing that unit's neighbours (absent when count = 0).
+    rec_ids = String[]
+    rec_nbrs = Vector{Vector{String}}()
     line_idx = 2
-    obs_count = 0
-    while line_idx <= length(lines) && obs_count < N
+    while line_idx <= length(lines) && length(rec_ids) < N
         parts = split(strip(lines[line_idx]))
-        isempty(parts) && (line_idx += 1; continue)
-
-        obs_id = parts[1]
-        n_neighbors = parse(Int, parts[2])
-
-        obs_count += 1
-        if !haskey(id_map, obs_id)
-            id_map[obs_id] = obs_count
-            push!(ids, obs_id)
+        if isempty(parts)
+            line_idx += 1
+            continue
         end
-        i = id_map[obs_id]
-
+        length(parts) < 2 && error("Malformed GAL record on line $line_idx: $(lines[line_idx])")
+        push!(rec_ids, parts[1])
+        n_neighbors = parse(Int, parts[2])
         line_idx += 1
-        if n_neighbors > 0 && line_idx <= length(lines)
-            nb_parts = split(strip(lines[line_idx]))
-            for nb_str in nb_parts
-                if !haskey(id_map, nb_str)
-                    id_map[nb_str] = length(ids) + 1
-                    push!(ids, nb_str)
-                end
-                push!(I_idx, i); push!(J_idx, id_map[nb_str])
-            end
+        if n_neighbors > 0
+            line_idx > length(lines) &&
+                error("GAL file ends before the neighbour list for unit $(rec_ids[end])")
+            push!(rec_nbrs, split(strip(lines[line_idx])))
             line_idx += 1
         else
-            line_idx += 1
+            push!(rec_nbrs, String[])
+        end
+    end
+
+    length(rec_ids) == N ||
+        error("GAL header declares $N units but only $(length(rec_ids)) records were found")
+
+    # The ordering comes from the observation records (or from `ids`, to align
+    # with an external table), NEVER from the order in which ids happen to be
+    # mentioned. Assigning indices on first appearance put a neighbour listed
+    # before its own record at the wrong index, silently permuting the units.
+    order = isnothing(ids) ? rec_ids : string.(ids)
+    length(order) == N ||
+        error("`ids` has $(length(order)) entries but the GAL file declares $N units")
+    id_map = Dict{String, Int}(id => k for (k, id) in enumerate(order))
+    length(id_map) == N || error("duplicate unit ids in GAL file")
+
+    # Pass 2: resolve the edges against that fixed map.
+    I_idx = Int[]; J_idx = Int[]
+    for (rid, nbrs) in zip(rec_ids, rec_nbrs)
+        i = get(id_map, rid, 0)
+        i == 0 && error("GAL unit id $(rid) is not present in the id ordering")
+        for nb in nbrs
+            j = get(id_map, nb, 0)
+            j == 0 && error("GAL unit $(rid) lists unknown neighbour id $(nb)")
+            push!(I_idx, i); push!(J_idx, j)
         end
     end
 
     W = sparse(I_idx, J_idx, ones(length(I_idx)), N, N)
     row_standardize!(W)
-    return W, ids
+    return W, order
 end
 
 """
@@ -433,38 +447,47 @@ end
 
 Read a GeoDa GWT (general weights) file. Returns sparse weight matrix and IDs.
 """
-function read_gwt(path::AbstractString)
+function read_gwt(path::AbstractString; ids::Union{Nothing, AbstractVector}=nothing)
     lines = readlines(path)
     isempty(lines) && error("Empty GWT file")
 
     header = split(strip(lines[1]))
     N = parse(Int, header[2])
 
-    id_map = Dict{String, Int}()
-    ids = String[]
-    I_idx = Int[]; J_idx = Int[]; V_val = Float64[]
-
+    # Pass 1: read every (origin, destination, weight) triple.
+    src = String[]; dst = String[]; V_val = Float64[]
     for line_idx in 2:length(lines)
         parts = split(strip(lines[line_idx]))
         length(parts) < 3 && continue
+        push!(src, parts[1]); push!(dst, parts[2])
+        push!(V_val, parse(Float64, parts[3]))
+    end
 
-        id_i, id_j = parts[1], parts[2]
-        w = parse(Float64, parts[3])
+    # A GWT file carries no unit ordering of its own, so one must be imposed
+    # deterministically. Indexing ids by first appearance made the matrix depend
+    # on the order the edges happened to be written, silently permuting the
+    # units; pass `ids` to align with an external table instead.
+    order = if !isnothing(ids)
+        string.(ids)
+    else
+        uniq = unique(vcat(src, dst))
+        # Sort numerically when every id is an integer, else lexicographically.
+        nums = tryparse.(Int, uniq)
+        all(!isnothing, nums) ? uniq[sortperm(Int.(nums))] : sort(uniq)
+    end
+    length(order) <= N ||
+        error("GWT file references $(length(order)) distinct ids but the header declares $N")
+    id_map = Dict{String, Int}(id => k for (k, id) in enumerate(order))
 
-        if !haskey(id_map, id_i)
-            id_map[id_i] = length(ids) + 1
-            push!(ids, id_i)
-        end
-        if !haskey(id_map, id_j)
-            id_map[id_j] = length(ids) + 1
-            push!(ids, id_j)
-        end
-
-        push!(I_idx, id_map[id_i]); push!(J_idx, id_map[id_j]); push!(V_val, w)
+    I_idx = Int[]; J_idx = Int[]
+    for (a, b) in zip(src, dst)
+        i = get(id_map, a, 0); j = get(id_map, b, 0)
+        (i == 0 || j == 0) && error("GWT edge references unknown id: $(a) -> $(b)")
+        push!(I_idx, i); push!(J_idx, j)
     end
 
     W = sparse(I_idx, J_idx, V_val, N, N)
-    return W, ids
+    return W, order
 end
 
 """

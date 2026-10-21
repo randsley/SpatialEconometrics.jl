@@ -417,7 +417,7 @@ SpatialEconometrics/
 │   ├── SpatialEconometricsTuringExt.jl # Bayesian extension
 │   └── SpatialEconometricsMakieExt.jl  # visualization extension
 ├── test/
-│   └── runtests.jl                     # 337 assertions, 22 testsets
+│   └── runtests.jl                     # 477 assertions, 23 testsets
 ├── validation/
 │   ├── mc_sdm.jl                       # Monte Carlo validation
 │   └── mc_sdm_output.txt

@@ -106,8 +106,15 @@ end
 
 function robust_coeftable(m::StatsAPI.RegressionModel, spec::AbstractRobustVCOV)
     V_rob = robust_vcov(m, spec)
-    se_base = sqrt.(max.(0.0, diag(vcov(m))))
-    return RobustInferenceTable(spec isa DriscollKraayVCOV ? "Driscoll-Kraay SCC" : "Conley HAC", coefnames(m), coef(m), sqrt.(max.(0.0, diag(V_rob))), se_base, coef(m) ./ sqrt.(max.(0.0, diag(V_rob))), V_rob)
+    # Qualify these: this module has both `using StatsAPI` and `using StatsModels`,
+    # which makes the bare name `vcov` ambiguous, so it resolves to nothing and
+    # calling this function raised UndefVarError.
+    se_base = sqrt.(max.(0.0, diag(StatsAPI.vcov(m))))
+    se_rob = sqrt.(max.(0.0, diag(V_rob)))
+    return RobustInferenceTable(
+        spec isa DriscollKraayVCOV ? "Driscoll-Kraay SCC" : "Conley HAC",
+        StatsAPI.coefnames(m), StatsAPI.coef(m), se_rob, se_base,
+        StatsAPI.coef(m) ./ se_rob, V_rob)
 end
 
 spatial_effects(m::SpatialRegressionModel; max_power::Int=50, vcov_mat::AbstractMatrix=m.vcov) = SpatialEconometricsPrototype.spatial_effects(m; max_power=max_power, vcov_mat=vcov_mat)

@@ -251,7 +251,11 @@ function balance_gras(X0::AbstractMatrix{T1}, u::AbstractVector{T2}, v::Abstract
         for i in 1:M; w_col += W_sens[i, j]; end
         J_red[M + j, M + j] = w_col + V(1e-12)
     end
-    J_fact = ldlt(Symmetric(J_red))
+    # `ldlt` has no dense-Symmetric method (LinearAlgebra defines it only for
+    # SymTridiagonal and sparse CHOLMOD matrices), so this path previously threw
+    # a MethodError for every ForwardDiff/dual call. bunchkaufman is the dense
+    # symmetric LDL' factorization and handles the indefinite case too.
+    J_fact = bunchkaufman(Symmetric(J_red))
 
     rhs_mat = zeros(V, dim_red, N_partials)
     dX0_direct = Array{V, 3}(undef, M, N, N_partials)
