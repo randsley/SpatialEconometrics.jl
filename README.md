@@ -1,8 +1,8 @@
 # SpatialEconometrics.jl
 
-A comprehensive spatial and structural econometrics suite in Julia, built around sparse linear algebra, multiple dispatch and automatic differentiation. The package provides 13 submodules covering cross-sectional and panel spatial models, diagnostics, non-parametric spatial regression, gravity models, HAC-robust inference, and input-output calibration — all with a unified formula interface and optional Bayesian and visualization extensions.
+A comprehensive spatial and structural econometrics suite in Julia, built around sparse linear algebra, multiple dispatch and automatic differentiation. The package provides 22 submodules covering cross-sectional, panel and higher-order spatial models, spatial discrete choice, eigenvector spatial filtering, regime models, spatial and panel diagnostics, model selection, non-parametric spatial regression, gravity models, HAC-robust inference, weight-matrix construction, input-output calibration, Monte Carlo simulation and publication-ready output — all with a unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** — 54 tests passing on Julia 1.13.1. See [Validation Status](#validation-status) for Monte Carlo results.
+> **Version 0.3.0** (registered) — 453 test assertions across 23 testsets, passing on Julia 1.13.1. See [Validation Status](#validation-status) for Monte Carlo results.
 
 ---
 
@@ -11,20 +11,30 @@ A comprehensive spatial and structural econometrics suite in Julia, built around
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Modules](#modules)
+- [Weight Matrix Construction](#weight-matrix-construction)
 - [Spatial Diagnostics](#spatial-diagnostics)
 - [Cross-Sectional Models (SAR, SDM, SEM)](#cross-sectional-models)
+- [Higher-Order Models (SLX, SAC, SDEM)](#higher-order-models)
+- [Spatial Regime Models](#spatial-regime-models)
+- [Spatial Discrete Choice](#spatial-discrete-choice)
+- [Spatial Filtering (ESF / RE-ESF)](#spatial-filtering)
 - [Static Spatial Panels](#static-spatial-panels)
 - [Dynamic Spatial Panels](#dynamic-spatial-panels)
 - [GS2SLS / SARAR Panels](#gs2sls--sarar-panels)
 - [System GMM](#system-gmm)
+- [Panel Diagnostics](#panel-diagnostics)
 - [GWR & MGWR](#gwr--mgwr)
 - [Gravity / Flow Models](#gravity--flow-models)
 - [GRAS & Cross-Entropy Calibration](#gras--cross-entropy-calibration)
 - [HAC-Robust Inference](#hac-robust-inference)
+- [Model Selection & Comparison](#model-selection--comparison)
+- [Simulation & Power Analysis](#simulation--power-analysis)
+- [Output & Tables](#output--tables)
 - [Formula Interface](#formula-interface)
 - [Package Extensions](#package-extensions)
 - [Repository Layout](#repository-layout)
 - [Validation Status](#validation-status)
+- [Known Limitations](#known-limitations)
 - [References](#references)
 
 ---
@@ -93,6 +103,68 @@ println(spatial_effects(m))
 | `GWREstimation` | `GWRMod` | GWR & MGWR with KDTree spatial indexing | Fotheringham et al. (2002) |
 | `SpatialGravityModels` | `GravityMod` | PPML & NB gravity with high-dim FE | Santos Silva & Tenreyro (2006) |
 | `FormulaDSL` | `DSLMod` | `@formula` interface with `slag`, `fe`, `endo` | — |
+| `SpatialWeights` | `WeightsMod` | k-NN / distance / band weights, standardization, GeoDa I/O | Anselin & Rey (2014) |
+| `SpatialModelSelection` | `SelectionMod` | AIC/BIC, LR, Vuong, Wald, common factor tests | Vuong (1989) |
+| `SpatialPanelDiagnostics` | `PanelDiagMod` | Spatial Hausman, Chow, joint panel LM, panel Moran | Baltagi, Song & Koh (2003) |
+| `HigherOrderSpatial` | `HigherMod` | SLX, SAC/SARAR, SDEM | Halleck Vega & Elhorst (2015) |
+| `SpatialRegimeModels` | `RegimeMod` | Regime models with SKATER regionalization | Assuncao et al. (2006) |
+| `SpatialDiscreteChoice` | `DiscreteMod` | Spatial probit — linearized GMM and Albert-Chib Gibbs | Klier & McMillen (2008) |
+| `SpatialFiltering` | `FilterMod` | Eigenvector spatial filtering (ESF) and RE-ESF | Griffith (2003) |
+| `SpatialSimulation` | `SimMod` | Six DGPs, Monte Carlo, power analysis | — |
+| `SpatialTables` | `TablesMod` | Coefficient and regression tables, LaTeX / CSV / Markdown | — |
+
+---
+
+## Weight Matrix Construction
+
+Spatial weight matrices from coordinates, regular grids, or GeoDa files.
+
+```julia
+# From coordinates (N×2 matrix of (x, y) or (lon, lat))
+W = knn_weights(coords, 5;
+    binary = false,          # false → inverse distance, true → 0/1
+    row_standardize = true,
+    symmetrize = false)      # force symmetry via max(W, W')
+
+W = distance_weights(coords, 50.0;
+    decay = :inverse,        # :inverse, :negative_exponential, :bisquare, :power
+    alpha = 1.0)
+
+W = band_weights(coords, 0.0, 50.0)   # distance band [d_min, d_max]
+
+# From a regular L×L grid
+W = make_rook_weights(20)    # 4-connected, N = 400
+W = make_queen_weights(20)   # 8-connected
+
+# Combine disjoint regions
+W = block_diagonal_weights([W_region1, W_region2, W_region3])
+
+# Standardization — the `!` forms mutate, the others return a copy
+row_standardize!(W)       # each row sums to 1
+spectral_standardize!(W)  # divide by the spectral radius
+minmax_standardize!(W)
+
+# Connectivity report
+sc = spatial_connectivity(W)
+# sc.N, sc.density, sc.avg_neighbors, sc.min_neighbors, sc.max_neighbors,
+# sc.n_islands, sc.is_symmetric, sc.spectral_radius
+```
+
+### GeoDa Interchange Formats
+
+```julia
+write_gal("weights.gal", W, ids);  W, ids = read_gal("weights.gal")
+write_gwt("weights.gwt", W, ids);  W, ids = read_gwt("weights.gwt")
+
+# Row i of W corresponds to ids[i]. A GAL file carries its own ordering in its
+# observation records, so read_gal uses that. A GWT file is only an edge list,
+# so read_gwt sorts the ids it finds. Pass `ids` to impose the ordering of an
+# external table instead:
+W, _ = read_gwt("weights.gwt"; ids = df.region_code)
+```
+
+A neighbour id that appears in no observation record raises an error rather than
+being given an invented index.
 
 ---
 
@@ -146,6 +218,109 @@ effects = spatial_effects(m)  # direct, indirect, total with SEs
 m = fit_spatial_error(W, X, y; varnames = ["x1", "x2"])
 # m.lambda: estimated spatial error parameter
 ```
+
+---
+
+## Higher-Order Models
+
+SLX, SAC/SARAR and SDEM — the specifications between OLS and full SDM.
+
+```julia
+# SLX: y = Xβ + WXθ + ε   — OLS; a sound starting point before SAR/SDM
+m = fit_slx(W, X, y; varnames = ["gdp", "pop"])
+
+# SAC / SARAR: y = ρW₁y + Xβ + u,  u = λW₂u + ε
+# Separate weight matrices for the lag and error components
+m = fit_sac(W_lag, W_error, X, y; varnames = ["gdp", "pop"])
+
+# SDEM: y = Xβ + WXθ + u,  u = λWu + ε   — concentrated ML
+m = fit_sdem(W, X, y; varnames = ["gdp", "pop"])
+```
+
+---
+
+## Spatial Regime Models
+
+Regression coefficients that vary across groups, with the regimes either given or
+discovered.
+
+```julia
+# Known groupings — each regime gets its own intercept and slopes
+labels = [i <= 100 ? 1 : 2 for i in 1:N]
+m = fit_spatial_regime(W, X, y, ExogenousRegimes(labels);
+    spatial_lag = true, varnames = ["gdp", "pop"])
+
+# Endogenous, spatially contiguous regimes via SKATER: a minimum spanning tree
+# on the connectivity graph, cut to maximise the reduction in within-group SSD
+regimes = skater_regimes(W, X, 3; min_size = 10)
+m_regime = fit_spatial_regime(W, X, y, regimes)
+
+# Are the coefficients actually different across regimes?
+m_pooled = fit_spatial(CrossSection.SAR(), W, X, y)
+ct = regime_chow_test(m_pooled, m_regime)   # ct.stat, ct.df, ct.p_value
+```
+
+`min_size` guards against the degenerate cuts a pure longest-edge criterion
+produces, where a single outlying leaf becomes its own regime.
+
+---
+
+## Spatial Discrete Choice
+
+Binary and ordered outcomes with spatial dependence, all targeting the latent
+model `y* = ρWy* + Xβ + ε` with `σ² = 1` fixed for identification.
+
+```julia
+# Linearized GMM (Klier & McMillen) — fast, no MCMC; y coded 0/1
+m = fit_spatial_probit(W, X, y; varnames = ["gdp", "pop"])
+
+# Bayesian Albert–Chib Gibbs — slower, markedly more precise on ρ
+m = fit_bayesian_spatial_probit(W, X, y; n_samples = 2000, burnin = 500)
+# m.accept_rate should sit in 0.2–0.5; m.beta_draws and m.rho_draws hold the chain
+
+# Ordered outcomes in 1:J (no intercept, τ₁ = 0 for identification)
+m = fit_spatial_ordered_probit(W, X, y_ordered; n_categories = 3)
+
+# Coefficients are NOT marginal effects: a change in xᵢ propagates through (I − ρW)⁻¹
+eff = marginal_effects(m)   # eff.direct, eff.indirect, eff.total
+```
+
+Linearizing around `ρ = 0` trades precision for speed: at `N = 196` the GMM `ρ̂`
+has a standard deviation of roughly 0.25, about 2.5× the Gibbs sampler's. Both
+are approximately unbiased, so a single small-sample estimate is a coarse
+reading. Fitted probabilities and marginal effects need a dense inverse of
+`I − ρW`, so these estimators suit moderate `N`.
+
+---
+
+## Spatial Filtering
+
+Eigenvector spatial filtering absorbs the spatial structure into synthetic
+covariates, leaving a standard OLS or GLM problem — no spatial parameter, no
+Jacobian.
+
+```julia
+# The basis: eigenvectors of M Wᵤ M, ranked by Moran coefficient MCᵢ = (N/S₀)λᵢ
+se = spatial_eigenvectors(W; min_moran_ratio = 0.25)
+
+# Stepwise ESF — greedy selection on residual Moran (default) or AIC
+m = fit_esf(X, y, W; family = :gaussian, max_eigenvectors = 20,
+            criterion = :moran, varnames = ["x1", "x2"])
+m = fit_esf(X, counts, W; family = :poisson)   # also :logit, :negbin (m.alpha)
+selected_eigenvectors(m)                        # chosen indices and their MCs
+
+# Random-effects ESF — keeps the whole screened pool and shrinks instead,
+# with the variance ratio θ = τ²/σ² estimated by profile REML
+m = fit_re_esf(X, y, W; varnames = ["x1", "x2"])
+```
+
+For RE-ESF, `m.moran_final` is the Moran coefficient of the *conditional*
+residual and **is expected to be substantially negative — do not compare it
+against zero.** Subtracting `Eγ̂` strips the positively autocorrelated
+directions, so compare against `m.moran_reference`, the closed-form expectation
+for a random vector in the complement. A value at or above the reference is the
+healthy case. Watch `m.edf` too: effective degrees of freedom approaching `N`
+means the random effects are absorbing noise.
 
 ---
 
@@ -211,6 +386,29 @@ m = fit_dynamic_gmm(SystemGMM(), Y_mat, X_ten;
 # m.ar1_z, m.ar2_z: AR serial correlation test z-statistics
 
 m_diff = fit_dynamic_gmm(DifferenceGMM(), Y_mat, X_ten; max_lag = 3)
+```
+
+---
+
+## Panel Diagnostics
+
+Specification tests for the panel models above.
+
+```julia
+# FE vs RE — reject H₀ → fixed effects preferred
+ht = spatial_hausman_test(m_fe, m_re)        # ht.stat, ht.p_value
+
+# Structural break across periods
+ct = spatial_chow_test(y, X, W, N, T, break_period)
+
+# Joint LM for spatial lag, spatial error and random effects
+# (Baltagi, Song & Koh 2003)
+plm = panel_lm_tests(y, X_with_intercept, W, N, T)
+# plm.joint_stat (χ², df = 3), plm.lag_stat, plm.error_stat, plm.re_stat
+
+# Period-by-period and pooled Moran on panel residuals
+pm = panel_moran(residuals(m), W, N, T)
+# pm.period_results — per-period MoranResult; pm.pooled — meta-analytic statistic
 ```
 
 ---
@@ -313,6 +511,72 @@ effects = spatial_effects(m_panel, dk)
 
 # Kernels: BartlettKernel(), ParzenKernel(), QuadraticSpectralKernel(), UniformKernel()
 # Metrics: EuclideanDistance(), HaversineDistance(radius_km=6371.0)
+```
+
+---
+
+## Model Selection & Comparison
+
+```julia
+spatial_aic(m); spatial_bic(m)
+
+# Nested models (SAR nested in SDM)
+lr = lr_test(m_sar, m_sdm)          # lr.stat, lr.df, lr.p_value
+
+# Non-nested models (SAR vs SEM)
+vt = vuong_test(m_sar, m_sem)
+# vt.stat (positive favours the first), vt.preference ∈ (:model1, :model2, :indistinguishable)
+
+# Does SDM collapse to SEM?  H₀: θ + ρβ = 0
+cft = common_factor_test(beta_slope, theta, rho, vcov_full)   # cft.reject
+
+# General linear hypothesis Rβ = r
+R = zeros(1, length(coef(m))); R[1, 2] = 1.0   # H₀: β₁ = 0
+wt = wald_test(m, R, [0.0])
+
+println(model_comparison_table(m_sar, m_sdm, m_sem; names = ["SAR", "SDM", "SEM"]))
+```
+
+---
+
+## Simulation & Power Analysis
+
+Six data-generating processes, Monte Carlo experiments and power curves.
+
+```julia
+# SAR, SEM, SDM, SLX, SAC and SDEM DGPs
+dgp = SAR_DGP(0.5, [1.5, -0.8], 0.5)        # ρ, β, σ
+y, X = simulate_spatial(dgp, W, X)
+
+# Monte Carlo: bias, RMSE and coverage
+mc = monte_carlo_spatial(dgp, W, N, 2,
+    (W, X, y) -> fit_spatial(CrossSection.SAR(), W, X, y);
+    config = MonteCarloConfig(n_replications = 500, seed = 42))
+# mc.n_successful vs mc.n_replications — failed replications are reported, not hidden
+
+# Power curves across grid sizes and spatial strengths
+pa = power_analysis(ρ -> SAR_DGP(ρ, [1.5, -0.8], 0.5),
+    [5, 10, 15, 20],            # grid sizes, N = L²
+    [0.0, 0.1, 0.3, 0.5, 0.7];  # ρ values
+    n_reps = 200, alpha = 0.05)
+# pa.power_moran, pa.power_lm_lag, pa.power_lm_error — the ρ = 0 column is the test's size
+```
+
+---
+
+## Output & Tables
+
+```julia
+ct = coeftable(m; level = 0.95)   # Tables.jl-compatible: feed to DataFrames, CSV, …
+
+println(to_latex(ct))
+println(to_csv(ct))
+println(to_markdown(ct))
+
+ss = summary_stats(m; model_type = "SAR")   # N, K, log-lik, AIC, BIC, σ², R²
+
+# Stargazer-style side-by-side comparison
+println(regression_table(m_sar, m_sem; model_names = ["SAR", "SEM"]))
 ```
 
 ---
@@ -457,7 +721,7 @@ activates this project itself.
 
 | Module | Test Suite | Monte Carlo Validated |
 |---|---|---|
-| Cross-sectional SAR/SDM | 54/54 ✓ | **Yes** (100 draws, N=400, ρ=0.6, 96% coverage) |
+| Cross-sectional SAR/SDM | ✓ | **Yes** (100 draws, N=400, ρ=0.6, 96% coverage) |
 | Spatial Diagnostics | ✓ | Moran/LM correctly identifies SAR DGP |
 | Spatial Error Model | ✓ | λ recovery within atol=0.12 |
 | Static Spatial Panel | ✓ | ρ recovery within atol=0.12 |
@@ -468,6 +732,15 @@ activates this project itself.
 | Gravity (PPML/NB) | ✓ | Distance coefficient negative, α>0 |
 | GRAS / Cross-Entropy | ✓ | Convergence, margin matching |
 | Driscoll-Kraay / Conley | ✓ | PSD matrices, SEs differ from baseline |
+| Spatial Weights | ✓ | Row sums, connectivity, exact GAL/GWT round-trips |
+| Model Selection | ✓ | χ² upper tail matches the exact closed form at even df |
+| Panel Diagnostics | ✓ | F tail matches the exact integer-parameter beta reference |
+| Higher-Order (SLX/SAC/SDEM) | ✓ | Coefficient recovery on matching DGPs |
+| Spatial Regimes | ✓ | SKATER contiguity and balance; Chow test size and power |
+| Simulation / Monte Carlo | ✓ | **Yes** (β bias 0.0004 / −0.0029, ρ bias −0.0081) |
+| Spatial Discrete Choice | ✓ | **Yes** (GMM approx. unbiased, SD ≈ 0.25 at N=196; Gibbs posterior mean 0.374 at ρ=0.4) |
+| Spatial Filtering | ✓ | **Yes** (E'E = I exactly; RE-ESF β and σ² recovery; closed-form Moran reference matches the full spectrum) |
+| Output & Tables | ✓ | LaTeX / CSV / Markdown round-trips, Tables.jl interface |
 
 **Cross-sectional SDM Monte Carlo results** (`validation/mc_sdm_output.txt`): ρ̂ mean = 0.595 (true 0.600); mean SE = 0.0324, empirical SD = 0.0328; 95% coverage = 0.96. Direct, indirect, and total effects coverage between 0.92–0.97.
 

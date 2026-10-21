@@ -1,6 +1,11 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.3.0 → 0.4.0 (22 modules, 453 tests, 14 examples, 2 package extensions, CI/CD, Documenter.jl docs)
+> **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
+>
+> 22 submodules, 453 test assertions in 23 testsets, 14 examples, 8 notebooks,
+> 2 package extensions, CI/CD and 22 Documenter.jl pages. **Phases 4, 5 and 6
+> are complete except item #10 (Performance)**, which is the next piece of work.
+> Tiers 1 and 2 are otherwise finished; Tier 3 is untouched.
 >
 > This roadmap outlines planned additions organized by impact tier and development phase. Each item includes the motivation, key deliverables, estimated complexity, and relevant references.
 
@@ -45,7 +50,7 @@
 | Joint LM tests for panels | Extend cross-section LM-lag/LM-error to panel settings; test for spatial lag, spatial error, and random effects jointly | Baltagi, Song & Koh (2003) |
 | Panel Moran's I | Time-averaged and period-specific Moran statistics for panel residuals | Anselin et al. (2008) |
 
-**New file:** `src/SpatialPanelDiagnostics.jl` (~350 lines)
+**Status:** ✅ Implemented — `src/SpatialPanelDiagnostics.jl` (343 lines). Docs: `docs/src/diagnostics/panel.md`. Example: **no example script yet**. Tests: 15 assertions in testset “Spatial Panel Diagnostics”.
 
 **Key functions:**
 - `spatial_hausman_test(m_fe::SpatialPanelModel, m_re)` → `HausmanTestResult`
@@ -54,8 +59,6 @@
 - `panel_moran(residuals, W, N, T)` → Vector of per-period `MoranResult`
 
 **Dependencies:** None (uses existing SpatialUtils infrastructure)
-
-**Estimated complexity:** ~350 lines
 
 ---
 
@@ -72,7 +75,7 @@
 | Regime Chow test | F-test / LR-test for coefficient homogeneity across regimes | Anselin (1990) |
 | SKATER clustering | Spatially constrained minimum spanning tree clustering for automatic regime detection from covariates | Assunção et al. (2006) |
 
-**New file:** `src/SpatialRegimeModels.jl` (~400 lines)
+**Status:** ✅ Implemented — `src/SpatialRegimeModels.jl` (363 lines). Docs: `docs/src/models/regime.md`. Example: `examples/10_spatial_regimes.jl`. Tests: 12 assertions in testset “Spatial Regime Models”.
 
 **Key types:**
 ```julia
@@ -93,8 +96,6 @@ end
 
 **Dependencies:** None for core; SKATER uses the existing NearestNeighbors.jl
 
-**Estimated complexity:** ~400 lines
-
 ---
 
 ### 3. Higher-Order Spatial Models
@@ -110,7 +111,7 @@ end
 | SDEM model | Spatial Durbin Error: `y = Xβ + WXθ + u, u = λWu + ε` — SDM structure in errors | LeSage & Pace (2009) |
 | Time-varying W panels | `W_t` changes across periods; requires period-specific log-determinant computation | Lee & Yu (2012) |
 
-**New file:** `src/HigherOrderSpatial.jl` (~450 lines)
+**Status:** ✅ Implemented — `src/HigherOrderSpatial.jl` (336 lines). Docs: `docs/src/models/higher_order.md`. Example: `examples/09_higher_order.jl`. Tests: 22 assertions in testset “Higher-Order Spatial Models”.
 
 **Key functions:**
 - `fit_slx(W, X, y; ...)` → `SLXModel` (OLS, no ML needed)
@@ -119,8 +120,6 @@ end
 - `fit_spatial_panel_tvw(variant, fe, W_list, X, y, N, T; ...)` → time-varying W panel
 
 **Dependencies:** None
-
-**Estimated complexity:** ~450 lines
 
 ---
 
@@ -137,7 +136,7 @@ end
 | Spatial ordered probit | Extension to ordered categorical outcomes | Wang, Kockelman & Wang (2013) |
 | Marginal effects | Direct/indirect/total effects for spatial probit (not just coefficients) | LeSage & Pace (2009) |
 
-**New file:** `src/SpatialDiscreteChoice.jl` (~500 lines)
+**Status:** ✅ Implemented — `src/SpatialDiscreteChoice.jl` (700 lines). Docs: `docs/src/models/discrete_choice.md`. Example: `examples/11_discrete_choice.jl`. Tests: 51 assertions in testset “Spatial Discrete Choice”.
 
 **Key types:**
 ```julia
@@ -160,8 +159,6 @@ end
 
 **Dependencies:** None for GMM; Bayesian version in the Turing extension
 
-**Estimated complexity:** ~500 lines
-
 ---
 
 ### 5. Model Selection & Comparison
@@ -178,7 +175,7 @@ end
 | Common factor test | Tests whether the SDM simplifies to SEM (i.e., θ = -ρβ); rejection → SDM preferred over SEM | Burridge (1981); Elhorst (2010) |
 | Wald test | General linear hypothesis testing on spatial model parameters | — |
 
-**New file:** `src/SpatialModelSelection.jl` (~300 lines)
+**Status:** ✅ Implemented — `src/SpatialModelSelection.jl` (297 lines). Docs: `docs/src/diagnostics/model_selection.md`. Example: **no example script yet**. Tests: 16 assertions in testset “Model Selection & Comparison”.
 
 **Key functions:**
 - `spatial_aic(m)`, `spatial_bic(m)` → corrected information criteria
@@ -189,8 +186,6 @@ end
 - `model_comparison_table(models...)` → formatted comparison table
 
 **Dependencies:** None
-
-**Estimated complexity:** ~300 lines
 
 ---
 
@@ -213,7 +208,7 @@ end
 | W diagnostics | `spatial_connectivity(W)` — number of islands, average neighbors, histogram, eigenvalue bounds |
 | Import/export | `read_gal(path)`, `write_gal(W, ids, path)`, `read_gwt(path)`, `write_gwt(W, ids, path)` — GeoDa format compatibility |
 
-**New file:** `src/SpatialWeights.jl` (~500 lines)
+**Status:** ✅ Implemented — `src/SpatialWeights.jl` (526 lines). Docs: `docs/src/weights.md`. Example: **no example script yet**. Tests: 22 assertions in testset “Spatial Weights Construction”.
 
 **Key functions:**
 ```julia
@@ -233,8 +228,6 @@ info = spatial_connectivity(W)
 
 **Dependencies:** NearestNeighbors.jl (already available); optional GeoInterface.jl for geometry-based weights
 
-**Estimated complexity:** ~500 lines
-
 ---
 
 ### 7. Spatial Filtering (Eigenvector)
@@ -251,7 +244,7 @@ info = spatial_connectivity(W)
 | ESF-GLM | Spatial filtering for Poisson, logit, negative binomial | Griffith (2003); Chun et al. (2016) |
 | Random effects ESF | Eigenvector spatial filtering with random effects for panels | Murakami & Griffith (2015) |
 
-**New file:** `src/SpatialFiltering.jl` (~350 lines)
+**Status:** ✅ Implemented — `src/SpatialFiltering.jl` (718 lines). Docs: `docs/src/models/filtering.md`. Example: `examples/12_spatial_filtering.jl`. Tests: 47 assertions in testset “Spatial Filtering”.
 
 **Key functions (delivered):**
 - `spatial_eigenvectors(W; n_candidates=nothing, min_moran_ratio=0.0)` → `SpatialEigen`
@@ -274,8 +267,6 @@ info = spatial_connectivity(W)
 
 **Dependencies:** None (uses LinearAlgebra `eigen`)
 
-**Estimated complexity:** ~350 lines
-
 ---
 
 ### 8. Simulation & Power Analysis
@@ -292,7 +283,7 @@ info = spatial_connectivity(W)
 | Bootstrap inference | `spatial_bootstrap(m, n_boot; type=:residual)` — residual and wild bootstrap for spatial models |
 | Size-power comparison | `size_power_table(tests, dgps, n_reps)` — tabulate size and power across multiple tests and DGPs |
 
-**New file:** `src/SpatialSimulation.jl` (~400 lines)
+**Status:** ✅ Implemented — `src/SpatialSimulation.jl` (484 lines). Docs: `docs/src/simulation.md`. Example: `examples/13_simulation_power.jl`. Tests: 11 assertions in testset “Spatial Simulation & Monte Carlo”.
 
 **Key functions:**
 ```julia
@@ -315,8 +306,6 @@ pc = power_curve(
 
 **Dependencies:** None
 
-**Estimated complexity:** ~400 lines
-
 ---
 
 ### 9. Interoperability
@@ -325,20 +314,23 @@ pc = power_curve(
 
 **Deliverables:**
 
-| Feature | Description |
-|---|---|
-| GeoDa file I/O | Read/write `.gal` (contiguity) and `.gwt` (general) weight matrix formats — standard interchange format |
-| DataFrame integration | `coeftable(m)` returning a `DataFrame` with columns: name, estimate, se, z, p, ci_lo, ci_hi |
-| Stargazer-style tables | `comparison_table(m1, m2, m3; format=:latex)` — side-by-side regression tables in LaTeX, HTML, or Unicode |
-| GeoDataFrames bridge | Attach local GWR coefficients and LISA clusters back to polygon geometries for mapping |
-| R interop | `read_rds_weights(path)` — read spatial weights from R's `spdep` `.rds` format |
-| CSV export | `export_results(m, "results.csv")` — flat file export of all coefficients, SEs, effects |
+| Feature | Status | Description |
+|---|---|---|
+| GeoDa file I/O | ✅ | `read_gal`/`write_gal`, `read_gwt`/`write_gwt`. Both readers return `(W, ids)` and take an `ids` keyword to align with an external table |
+| DataFrame integration | ✅ | `coeftable(m)` returns a Tables.jl-compatible table, consumable by DataFrames, CSV and friends |
+| Stargazer-style tables | ✅ | `regression_table(m1, m2, …)` side by side, plus `to_latex`, `to_csv`, `to_markdown` |
+| CSV export | 🟡 | Covered by `to_csv(coeftable(m))`; there is no single-call `export_results(m, path)` |
+| GeoDataFrames bridge | ⬜ | Not started |
+| R interop | ⬜ | Not started — `read_rds_weights` does not exist |
 
-**New files:** `src/SpatialIO.jl` (~300 lines), `src/SpatialTables.jl` (~200 lines)
+**Status:** 🟡 Mostly implemented — `src/SpatialTables.jl` (308 lines) plus the I/O
+half of `src/SpatialWeights.jl`. Note that **`src/SpatialIO.jl` was never created**:
+the GeoDa readers and writers live in `SpatialWeights.jl`, since they return a
+weight matrix and share its sparse plumbing. The GeoDataFrames bridge and the R
+interop remain outstanding, and the planned `comparison_table(…; format=:latex)`
+signature became the pair `regression_table` / `to_latex`.
 
 **Dependencies:** Optional DataFrames.jl (weakdep), optional GeoDataFrames.jl (weakdep)
-
-**Estimated complexity:** ~500 lines total
 
 ---
 
@@ -357,11 +349,20 @@ pc = power_curve(
 | Precompiled sysimage | PackageCompiler.jl sysimage recipe for zero-latency interactive use |
 | Benchmark suite | BenchmarkTools.jl suite comparing across N sizes, W densities, and Chebyshev orders |
 
-**Files modified:** Existing modules + new `src/SpatialGPU.jl` (extension), `benchmark/` directory
+**Status:** ⬜ Not started — the only outstanding item in Tiers 1–2.
+
+**Files to add:** Existing modules + new `src/SpatialGPU.jl` (extension), `benchmark/` directory
 
 **Dependencies:** Optional CUDA.jl (weakdep), optional Arrow.jl (weakdep), optional DuckDB.jl (weakdep)
 
 **Estimated complexity:** ~600 lines across multiple files
+
+**Verification note:** all six deliverables are testable on the current
+development machine — 16 logical cores, an RTX 3080 (compute capability 8.6,
+16 GB VRAM, `CUDA.functional()` confirmed) and ample free disk for a panel that
+genuinely exceeds the 32 GB of RAM. CI runners have no GPU, so the CUDA paths
+must be gated on `CUDA.functional()` behind a package extension, following the
+pattern the Turing and Makie extensions already use.
 
 ---
 
@@ -460,36 +461,40 @@ pc = power_curve(
 
 ## Development Phases
 
-### Phase 4 (Next Sprint — Recommended)
+> **Known gap:** `SpatialWeights`, `SpatialModelSelection` and
+> `SpatialPanelDiagnostics` have documentation and tests but no dedicated
+> example script. Examples 01–14 cover the other eleven modules.
 
-| Priority | Item | Est. Lines | Rationale |
-|---|---|---|---|
-| 1 | Weight Matrix Construction (#6) | ~500 | Most requested feature; unlocks real-world use |
-| 2 | Model Selection & Comparison (#5) | ~300 | Essential for applied workflow |
-| 3 | Spatial Panel Diagnostics (#1) | ~350 | Completes the panel econometrics toolkit |
-| 4 | CI/CD + Documenter.jl (#14 partial) | ~500 | Required for community adoption |
-| | **Phase 4 total** | **~1,650** | |
+### Phase 4 — ✅ Complete
 
-### Phase 5
+| Priority | Item | Est. | Actual | Status |
+|---|---|---|---|---|
+| 1 | Weight Matrix Construction (#6) | ~500 | 526 | ✅ |
+| 2 | Model Selection & Comparison (#5) | ~300 | 297 | ✅ |
+| 3 | Spatial Panel Diagnostics (#1) | ~350 | 343 | ✅ |
+| 4 | CI/CD + Documenter.jl (#14 partial) | ~500 | — | ✅ GitHub Actions, 22 docs pages |
+| | **Phase 4 total** | **~1,650** | | |
 
-| Priority | Item | Est. Lines | Rationale |
-|---|---|---|---|
-| 5 | Higher-Order Spatial Models (#3) | ~450 | SLX and SDEM fill common specification gaps |
-| 6 | Spatial Regime Models (#2) | ~400 | Addresses structural heterogeneity |
-| 7 | Simulation & Power Analysis (#8) | ~400 | Enables rigorous Monte Carlo validation |
-| 8 | Interoperability (#9) | ~500 | DataFrames, LaTeX tables, GeoDa I/O |
-| | **Phase 5 total** | **~1,750** | |
+### Phase 5 — ✅ Complete
 
-### Phase 6
+| Priority | Item | Est. | Actual | Status |
+|---|---|---|---|---|
+| 5 | Higher-Order Spatial Models (#3) | ~450 | 336 | ✅ |
+| 6 | Spatial Regime Models (#2) | ~400 | 363 | ✅ |
+| 7 | Simulation & Power Analysis (#8) | ~400 | 484 | ✅ |
+| 8 | Interoperability (#9) | ~500 | 308 | 🟡 Tables and GeoDa I/O done; GeoDataFrames and R interop not started |
+| | **Phase 5 total** | **~1,750** | | |
 
-| Priority | Item | Est. Lines | Rationale |
-|---|---|---|---|
-| 9 | Spatial Probit / Logit (#4) | ~500 | Opens discrete choice applications |
-| 10 | Spatial Filtering (#7) | ~350 | Nonparametric alternative to SAR/SEM |
-| 11 | Performance (#10) | ~600 | Multithreading, GPU, out-of-core |
-| | **Phase 6 total** | **~1,450** | |
+### Phase 6 — 🟡 Two of three
 
-### Phase 7
+| Priority | Item | Est. | Actual | Status |
+|---|---|---|---|---|
+| 9 | Spatial Probit / Logit (#4) | ~500 | 700 | ✅ |
+| 10 | Spatial Filtering (#7) | ~350 | 718 | ✅ |
+| 11 | Performance (#10) | ~600 | — | ⬜ **Next up** |
+| | **Phase 6 total** | **~1,450** | | |
+
+### Phase 7 — ⬜ Not started
 
 | Priority | Item | Est. Lines | Rationale |
 |---|---|---|---|
@@ -499,15 +504,26 @@ pc = power_curve(
 | 15 | Full documentation & paper (#14) | ~2,000 | JSS paper, tutorials, benchmarks |
 | | **Phase 7 total** | **~3,400** | |
 
-### Cumulative Size Projection
+### Size: Actuals and Projections
 
-| Milestone | Modules | Tests | Lines (est.) |
+Rows above the rule are measured; rows below are estimates.
+
+| Milestone | Modules | Test assertions | Lines of `src/` |
 |---|---|---|---|
-| **v0.3.0** (current) | 13 | 54 | ~6,500 |
-| **v0.4.0** (Phase 4) | 16 | ~75 | ~8,200 |
-| **v0.5.0** (Phase 5) | 20 | ~100 | ~10,000 |
-| **v0.6.0** (Phase 6) | 23 | ~120 | ~11,500 |
-| **v1.0.0** (Phase 7) | 27 | ~150 | ~15,000 |
+| **v0.3.0** (registered) | 13 | 54 | ~6,500 |
+| **master** (Phases 4–6 bar #10) | 22 | 453 | 8,817 |
+| — | | | |
+| **v0.4.0** (next release) | 22–23 | ~470 | ~9,400 |
+| **v1.0.0** (Phase 7) | 26–27 | ~600 | ~13,000 |
+
+Measured on master: 22 submodules plus the umbrella across 8,817 lines of
+`src/`, 1,149 lines of tests (453 assertions in 23 testsets), 1,426 lines of
+examples across 14 scripts, 318 lines of package extensions, 22 documentation
+pages and 8 notebooks.
+
+The earlier per-release projections (v0.4.0 at 16 modules, v0.5.0 at 20,
+v0.6.0 at 23) were overtaken: Phases 4, 5 and 6 all landed on the 0.4.0
+development line rather than across three releases.
 
 ---
 
