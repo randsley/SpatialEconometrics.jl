@@ -72,6 +72,7 @@ Pages = [
     "robust.md",
     "simulation.md",
     "tables.md",
+    "extensions.md",
     "api.md",
 ]
 ```

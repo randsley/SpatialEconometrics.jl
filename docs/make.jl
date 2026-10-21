@@ -36,6 +36,7 @@ makedocs(
         "Robust Inference" => "robust.md",
         "Simulation" => "simulation.md",
         "Output & Tables" => "tables.md",
+        "Package Extensions" => "extensions.md",
         "API Reference" => "api.md",
     ],
 )
