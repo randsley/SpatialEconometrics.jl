@@ -11,7 +11,7 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
-       brent_maximize, _normcdf, _print_coef_table
+       brent_maximize, _normcdf, _print_coef_table, _chi2_sf
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -350,72 +350,6 @@ function regime_chow_test(
     stat = max(stat, zero(T))
     p = _chi2_sf(stat, df)
     return ChowRegimeTest{T}(stat, df, p, ll_p, ll_r)
-end
-
-# Upper tail of the chi-squared distribution, i.e. Q(k/2, x/2).
-#
-# The lower-incomplete-gamma SERIES only converges for z < a + 1; past that its
-# terms keep growing for roughly z iterations before they decay, so a truncated
-# series silently returns a tiny partial sum and the survival function comes back
-# near 1. That turns a decisive rejection into "fail to reject". Switch to the
-# continued fraction for the upper tail once z >= a + 1 (Numerical Recipes).
-function _chi2_sf(x::T, k::Int) where {T<:AbstractFloat}
-    k <= zero(k) && return one(T)
-    x <= zero(T) && return one(T)
-    a = T(k) / T(2)
-    z = x / T(2)
-    return z < a + one(T) ? max(zero(T), one(T) - _gamma_series(a, z)) :
-                            max(zero(T), _gamma_cf(a, z))
-end
-
-# Regularized lower incomplete gamma P(a, z) by series. Valid for z < a + 1.
-function _gamma_series(a::T, z::T) where {T<:AbstractFloat}
-    z <= zero(T) && return zero(T)
-    ap = a
-    s = one(T) / a
-    del = s
-    for _ in 1:1000
-        ap += one(T)
-        del *= z / ap
-        s += del
-        abs(del) < abs(s) * T(1e-14) && break
-    end
-    return s * exp(-z + a * log(z) - _loggamma(a))
-end
-
-# Regularized upper incomplete gamma Q(a, z) by continued fraction. Valid for
-# z >= a + 1, where the series above fails.
-function _gamma_cf(a::T, z::T) where {T<:AbstractFloat}
-    tiny = T(1e-300)
-    b = z + one(T) - a
-    c = one(T) / tiny
-    d = one(T) / b
-    h = d
-    for i in 1:1000
-        an = -T(i) * (T(i) - a)
-        b += T(2)
-        d = an * d + b
-        abs(d) < tiny && (d = tiny)
-        c = b + an / c
-        abs(c) < tiny && (c = tiny)
-        d = one(T) / d
-        del = d * c
-        h *= del
-        abs(del - one(T)) < T(1e-14) && break
-    end
-    return exp(-z + a * log(z) - _loggamma(a)) * h
-end
-
-# log Gamma(z) by the Lanczos approximation (Numerical Recipes `gammln`, in the
-# x = z - 1 shifted form). Kept in the log domain: Gamma(z) itself overflows
-# Float64 past z ~ 171, which a chi-squared test with large df would reach.
-function _loggamma(z::T) where {T<:AbstractFloat}
-    coefs = T.([76.18009172947146, -86.50532032941677, 24.01409824083091,
-                 -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5])
-    x = z - one(T); t = x + T(5.5); t -= (x + T(0.5)) * log(t)
-    ser = T(1.000000000190015)
-    for (j, c) in enumerate(coefs); ser += c / (x + T(j)); end
-    return -t + log(T(2.5066282746310005) * ser)
 end
 
 function Base.show(io::IO, t::ChowRegimeTest)

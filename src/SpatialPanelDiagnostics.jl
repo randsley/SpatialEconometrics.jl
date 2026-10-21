@@ -7,7 +7,7 @@ using Printf
 using StatsAPI
 import StatsAPI: coef, vcov, nobs, dof_residual
 
-import ..SpatialUtils: _normcdf, FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
+import ..SpatialUtils: _normcdf, _chi2_sf, _loggamma, FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
     within_transform, within_transform!, panel_spatial_lag!
 import ..SpatialDiagnostics: MoranResult, moran_global
 
@@ -299,43 +299,12 @@ function panel_moran(
     return PanelMoranResult(period_results, pooled, T_per)
 end
 
-# ─── Chi-squared / F survival functions ──────────────────────────────
-
-function _chi2_sf(x::Real, df::Int)
-    x <= 0.0 && return 1.0
-    df <= 0 && return 0.0
-    _regularized_gamma_upper(df / 2.0, x / 2.0)
-end
+# ─── F survival function (regularized incomplete beta) ───────────────
+# The chi-squared survival function and log Gamma now live in SpatialUtils.
 
 function _f_sf(x::Real, df1::Int, df2::Int)
     x <= 0.0 && return 1.0
     _regularized_beta_upper(df1 / 2.0, df2 / 2.0, df1 * x / (df1 * x + df2))
-end
-
-function _regularized_gamma_upper(a::Real, x::Real)
-    x < a + 1.0 ? (1.0 - _gamma_series(a, x)) : _gamma_cf(a, x)
-end
-
-function _gamma_series(a::Real, x::Real)
-    x <= 0.0 && return 0.0
-    ap = a; s = 1.0 / a; del = s
-    for _ in 1:200
-        ap += 1.0; del *= x / ap; s += del
-        abs(del) < abs(s) * 1e-12 && break
-    end
-    s * exp(-x + a * log(x) - _loggamma(a))
-end
-
-function _gamma_cf(a::Real, x::Real)
-    b = x + 1.0 - a; c = 1.0 / 1e-30; d = 1.0 / b; h = d
-    for i in 1:200
-        an = -i * (i - a); b += 2.0
-        d = an * d + b; abs(d) < 1e-30 && (d = 1e-30)
-        c = b + an / c; abs(c) < 1e-30 && (c = 1e-30)
-        d = 1.0 / d; del = d * c; h *= del
-        abs(del - 1.0) < 1e-12 && break
-    end
-    exp(-x + a * log(x) - _loggamma(a)) * h
 end
 
 function _regularized_beta_upper(a::Real, b::Real, x::Real)
@@ -369,16 +338,6 @@ function _beta_cf(a::Real, b::Real, x::Real)
         abs(del - 1.0) < 1e-12 && break
     end
     return h
-end
-
-function _loggamma(x::Real)
-    x <= 0.0 && return Inf
-    cof = [76.18009172947146, -86.50532032941677, 24.01409824083091,
-           -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5]
-    tmp = x + 5.5; tmp -= (x + 0.5) * log(tmp)
-    ser = 1.000000000190015
-    for j in 1:6; ser += cof[j] / (x + j); end
-    return -tmp + log(2.5066282746310005 * ser / x)
 end
 
 end # module

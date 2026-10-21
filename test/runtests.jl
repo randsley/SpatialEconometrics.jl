@@ -1061,22 +1061,40 @@ using NearestNeighbors
             @test M[end, end] > M[end, 1]
         end
 
-        # ── the three chi-squared copies must stay in agreement ──
+        # ── one chi-squared survival function, shared ──
+        # There used to be three copies, which is how one of them came to be
+        # wrong: a truncated lower-gamma series reported p = 0.9977 for an LR of
+        # 499.5 on 3 df. They now resolve to a single definition in SpatialUtils,
+        # so identity — not numerical agreement — is the invariant to pin.
+        UTx = SpatialEconometrics.SpatialUtils
         MSx = SpatialEconometrics.SpatialModelSelection
         PDx = SpatialEconometrics.SpatialPanelDiagnostics
         RMx = SpatialEconometrics.SpatialRegimeModels
+        @test MSx._chi2_sf === UTx._chi2_sf
+        @test PDx._chi2_sf === UTx._chi2_sf
+        @test RMx._chi2_sf === UTx._chi2_sf
+        # PD keeps the F / incomplete-beta helpers, so its log Gamma must be the
+        # shared one too rather than a fourth private copy.
+        @test PDx._loggamma === UTx._loggamma
+        @test PDx._f_sf(2.0, 4, 8) ≈ 0.1875 rtol = 1e-9
+
         for df in (1, 2, 3, 6, 10, 50), x in (0.5, 2.0, 7.815, 25.0, 100.0)
-            a = MSx._chi2_sf(x, df); b = PDx._chi2_sf(x, df); c = RMx._chi2_sf(x, df)
-            @test a ≈ b rtol = 1e-9 atol = 1e-300
-            @test a ≈ c rtol = 1e-9 atol = 1e-300
-            @test 0.0 <= a <= 1.0
+            q = UTx._chi2_sf(x, df)
+            @test isfinite(q)
+            @test 0.0 <= q <= 1.0
         end
+        # Standard critical values, and the degenerate cases.
+        @test UTx._chi2_sf(3.841, 1) ≈ 0.05 atol = 5e-5
+        @test UTx._chi2_sf(7.815, 3) ≈ 0.05 atol = 5e-5
+        @test UTx._chi2_sf(0.0, 3) == 1.0      # nothing to reject
+        @test UTx._chi2_sf(10.0, 0) == 1.0     # no restriction to reject
+        # The case that exposed the bug: a large LR must stay decisive.
+        @test UTx._chi2_sf(499.5, 3) < 1e-100
         # Exact closed form at even df: Q(x; 2k) = exp(-x/2) * sum_{j<k} (x/2)^j / j!
         for (x, df) in [(2.0, 2), (5.0, 4), (10.0, 6), (3.0, 10)]
             k = df ÷ 2; z = x / 2
             want = exp(-z) * sum(z^j / factorial(j) for j in 0:(k-1))
-            @test MSx._chi2_sf(x, df) ≈ want rtol = 1e-7
-            @test RMx._chi2_sf(x, df) ≈ want rtol = 1e-7
+            @test UTx._chi2_sf(x, df) ≈ want rtol = 1e-7
         end
 
         # ── GAL / GWT readers must preserve the unit ordering ──

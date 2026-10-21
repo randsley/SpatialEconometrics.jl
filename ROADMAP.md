@@ -1,6 +1,6 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.3.0 → 0.4.0 (22 modules, 477 tests, 14 examples, 2 package extensions, CI/CD, Documenter.jl docs)
+> **Current version:** 0.3.0 → 0.4.0 (22 modules, 453 tests, 14 examples, 2 package extensions, CI/CD, Documenter.jl docs)
 >
 > This roadmap outlines planned additions organized by impact tier and development phase. Each item includes the motivation, key deliverables, estimated complexity, and relevant references.
 

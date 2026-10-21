@@ -13,7 +13,8 @@ export LogDetMethod, ExactLU, ChebyshevApprox,
        panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform,
        effective_dims, has_indiv_fe, has_time_fe,
-       _normcdf, _print_coef_table
+       _normcdf, _print_coef_table,
+       _chi2_sf, _gamma_series, _gamma_cf, _loggamma
 
 # ─── Log-determinant methods ──────────────────────────────────────────
 
@@ -257,6 +258,80 @@ function _normcdf(z::Real)
     d = 0.3989422804014327  # 1/sqrt(2π)
     p = d * exp(-x * x / 2.0) * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))))
     return x > 0.0 ? 1.0 - p : p
+end
+
+# ─── Incomplete gamma / chi-squared survival ─────────────────────────
+
+# Upper tail of the chi-squared distribution with `df` degrees of freedom,
+# i.e. Q(df/2, x/2): the p-value of a statistic `x` referred to χ²(df).
+#
+# The lower-incomplete-gamma SERIES only converges for z < a + 1; past that its
+# terms keep growing for roughly z iterations before they decay, so a truncated
+# series silently returns a tiny partial sum and the survival function comes back
+# near 1. That turns a decisive rejection into "fail to reject". Switch to the
+# continued fraction for the upper tail once z >= a + 1 (Numerical Recipes).
+#
+# A degenerate df <= 0 returns 1.0: there is no restriction to reject.
+function _chi2_sf(x::Real, df::Integer)
+    df <= 0 && return 1.0
+    a = df / 2.0
+    z = Float64(x) / 2.0
+    z <= 0.0 && return 1.0
+    return z < a + 1.0 ? clamp(1.0 - _gamma_series(a, z), 0.0, 1.0) :
+                         clamp(_gamma_cf(a, z), 0.0, 1.0)
+end
+
+# Regularized lower incomplete gamma P(a, z) by series. Valid for z < a + 1.
+function _gamma_series(a::Real, z::Real)
+    z <= 0.0 && return 0.0
+    ap = Float64(a)
+    s = 1.0 / a
+    del = s
+    for _ in 1:1000
+        ap += 1.0
+        del *= z / ap
+        s += del
+        abs(del) < abs(s) * 1e-14 && break
+    end
+    return s * exp(-z + a * log(z) - _loggamma(a))
+end
+
+# Regularized upper incomplete gamma Q(a, z) by continued fraction. Valid for
+# z >= a + 1, where the series above fails.
+function _gamma_cf(a::Real, z::Real)
+    tiny = 1e-300
+    b = z + 1.0 - a
+    c = 1.0 / tiny
+    d = 1.0 / b
+    h = d
+    for i in 1:1000
+        an = -i * (i - a)
+        b += 2.0
+        d = an * d + b
+        abs(d) < tiny && (d = tiny)
+        c = b + an / c
+        abs(c) < tiny && (c = tiny)
+        d = 1.0 / d
+        del = d * c
+        h *= del
+        abs(del - 1.0) < 1e-14 && break
+    end
+    return exp(-z + a * log(z) - _loggamma(a)) * h
+end
+
+# log Gamma(z) by the Lanczos approximation (Numerical Recipes `gammln`, in the
+# x = z - 1 shifted form). Kept in the log domain: Gamma(z) itself overflows
+# Float64 past z ~ 171, which a chi-squared test with large df would reach.
+function _loggamma(z::Real)
+    z <= 0.0 && return Inf
+    coefs = (76.18009172947146, -86.50532032941677, 24.01409824083091,
+             -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5)
+    x = Float64(z) - 1.0
+    t = x + 5.5
+    t -= (x + 0.5) * log(t)
+    ser = 1.000000000190015
+    for (j, c) in enumerate(coefs); ser += c / (x + j); end
+    return -t + log(2.5066282746310005 * ser)
 end
 
 # ─── Shared show helper ──────────────────────────────────────────────
