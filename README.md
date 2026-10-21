@@ -699,7 +699,10 @@ SpatialEconometrics/
 │   ├── 11_discrete_choice.jl           # spatial probit, ordered, marg. effects
 │   ├── 12_spatial_filtering.jl         # ESF families + RE-ESF diagnostics
 │   ├── 13_simulation_power.jl          # six DGPs, Monte Carlo, power curves
-│   └── 14_output_tables.jl             # LaTeX / CSV / Markdown export
+│   ├── 14_output_tables.jl             # LaTeX / CSV / Markdown export
+│   ├── 15_weight_matrices.jl           # knn/distance/band, standardization, GeoDa I/O
+│   ├── 16_model_selection.jl           # AIC/BIC, LR, Vuong, common factor, Wald
+│   └── 17_panel_diagnostics.jl         # Hausman, panel LM, Chow, panel Moran
 └── notebooks/
     ├── 01_getting_started.ipynb        # Jupyter
     ├── 02_spatial_panels.ipynb         # Jupyter

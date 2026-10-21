@@ -2,7 +2,7 @@
 
 > **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 453 test assertions in 23 testsets, 14 examples, 8 notebooks,
+> 22 submodules, 453 test assertions in 23 testsets, 17 examples, 8 notebooks,
 > 2 package extensions, CI/CD and 22 Documenter.jl pages. **Phases 4, 5 and 6
 > are complete except item #10 (Performance)**, which is the next piece of work.
 > Tiers 1 and 2 are otherwise finished; Tier 3 is untouched.
@@ -50,7 +50,7 @@
 | Joint LM tests for panels | Extend cross-section LM-lag/LM-error to panel settings; test for spatial lag, spatial error, and random effects jointly | Baltagi, Song & Koh (2003) |
 | Panel Moran's I | Time-averaged and period-specific Moran statistics for panel residuals | Anselin et al. (2008) |
 
-**Status:** ✅ Implemented — `src/SpatialPanelDiagnostics.jl` (343 lines). Docs: `docs/src/diagnostics/panel.md`. Example: **no example script yet**. Tests: 15 assertions in testset “Spatial Panel Diagnostics”.
+**Status:** ✅ Implemented — `src/SpatialPanelDiagnostics.jl` (343 lines). Docs: `docs/src/diagnostics/panel.md`. Example: `examples/17_panel_diagnostics.jl`. Tests: 15 assertions in testset “Spatial Panel Diagnostics”.
 
 **Key functions:**
 - `spatial_hausman_test(m_fe::SpatialPanelModel, m_re)` → `HausmanTestResult`
@@ -175,7 +175,7 @@ end
 | Common factor test | Tests whether the SDM simplifies to SEM (i.e., θ = -ρβ); rejection → SDM preferred over SEM | Burridge (1981); Elhorst (2010) |
 | Wald test | General linear hypothesis testing on spatial model parameters | — |
 
-**Status:** ✅ Implemented — `src/SpatialModelSelection.jl` (297 lines). Docs: `docs/src/diagnostics/model_selection.md`. Example: **no example script yet**. Tests: 16 assertions in testset “Model Selection & Comparison”.
+**Status:** ✅ Implemented — `src/SpatialModelSelection.jl` (297 lines). Docs: `docs/src/diagnostics/model_selection.md`. Example: `examples/16_model_selection.jl`. Tests: 16 assertions in testset “Model Selection & Comparison”.
 
 **Key functions:**
 - `spatial_aic(m)`, `spatial_bic(m)` → corrected information criteria
@@ -208,7 +208,7 @@ end
 | W diagnostics | `spatial_connectivity(W)` — number of islands, average neighbors, histogram, eigenvalue bounds |
 | Import/export | `read_gal(path)`, `write_gal(W, ids, path)`, `read_gwt(path)`, `write_gwt(W, ids, path)` — GeoDa format compatibility |
 
-**Status:** ✅ Implemented — `src/SpatialWeights.jl` (526 lines). Docs: `docs/src/weights.md`. Example: **no example script yet**. Tests: 22 assertions in testset “Spatial Weights Construction”.
+**Status:** ✅ Implemented — `src/SpatialWeights.jl` (526 lines). Docs: `docs/src/weights.md`. Example: `examples/15_weight_matrices.jl`. Tests: 22 assertions in testset “Spatial Weights Construction”.
 
 **Key functions:**
 ```julia
@@ -461,10 +461,6 @@ pattern the Turing and Makie extensions already use.
 
 ## Development Phases
 
-> **Known gap:** `SpatialWeights`, `SpatialModelSelection` and
-> `SpatialPanelDiagnostics` have documentation and tests but no dedicated
-> example script. Examples 01–14 cover the other eleven modules.
-
 ### Phase 4 — ✅ Complete
 
 | Priority | Item | Est. | Actual | Status |
@@ -517,8 +513,8 @@ Rows above the rule are measured; rows below are estimates.
 | **v1.0.0** (Phase 7) | 26–27 | ~600 | ~13,000 |
 
 Measured on master: 22 submodules plus the umbrella across 8,817 lines of
-`src/`, 1,149 lines of tests (453 assertions in 23 testsets), 1,426 lines of
-examples across 14 scripts, 318 lines of package extensions, 22 documentation
+`src/`, 1,149 lines of tests (453 assertions in 23 testsets), 1,946 lines of
+examples across 17 scripts, 318 lines of package extensions, 22 documentation
 pages and 8 notebooks.
 
 The earlier per-release projections (v0.4.0 at 16 modules, v0.5.0 at 20,
