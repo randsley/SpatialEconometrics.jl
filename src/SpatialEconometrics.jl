@@ -32,6 +32,7 @@ include("SpatialRegimeModels.jl")
 include("SpatialSimulation.jl")
 include("SpatialTables.jl")
 include("SpatialDiscreteChoice.jl")
+include("SpatialFiltering.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -54,6 +55,7 @@ const RegimeMod     = SpatialRegimeModels
 const SimMod        = SpatialSimulation
 const TablesMod     = SpatialTables
 const DiscreteMod   = SpatialDiscreteChoice
+const FilterMod     = SpatialFiltering
 
 import .SpatialEconometricsPrototype: SpatialRegressionModel, fit_spatial
 import .SpatialPanelEconometrics: SpatialPanelModel, LeeYuTransformation, DirectQML, fit_spatial_panel
@@ -75,6 +77,7 @@ import .SpatialRegimeModels: SpatialRegimeModel, fit_spatial_regime, ExogenousRe
 import .SpatialSimulation: SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP, simulate_spatial, MonteCarloConfig, monte_carlo_spatial, MonteCarloResult, PowerAnalysisResult, power_analysis
 import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to_markdown, regression_table
 import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianSpatialProbitModel, fit_bayesian_spatial_probit, SpatialOrderedProbitModel, fit_spatial_ordered_probit, SpatialProbitEffects, marginal_effects
+import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf
 
 function robust_vcov(m::SpatialRegressionModel, spec::ConleySpatialHAC)
     Z_eff, bread_inv = SpatialHAC.extract_spatial_jacobian_scores(m.X_aug, m.W, m.coef, m.rho, m.sigma2, m.vcov, length(m.y), 1)
@@ -206,6 +209,11 @@ export
     SpatialProbitModel, fit_spatial_probit,
     BayesianSpatialProbitModel, fit_bayesian_spatial_probit,
     SpatialOrderedProbitModel, fit_spatial_ordered_probit,
-    SpatialProbitEffects, marginal_effects
+    SpatialProbitEffects, marginal_effects,
+    # SpatialFiltering
+    SpatialFiltering, FilterMod,
+    SpatialEigen, spatial_eigenvectors, moran_coefficient,
+    ESFModel, fit_esf, selected_eigenvectors,
+    REESFModel, fit_re_esf
 
 end # module

@@ -1,6 +1,6 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.3.0 → 0.4.0 (21 modules, 226 tests, 8 examples, 2 package extensions, CI/CD, Documenter.jl docs)
+> **Current version:** 0.3.0 → 0.4.0 (22 modules, 273 tests, 8 examples, 2 package extensions, CI/CD, Documenter.jl docs)
 >
 > This roadmap outlines planned additions organized by impact tier and development phase. Each item includes the motivation, key deliverables, estimated complexity, and relevant references.
 
@@ -253,11 +253,24 @@ info = spatial_connectivity(W)
 
 **New file:** `src/SpatialFiltering.jl` (~350 lines)
 
-**Key functions:**
-- `spatial_eigenvectors(W; n_candidates=nothing)` → eigenvalues + eigenvectors
-- `fit_esf(X, y, W; family=:gaussian, max_eigenvectors=20)` → `ESFModel`
-- `fit_esf(X, y, W; family=:poisson)` — Poisson ESF
+**Key functions (delivered):**
+- `spatial_eigenvectors(W; n_candidates=nothing, min_moran_ratio=0.0)` → `SpatialEigen`
+- `moran_coefficient(x, W)` → Moran coefficient of a vector
+- `fit_esf(X, y, W; family=:gaussian, max_eigenvectors=20, criterion=:moran)` → `ESFModel`
+  (families `:gaussian`, `:poisson`, `:logit`, `:negbin`; `criterion` `:moran` or `:aic`)
 - `selected_eigenvectors(m::ESFModel)` → indices and Moran values of selected eigenvectors
+- `fit_re_esf(X, y, W; min_moran_ratio=0.25)` → `REESFModel` (profile-REML shrinkage)
+
+**Implementation notes:**
+- The basis is built on the orthogonal complement of `1` via QR rather than by
+  decomposing `Ω` directly. `Ω` has a multi-dimensional null space, so `eigen`
+  returns an arbitrary rotation within it, which smears the constant direction
+  across several near-zero eigenvectors and leaves each partly collinear with the
+  intercept. The QR construction gives `E'E = I` and `Σᵢ eᵢ = 0` exactly.
+- RE-ESF reports `moran_reference`, the closed-form expected Moran coefficient of
+  the complement of `span(E)`. The conditional residual Moran coefficient is
+  expected to be substantially negative and must be read against that reference
+  rather than against zero.
 
 **Dependencies:** None (uses LinearAlgebra `eigen`)
 

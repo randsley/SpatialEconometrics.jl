@@ -95,6 +95,17 @@ fit_spatial_ordered_probit
 marginal_effects
 ```
 
+## Spatial Filtering
+
+```@docs
+SpatialEigen
+spatial_eigenvectors
+moran_coefficient
+fit_esf
+selected_eigenvectors
+fit_re_esf
+```
+
 ## Simulation
 
 ```@docs
