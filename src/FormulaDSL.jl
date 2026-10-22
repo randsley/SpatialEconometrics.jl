@@ -19,8 +19,66 @@ export @formula, slag, fe, endo,
        ParsedSpatialFormula,
        extract_panel_permutation
 
+"""
+    slag(x...)
+
+Mark terms to be spatially lagged inside a `@formula`.
+
+`slag(x)` adds `W*x` to the design. `slag(x1, x2)` lags several terms, and
+`slag(x1 + x2)` is equivalent. Lagging every covariate makes the
+specification a Spatial Durbin model, which the parser detects.
+
+Only meaningful inside `@formula`; calling it directly raises an error.
+
+# Examples
+```julia
+fit_spatial(@formula(y ~ x1 + slag(x2)), table, W)
+fit_spatial(@formula(y ~ slag(x1 + x2)), table, W)     # SDM
+```
+
+See also [`fe`](@ref), [`endo`](@ref).
+"""
 slag(x...) = error("`slag` should only be used inside `@formula`.")
+"""
+    fe(x)
+
+Mark a column as a fixed effect to absorb, inside a `@formula`.
+
+The named variable is swept out rather than estimated, so no dummy
+coefficients appear in the output.
+
+Only meaningful inside `@formula`.
+
+# Examples
+```julia
+fit_spatial(@formula(y ~ x1 + fe(region)), table, W)
+```
+
+See also [`slag`](@ref), [`endo`](@ref).
+"""
 fe(x)      = error("`fe` should only be used inside `@formula`.")
+"""
+    endo(x...)
+
+Mark endogenous regressors and their instruments inside a `@formula`.
+
+Written `endo(x_endog, z1 + z2)`: the first argument is the endogenous
+regressor, the rest are the excluded instruments for it. Identification
+needs at least as many instruments as endogenous regressors.
+
+Only meaningful inside `@formula`, and only `fit_gs2sls_panel`
+consumes it — the likelihood-based estimators have no way to use
+instruments.
+
+# Examples
+```julia
+fit_gs2sls_panel(
+    @formula(y ~ x1 + endo(x2, z1 + z2) + fe(region) + fe(year)),
+    table, W; panel = :region, time = :year)
+```
+
+See also [`slag`](@ref), [`fe`](@ref).
+"""
 endo(x...) = error("`endo` should only be used inside `@formula`.")
 
 struct SpatialLagTerm{T} <: StatsModels.AbstractTerm
@@ -91,6 +149,23 @@ function StatsModels.apply_schema(t::StatsModels.FunctionTerm{typeof(endo)}, sch
     return EndogenousTerm(e_term, z_term)
 end
 
+"""
+    ParsedSpatialFormula
+
+The result of parsing a spatial `@formula` against a table: the response,
+the design blocks and their names, separated by role.
+
+Carries `y` and `lhs_name`; `X_exog`/`exog_names` for the exogenous
+covariates; `X_slag_source`/`slag_names` for the terms marked with
+[`slag`](@ref); `X_endog`/`endog_names` and `Z_iv`/`iv_names` for terms
+marked with [`endo`](@ref); `fe_symbols` for those marked with
+[`fe`](@ref); and the flags `has_slag` and `is_full_sdm`, the latter set
+when every covariate was lagged so the specification is a Spatial Durbin
+model.
+
+Mostly an internal hand-off between the formula parser and the estimators;
+inspect it when a formula does not produce the design you expected.
+"""
 struct ParsedSpatialFormula{T<:AbstractFloat}
     y::Vector{T}; lhs_name::String; X_exog::Matrix{T}; exog_names::Vector{String}; X_slag_source::Matrix{T}; slag_names::Vector{String}; X_endog::Matrix{T}; endog_names::Vector{String}; Z_iv::Matrix{T}; iv_names::Vector{String}; fe_symbols::Vector{Symbol}; has_slag::Bool; is_full_sdm::Bool
 end
@@ -144,6 +219,41 @@ function parse_spatial_formula(f::StatsModels.FormulaTerm, table; perm::Union{No
     return ParsedSpatialFormula{T}(y_vec, lhs_name, X_exog, exog_names, X_slag, slag_names, X_endog, endog_names, Z_iv, iv_names, fe_syms, has_slag, is_full_sdm)
 end
 
+"""
+    extract_panel_permutation(table, panel_col, time_col) -> (perm, N, T_per)
+
+Work out the reordering that puts a table into the stacking order the panel
+estimators require, along with the panel dimensions.
+
+Sorts by period and then by unit, so units vary fastest within each period.
+Every panel entry point assumes that layout and none of them can detect a
+violation, so this is the safe way to get there from a table in arbitrary
+order.
+
+# Arguments
+- `table`: any Tables.jl-compatible table.
+- `panel_col`, `time_col`: the unit and period identifier columns.
+
+# Returns
+`(perm, N, T_per)`: the permutation, the number of units and the number of
+periods.
+
+Throws an `ArgumentError` if `N * T_per` does not equal the number of rows,
+i.e. if the panel is unbalanced — none of the estimators here support that.
+
+# Examples
+```julia
+perm, N, T_per = extract_panel_permutation(df, :region, :year)
+y = df.y[perm]
+X = Matrix(df[perm, [:x1, :x2]])
+m = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per)
+```
+
+The formula methods call this for you, so passing `panel` and `time` to
+`fit_spatial_panel` avoids the step entirely.
+
+See also `fit_spatial_panel`.
+"""
 function extract_panel_permutation(table, panel_col::Symbol, time_col::Symbol)
     cols = Tables.columntable(table)
     id_vec = getproperty(cols, panel_col); time_vec = getproperty(cols, time_col); NT = length(id_vec)

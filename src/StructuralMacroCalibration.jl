@@ -11,6 +11,24 @@ export CalibrationResult,
        balance_generalized_ce,
        sam_leontief_multipliers
 
+"""
+    CalibrationResult
+
+Output of a matrix-balancing problem, from
+[`balance_gras_full`](@ref) or [`balance_generalized_ce`](@ref).
+
+# Fields
+- `X_balanced`: the balanced matrix, the result itself.
+- `X_prior`: the input matrix it started from.
+- `tau`, `sigma`: the row and column scaling multipliers.
+- `W_sens`: sensitivity matrix, for propagating uncertainty in the targets
+  through to the solution.
+- `kl_divergence`: how far `X_balanced` moved from `X_prior`. Large values
+  mean the targets were hard to reconcile with the prior.
+- `max_discrepancy`: largest remaining violation of a target constraint.
+- `iterations`, `converged`: solver state. **Check `converged`**, and read
+  `max_discrepancy` even when it is `true`.
+"""
 struct CalibrationResult{T<:AbstractFloat}
     X_balanced::Matrix{T}
     X_prior::Matrix{T}
@@ -161,10 +179,61 @@ function solve_gras_primal_dual(
     )
 end
 
+"""
+    balance_gras_full(X0, u, v; tol = 1e-11) -> CalibrationResult
+
+Balance a matrix to given row and column totals by GRAS, returning the full
+diagnostics.
+
+GRAS (Generalized RAS) extends biproportional scaling to matrices
+containing **negative** entries, which ordinary RAS cannot handle — the
+reason it is the standard tool for social accounting matrices and
+input-output tables, where negatives legitimately occur.
+
+The solution is the matrix closest to `X0` in a cross-entropy sense that
+satisfies the targets, so the prior's structure is preserved as far as the
+constraints allow. Sign patterns and zeros in `X0` are respected: a zero
+cell stays zero.
+
+# Arguments
+- `X0`: prior matrix.
+- `u`: target row sums.
+- `v`: target column sums.
+
+Totals must be consistent (`sum(u) == sum(v)`) for a solution to exist.
+
+# Returns
+A [`CalibrationResult`](@ref). Use [`balance_gras`](@ref) when you want the
+balanced matrix alone.
+
+!!! note
+    Differentiable: the solution can be propagated through automatic
+    differentiation, so a balanced matrix can sit inside a larger
+    calibration or estimation problem.
+
+# References
+Junius, T. & Oosterhaven, J. (2003). *Economic Systems Research*, 15(1).
+"""
 function balance_gras_full(X0::AbstractMatrix{T}, u::AbstractVector{T}, v::AbstractVector{T}; kwargs...) where {T<:AbstractFloat}
     return solve_gras_primal_dual(X0, u, v; kwargs...)
 end
 
+"""
+    balance_gras(X0, u, v; tol = 1e-11) -> Matrix
+
+Balance a matrix to target row sums `u` and column sums `v` by GRAS,
+returning just the balanced matrix.
+
+A convenience wrapper over [`balance_gras_full`](@ref), which returns the
+multipliers, sensitivities and convergence diagnostics as well. Prefer the
+full version when the result matters, since this one discards the
+information that would tell you the solve went badly.
+
+# Examples
+```julia
+X = balance_gras(X_prior, row_targets, col_targets)
+```
+"""
 function balance_gras(X0::AbstractMatrix{T}, u::AbstractVector{T}, v::AbstractVector{T}; tol::Float64=1e-11) where {T<:AbstractFloat}
     res = solve_gras_primal_dual(X0, u, v; tol=T(tol))
     return res.X_balanced
@@ -294,6 +363,35 @@ function balance_gras(X0::AbstractMatrix{T1}, u::AbstractVector{T2}, v::Abstract
     return X_dual
 end
 
+"""
+    balance_generalized_ce(X0, G, b, sigma_b; tol = 1e-10, maxiter = 40) -> CalibrationResult
+
+Balance a matrix under general linear constraints with uncertain targets, by
+cross-entropy minimization.
+
+More flexible than [`balance_gras_full`](@ref) in two ways. Constraints are
+arbitrary linear combinations `G*vec(X) = b` rather than just row and column
+sums, so aggregates spanning several cells can be targeted. And each target
+carries a standard deviation `sigma_b`, so constraints are matched as
+closely as their reliability warrants rather than exactly — which is what
+makes an over-determined or mutually inconsistent set of targets solvable
+at all.
+
+# Arguments
+- `X0`: prior matrix.
+- `G`: constraint matrix acting on `vec(X)`.
+- `b`: target values.
+- `sigma_b`: standard deviation per target. Smaller means a harder
+  constraint; set one very small to make a target effectively exact.
+
+# Returns
+A [`CalibrationResult`](@ref).
+
+# References
+Golan, A., Judge, G. & Robinson, S. (1994). Recovering information from
+incomplete or partial multisectoral economic data. *Review of Economics and
+Statistics*, 76(3).
+"""
 function balance_generalized_ce(X0::AbstractMatrix{T}, G::AbstractMatrix{T}, b::AbstractVector{T}, sigma_b::AbstractVector{T}; tol::T=T(1e-10), maxiter::Int=40) where {T<:AbstractFloat}
     M, N = size(X0); MN = M * N; K = length(b)
     x0_vec = vec(copy(X0)); p_vec = max.(x0_vec, zero(T)); n_vec = max.(-x0_vec, zero(T))
@@ -315,6 +413,29 @@ function balance_generalized_ce(X0::AbstractMatrix{T}, G::AbstractMatrix{T}, b::
     return reshape(x_curr, M, N), -(var_b .* λ), λ
 end
 
+"""
+    sam_leontief_multipliers(X_sam, endogenous_idx)
+
+Leontief multipliers from a social accounting matrix.
+
+Forms the column-coefficient matrix over the accounts named by
+`endogenous_idx`, then inverts `(I - A)` to give the total effect of a unit
+of exogenous injection on each endogenous account — direct plus all
+induced rounds.
+
+# Arguments
+- `X_sam`: a **balanced** SAM. Balance it first with
+  [`balance_gras`](@ref); multipliers from an unbalanced matrix are
+  meaningless.
+- `endogenous_idx`: indices of the accounts treated as endogenous. The rest
+  are the exogenous injections, and this split determines the multipliers
+  entirely.
+
+!!! warning
+    `(I - A)` must be invertible, which needs the endogenous block to be
+    productive. A near-singular inverse shows up as implausibly large
+    multipliers rather than an error.
+"""
 function sam_leontief_multipliers(X_sam::AbstractMatrix{T}, endogenous_idx::AbstractVector{Int}) where {T<:Real}
     col_totals = vec(sum(X_sam; dims=1))
     X_endog = X_sam[endogenous_idx, endogenous_idx]

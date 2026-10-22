@@ -60,7 +60,7 @@ const FilterMod     = SpatialFiltering
 import .SpatialUtils: SpatialVariant, SAR, SDM, SARAR,
        FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
        LogDetMethod, ExactLU, ChebyshevApprox
-import .SpatialEconometricsPrototype: SpatialRegressionModel, fit_spatial
+import .SpatialEconometricsPrototype: SpatialRegressionModel, SpatialEffectsResult, fit_spatial
 import .SpatialPanelEconometrics: SpatialPanelModel, LeeYuTransformation, DirectQML, fit_spatial_panel
 import .DynamicSpatialPanelEconometrics: DynamicSpatialPanelModel, DynamicSpatialEffectsResult, fit_dynamic_spatial_panel, dynamic_spatial_effects
 import .SpatialGS2SLSPanel: GS2SLSModel, fit_gs2sls_panel
@@ -88,9 +88,9 @@ import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient,
 Recompute a fitted model's coefficient covariance under a robust
 specification.
 
-`spec` selects the estimator: [`DriscollKraayVCOV`](@ref) for spatial
+`spec` selects the estimator: `DriscollKraayVCOV` for spatial
 correlation of unrestricted form within each period plus serial
-correlation, or [`ConleySpatialHAC`](@ref) for distance-decayed spatial
+correlation, or `ConleySpatialHAC` for distance-decayed spatial
 correlation using a kernel and cutoff.
 
 Both are sandwich estimators. Because a spatial-lag model is estimated by
@@ -99,8 +99,8 @@ through the Jacobian of the spatial transformation, so the result is a
 covariance for the same `coef` vector and can be substituted wherever the
 model's own `vcov` is used.
 
-Accepts [`SpatialRegressionModel`](@ref), [`SpatialPanelModel`](@ref) and
-[`DynamicSpatialPanelModel`](@ref).
+Accepts `SpatialRegressionModel`, `SpatialPanelModel` and
+`DynamicSpatialPanelModel`.
 
 # Examples
 ```julia
@@ -111,8 +111,8 @@ robust_coeftable(m, DriscollKraayVCOV(max_lag = 2))
 spatial_effects(m, DriscollKraayVCOV(max_lag = 2))
 ```
 
-See also [`robust_coeftable`](@ref), [`vcov_driscoll_kraay`](@ref),
-[`vcov_conley`](@ref).
+See also [`robust_coeftable`](@ref), `vcov_driscoll_kraay`,
+`vcov_conley`.
 
 # References
 Driscoll, J. & Kraay, A. (1998). *Review of Economics and Statistics*,
@@ -153,7 +153,7 @@ robust errors are much larger, the model's own covariance was understating
 uncertainty, usually because of spatial correlation the specification did
 not capture.
 
-`spec` is a [`DriscollKraayVCOV`](@ref) or [`ConleySpatialHAC`](@ref); the
+`spec` is a `DriscollKraayVCOV` or `ConleySpatialHAC`; the
 covariance itself comes from [`robust_vcov`](@ref).
 
 # Examples
@@ -189,9 +189,9 @@ matrix is the **direct** effect, the average off-diagonal row sum the
 **indirect** (spillover) effect, and their sum the **total**. Standard
 errors are obtained by the delta method.
 
-Works on [`SpatialRegressionModel`](@ref), [`SpatialPanelModel`](@ref) and
-[`DynamicSpatialPanelModel`](@ref); for the dynamic case see
-[`dynamic_spatial_effects`](@ref), which separates short-run from long-run.
+Works on `SpatialRegressionModel`, `SpatialPanelModel` and
+`DynamicSpatialPanelModel`; for the dynamic case see
+`dynamic_spatial_effects`, which separates short-run from long-run.
 
 # Keywords
 - `max_power`: truncation of the series used for `(I - rho*W)^{-1}`. The
@@ -200,7 +200,7 @@ Works on [`SpatialRegressionModel`](@ref), [`SpatialPanelModel`](@ref) and
   second positional argument instead to use [`robust_vcov`](@ref).
 
 # Returns
-A [`SpatialEffectsResult`](@ref) with `direct`, `indirect`, `total` and the
+A `SpatialEffectsResult` with `direct`, `indirect`, `total` and the
 matching `_se` vectors, aligned with `varnames`.
 
 # Examples
@@ -236,7 +236,7 @@ lattice sizes.
 
 Returns an `N x N` sparse matrix with `N = L^2`. Intended for examples,
 tests and Monte Carlo work; build weights for real data with
-[`knn_weights`](@ref), [`distance_weights`](@ref) or [`read_gal`](@ref).
+`knn_weights`, `distance_weights` or `read_gal`.
 
 # Examples
 ```julia
@@ -367,7 +367,7 @@ Requires a Makie backend - see [`plot_coefficients`](@ref).
 LISA cluster map, colouring units by `cluster_type` (`:HH`, `:LL`, `:HL`,
 `:LH`, `:ns`). Returns a `Makie.Figure`.
 
-`lisa` is a [`LISAResult`](@ref) from [`moran_local`](@ref) and `coords` an
+`lisa` is a `LISAResult` from `moran_local` and `coords` an
 `N x 2` matrix for the same units; a mismatch raises `DimensionMismatch`
 rather than plotting the shorter of the two.
 
@@ -390,7 +390,7 @@ Requires a Makie backend - see [`plot_coefficients`](@ref).
     plot_spatial_effects(effects)
 
 Grouped bar chart of the direct, indirect and total effects in a
-[`SpatialEffectsResult`](@ref). Returns a `Makie.Figure`.
+`SpatialEffectsResult`. Returns a `Makie.Figure`.
 
 Requires a Makie backend - see [`plot_coefficients`](@ref).
 """ plot_spatial_effects
@@ -422,7 +422,7 @@ Returns a `BayesianSpatialResult` (a subtype of
     and `posterior_std`, which are stable across both.
 
 See also [`bayesian_sdm`](@ref), [`bayesian_sem`](@ref),
-[`fit_spatial`](@ref).
+`fit_spatial`.
 """ bayesian_sar
 
 @doc """
@@ -455,7 +455,7 @@ export
     FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
     LogDetMethod, ExactLU, ChebyshevApprox,
 
-    SpatialRegressionModel, SpatialPanelModel, DynamicSpatialPanelModel, DynamicSpatialEffectsResult, GS2SLSModel, SystemGMMModel, CalibrationResult, SpatialErrorRegressionModel, SpatialErrorPanelModel,
+    SpatialRegressionModel, SpatialPanelModel, DynamicSpatialPanelModel, SpatialEffectsResult, DynamicSpatialEffectsResult, GS2SLSModel, SystemGMMModel, CalibrationResult, SpatialErrorRegressionModel, SpatialErrorPanelModel,
     LeeYuTransformation, DirectQML, GMMVariant, DifferenceGMM, SystemGMM,
     KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel,
     DistanceMetric, EuclideanDistance, HaversineDistance,

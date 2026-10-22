@@ -50,7 +50,7 @@ separately:
 # Other fields
 - `coef`, `vcov`, `coefnames`, `sigma2`, `loglik`, `residuals`: as usual.
   `coefnames` runs `"y_lag"`, `"Wy_lag"`, the covariates, the `W_`-prefixed
-  terms for an [`SDM`](@ref), then `"ρ"`.
+  terms for an `SDM`, then `"ρ"`.
 - `coef_uncorrected`, `sigma2_uncorrected`: the estimates before the bias
   correction, so you can see what it moved.
 - `spectral_radius_A`: stability diagnostic for the implied system. The
@@ -133,9 +133,9 @@ analytical correction is applied, using stochastic probes to estimate the
 traces the correction needs.
 
 # Arguments
-- `variant`: [`SAR`](@ref) or [`SDM`](@ref).
-- `fe_spec`: a [`FixedEffectsSpec`](@ref); [`IndivFE`](@ref) or
-  [`TwoWayFE`](@ref) are the meaningful choices here.
+- `variant`: `SAR` or `SDM`.
+- `fe_spec`: a `FixedEffectsSpec`; `IndivFE` or
+  `TwoWayFE` are the meaningful choices here.
 - `W`: `N x N` cross-sectional weight matrix.
 - `X`, `y`: stacked over all `T_total` periods, units varying fastest.
 - `N`, `T_total`: units and periods **including** the one consumed by the
@@ -145,13 +145,13 @@ traces the correction needs.
 - `n_bias_probes`, `rng`: probes used by the bias correction, and the
   random source for them. Results vary slightly with `rng`; pass a seeded
   one for reproducibility.
-- `method`, `varnames`, `rho_bounds`: as for [`fit_spatial_panel`](@ref).
+- `method`, `varnames`, `rho_bounds`: as for `fit_spatial_panel`.
 
 # Returns
 A [`DynamicSpatialPanelModel`](@ref).
 
 !!! warning
-    Same stacking requirement as [`fit_spatial_panel`](@ref): units vary
+    Same stacking requirement as `fit_spatial_panel`: units vary
     fastest within each period. The bias correction also assumes `T` is
     small relative to `N`; with long panels the correction matters less and
     the uncorrected estimates are already close.

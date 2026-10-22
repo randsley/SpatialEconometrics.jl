@@ -150,7 +150,7 @@ every location, so the headline output is the `N x K` surface
     The local standard errors are not adjusted for the fact that `N`
     regressions were run on overlapping data, so pointwise `t`-statistics
     overstate significance. Read the surface as description, and use
-    [`plot_gwr_coefficients`](@ref) to look at it.
+    `plot_gwr_coefficients` to look at it.
 """
 struct GWRModel{T<:AbstractFloat} <: StatsAPI.RegressionModel
     coef_local::Matrix{T}       # N × K local coefficients
@@ -391,7 +391,7 @@ Each local fit weights observations by their distance from the target
 location, so the result is a coefficient *surface* rather than a single
 vector. This describes how a relationship varies over space; it does not
 model spatial dependence in the error, which is what
-[`fit_spatial`](@ref) and [`fit_spatial_error`](@ref) are for.
+`fit_spatial` and `fit_spatial_error` are for.
 
 # Arguments
 - `X`: `N x K` covariates, **without** an intercept — one is added.

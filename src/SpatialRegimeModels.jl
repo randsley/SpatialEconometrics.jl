@@ -27,6 +27,20 @@ export SpatialRegimeModel, fit_spatial_regime,
 
 abstract type RegimeAssignment end
 
+"""
+    ExogenousRegimes(labels)
+
+Regime membership supplied directly, as an integer label per unit.
+
+Use this when the grouping is known in advance — states, planning regions,
+pre- and post-reform periods. When it is not, [`skater_regimes`](@ref)
+derives spatially contiguous regimes from the data instead.
+
+# Examples
+```julia
+fit_spatial_regime(W, X, y, ExogenousRegimes(region_id))
+```
+"""
 struct ExogenousRegimes <: RegimeAssignment
     labels::Vector{Int}
 end
@@ -197,6 +211,18 @@ end
 #   y = Xβ_r + ε  or  y = ρWy + Xβ_r + ε  (SAR with regime-specific β)
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SpatialRegimeModel
+
+A spatial regime model, returned by [`fit_spatial_regime`](@ref):
+coefficients are allowed to differ across groups of units rather than being
+held constant over the whole map.
+
+A discrete alternative to GWR — where `fit_gwr` lets coefficients
+vary smoothly with location, this estimates one set per regime, which is
+easier to interpret and test when the groups are meaningful. Use
+[`regime_chow_test`](@ref) to ask whether the split is warranted.
+"""
 struct SpatialRegimeModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -325,6 +351,21 @@ end
 # Chow-type Regime Stability Test
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    ChowRegimeTest
+
+Test of coefficient equality across regimes, returned by
+[`regime_chow_test`](@ref).
+
+Fields: `stat`, `df`, `p_value`, and the two log-likelihoods `ll_pooled`
+and `ll_regime`. Failing to reject means the pooled model is adequate and
+the regime split is not buying anything.
+
+!!! note
+    If the regimes came from [`skater_regimes`](@ref) rather than from
+    outside knowledge, this p-value is optimistic: the split was chosen
+    using the same data it is being tested on.
+"""
 struct ChowRegimeTest{T<:AbstractFloat}
     stat::T
     df::Int

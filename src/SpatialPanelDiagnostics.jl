@@ -19,6 +19,16 @@ export
 
 # ─── Spatial Hausman Test ─────────────────────────────────────────────
 
+"""
+    HausmanTestResult
+
+Fixed- versus random-effects test for a spatial panel, returned by
+[`spatial_hausman_test`](@ref).
+
+Fields: `stat`, `df`, `p_value` and the `coefnames` compared. Rejection
+favours fixed effects, because it says the unit effects are correlated with
+the regressors and the random-effects estimator is therefore inconsistent.
+"""
 struct HausmanTestResult
     stat::Float64
     df::Int
@@ -116,6 +126,16 @@ end
 
 # ─── Spatial Chow Test ───────────────────────────────────────────────
 
+"""
+    ChowTestResult
+
+Structural-break test over time for a spatial panel, returned by
+[`spatial_chow_test`](@ref).
+
+Fields: `stat`, `df`, `p_value` and `break_period`, the period tested.
+Rejection says the coefficients differ either side of that period, so a
+single pooled specification is not adequate.
+"""
 struct ChowTestResult
     stat::Float64
     df::Int
@@ -191,6 +211,20 @@ end
 
 # ─── Joint LM Tests for Panels ──────────────────────────────────────
 
+"""
+    PanelLMTestResult
+
+Joint and individual LM tests for a spatial panel, returned by
+[`panel_lm_tests`](@ref).
+
+Carries a joint test (`joint_stat`, `joint_df`, `joint_p`) against the
+hypothesis of no spatial dependence and no random effects, plus the
+component tests: `lag_stat`/`lag_p`, `error_stat`/`error_p` and
+`re_stat`/`re_p` for the random-effects variance.
+
+Read the joint test first; if it does not reject, the components are not
+worth chasing individually.
+"""
 struct PanelLMTestResult
     joint_stat::Float64
     joint_df::Int
@@ -282,6 +316,20 @@ end
 
 # ─── Panel Moran's I ─────────────────────────────────────────────────
 
+"""
+    PanelMoranResult
+
+Moran's I computed period by period for a panel, returned by
+[`panel_moran`](@ref).
+
+Fields: `period_results`, a vector of `MoranResult` with one entry
+per period; `pooled`, the statistic on the pooled residuals; and
+`T_periods`.
+
+The per-period series is the useful part — it shows whether spatial
+dependence is stable over time or concentrated in particular periods, which
+a single pooled number hides.
+"""
 struct PanelMoranResult
     period_results::Vector{MoranResult}
     pooled::MoranResult

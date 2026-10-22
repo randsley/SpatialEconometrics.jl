@@ -92,9 +92,9 @@ error, `sigma2`, `loglik`, the weight matrix, the transformed design
 `T_periods`.
 
 As in the cross-section, `coef` holds structural parameters rather than
-marginal effects — use [`spatial_effects`](@ref).
+marginal effects — use `spatial_effects`.
 
-See also [`fit_spatial_panel`](@ref), [`robust_vcov`](@ref).
+See also [`fit_spatial_panel`](@ref), `robust_vcov`.
 """
 struct SpatialPanelModel{
     V<:SpatialVariant,
@@ -173,9 +173,9 @@ end
 Fit a static spatial panel by quasi-maximum likelihood with fixed effects.
 
 # Arguments
-- `variant`: [`SAR`](@ref) or [`SDM`](@ref).
-- `fe_spec`: a [`FixedEffectsSpec`](@ref) — [`NoFE`](@ref),
-  [`IndivFE`](@ref), [`TimeFE`](@ref) or [`TwoWayFE`](@ref).
+- `variant`: `SAR` or `SDM`.
+- `fe_spec`: a `FixedEffectsSpec` — `NoFE`,
+  `IndivFE`, `TimeFE` or `TwoWayFE`.
 - `W`: `N x N` sparse weight matrix for the cross-section, **not** the
   stacked `NT x NT` matrix.
 - `X`: `(N*T_per) x K` covariates, no intercept.
@@ -185,8 +185,8 @@ Fit a static spatial panel by quasi-maximum likelihood with fixed effects.
 # Keywords
 - `approach`: [`LeeYuTransformation`](@ref) (default) or
   [`DirectQML`](@ref).
-- `method`: a [`LogDetMethod`](@ref).
-- `varnames`, `rho_bounds`: as for [`fit_spatial`](@ref).
+- `method`: a `LogDetMethod`.
+- `varnames`, `rho_bounds`: as for `fit_spatial`.
 
 # Returns
 A [`SpatialPanelModel`](@ref).
@@ -205,8 +205,8 @@ m.rho
 robust_coeftable(m, DriscollKraayVCOV())
 ```
 
-See also [`fit_dynamic_spatial_panel`](@ref), [`panel_lm_tests`](@ref),
-[`spatial_hausman_test`](@ref).
+See also `fit_dynamic_spatial_panel`, `panel_lm_tests`,
+`spatial_hausman_test`.
 
 # References
 Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).

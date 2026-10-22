@@ -105,6 +105,20 @@ end
 # SpatialProbitModel — linearized GMM (Klier & McMillen 2008)
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SpatialProbitModel
+
+A spatial probit fitted by linearized GMM, returned by
+[`fit_spatial_probit`](@ref).
+
+Fast, because it avoids the `N`-dimensional integral the exact likelihood
+needs, but less precise in small samples than the Gibbs sampler — see
+[`fit_bayesian_spatial_probit`](@ref) when precision on `rho` matters.
+
+Use [`marginal_effects`](@ref) to interpret the fit: as in any probit the
+coefficients are not marginal effects, and the spatial lag adds feedback on
+top of that.
+"""
 struct SpatialProbitModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -266,6 +280,16 @@ end
 # Marginal effects — direct / indirect / total
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SpatialProbitEffects
+
+Direct, indirect and total marginal effects on the probability scale for a
+spatial discrete-choice model, returned by [`marginal_effects`](@ref).
+
+Two things compound here: the probit link makes the effect depend on where
+each unit sits on the curve, and the spatial lag propagates a change
+through `(I - rho*W)^{-1}`. The reported effects average over both.
+"""
 struct SpatialProbitEffects{T<:AbstractFloat}
     direct::Vector{T}
     indirect::Vector{T}
@@ -367,6 +391,19 @@ end
 # BayesianSpatialProbitModel — Albert & Chib data augmentation
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    BayesianSpatialProbitModel
+
+A spatial probit estimated by Albert-Chib Gibbs sampling, returned by
+[`fit_bayesian_spatial_probit`](@ref).
+
+Data augmentation draws the latent utilities, which makes the conditional
+posteriors tractable and avoids the intractable likelihood. Slower than
+[`fit_spatial_probit`](@ref) but markedly more precise on `rho` in small
+samples, and it carries an intercept.
+
+This is built in, not part of the Turing extension.
+"""
 struct BayesianSpatialProbitModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -524,6 +561,21 @@ end
 # SpatialOrderedProbitModel — ordered outcomes via data augmentation
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SpatialOrderedProbitModel
+
+A spatial ordered probit, returned by
+[`fit_spatial_ordered_probit`](@ref), for an outcome with `J` ordered
+categories.
+
+Alongside the coefficients it carries the cut points separating the
+categories, drawn from their uniform conditionals between adjacent order
+statistics of the latent vector.
+
+With `J = 2` this reduces to binary probit, which
+[`fit_bayesian_spatial_probit`](@ref) handles better since it carries an
+intercept.
+"""
 struct SpatialOrderedProbitModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}

@@ -65,7 +65,7 @@ Spatial error process: `y = X*beta + u` with `u = lambda*W*u + e`.
 
 Dependence is in the disturbance only, so OLS stays unbiased but its
 standard errors are wrong — which is what makes this the useful null for
-[`lm_test_error`](@ref). Parameter order is `beta` then `lambda`.
+`lm_test_error`. Parameter order is `beta` then `lambda`.
 
 See also [`SpatialDGP`](@ref).
 """
@@ -82,7 +82,7 @@ Spatial Durbin process: `y = rho*W*y + X*beta + W*X*theta + e`.
 
 Nests [`SAR_DGP`](@ref) at `theta = 0` and [`SLX_DGP`](@ref) at `rho = 0`,
 so it is the natural process for checking
-[`common_factor_test`](@ref). Parameter order is `beta`, `theta`, `rho`.
+`common_factor_test`. Parameter order is `beta`, `theta`, `rho`.
 
 See also [`SpatialDGP`](@ref).
 """
@@ -120,7 +120,7 @@ With one weight matrix doing both jobs, `rho` and `lambda` are only weakly
 separated in finite samples — useful precisely for showing how hard the
 specification search gets. Parameter order is `beta`, `rho`, `lambda`.
 
-See also [`SpatialDGP`](@ref), [`SARAR`](@ref).
+See also [`SpatialDGP`](@ref), `SARAR`.
 """
 struct SAC_DGP{T<:AbstractFloat} <: SpatialDGP
     rho::T

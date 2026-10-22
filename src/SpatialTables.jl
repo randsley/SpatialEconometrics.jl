@@ -14,6 +14,25 @@ export CoefTable, coeftable, summary_stats,
 # CoefTable — a Tables.jl-compatible coefficient table
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    CoefTable
+
+A coefficient table ready for display or export, returned by
+`coeftable`.
+
+# Fields
+- `names`, `estimate`, `std_error`, `z_stat`, `p_value`: the usual columns.
+- `ci_lower`, `ci_upper`, `ci_level`: confidence interval bounds and the
+  level they correspond to.
+
+Export with [`to_latex`](@ref), [`to_csv`](@ref) or
+[`to_markdown`](@ref).
+
+!!! note
+    Inference is normal-theory: `z_stat` and `p_value` use the standard
+    normal, not a t distribution, which suits the large-sample
+    maximum-likelihood estimators here.
+"""
 struct CoefTable{T<:AbstractFloat}
     names::Vector{String}
     estimate::Vector{T}

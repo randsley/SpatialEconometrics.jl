@@ -11,10 +11,79 @@ using StatsAPI
 export GMMVariant, DifferenceGMM, SystemGMM,
        SystemGMMModel, fit_dynamic_gmm
 
+"""
+    GMMVariant
+
+Which moment conditions a dynamic panel GMM estimator uses. Subtypes:
+[`DifferenceGMM`](@ref) and [`SystemGMM`](@ref).
+"""
 abstract type GMMVariant end
+"""
+    DifferenceGMM()
+
+Arellano-Bond difference GMM: first-difference away the unit effects and
+instrument with lagged levels.
+
+Consistent for a dynamic panel with fixed effects, but the lagged-level
+instruments become weak as the autoregressive parameter approaches 1 —
+a highly persistent series provides little information about its own
+differences. [`SystemGMM`](@ref) adds moment conditions to address exactly
+that.
+
+# References
+Arellano, M. & Bond, S. (1991). *Review of Economic Studies*, 58(2).
+"""
 struct DifferenceGMM <: GMMVariant end
+"""
+    SystemGMM()
+
+Blundell-Bond system GMM: the difference equations of
+[`DifferenceGMM`](@ref) together with the levels equations, instrumented
+with lagged differences.
+
+Much better behaved when the series is persistent, which is the usual case.
+The extra moment conditions require that changes in the regressors be
+uncorrelated with the unit effects — a real assumption, and the thing to
+examine if the Sargan test rejects.
+
+# References
+Blundell, R. & Bond, S. (1998). *Journal of Econometrics*, 87(1).
+"""
 struct SystemGMM     <: GMMVariant end
 
+"""
+    SystemGMMModel
+
+A fitted dynamic panel GMM model, returned by
+[`fit_dynamic_gmm`](@ref). Implements the `StatsAPI.RegressionModel`
+interface.
+
+# Fields
+- `variant`: [`DifferenceGMM`](@ref) or [`SystemGMM`](@ref).
+- `coef_twostep`, `coef_onestep`: the two-step and one-step estimates.
+- `vcov_windmeijer`: two-step covariance with the Windmeijer finite-sample
+  correction — **the one to report**.
+- `vcov_naive`: uncorrected two-step covariance, kept for comparison.
+  Without the correction two-step standard errors are severely biased
+  downwards, so the gap between this and `vcov_windmeijer` is worth a look.
+- `vcov_onestep`: covariance of the one-step estimator.
+- `hansen_j`, `hansen_df`: Hansen J over-identification test.
+- `ar1_z`, `ar2_z`: Arellano-Bond tests for first- and second-order
+  residual autocorrelation.
+- `n_instruments`, `collapsed`: how many instruments were used and whether
+  the instrument matrix was collapsed.
+- `N`, `T_total`, `coefnames`.
+
+!!! note
+    Read the three diagnostics together. `ar1_z` is *expected* to reject,
+    since differencing induces first-order correlation by construction;
+    `ar2_z` should **not** reject, or the lag structure is misspecified and
+    the instruments are invalid. Then check `hansen_j`, bearing in mind the
+    `n_instruments` caveat on [`fit_dynamic_gmm`](@ref).
+
+# References
+Windmeijer, F. (2005). *Journal of Econometrics*, 126(1).
+"""
 struct SystemGMMModel{V<:GMMVariant, T<:AbstractFloat} <: StatsAPI.RegressionModel
     variant::V
     N::Int
@@ -132,6 +201,42 @@ function build_gmm_system(
     return X_list, y_list, Z_list, H, T_diff, L_total
 end
 
+"""
+    fit_dynamic_gmm(variant, Y_mat, X_ten; max_lag = 4, collapsed = false,
+                    varnames = nothing)
+
+Fit a dynamic panel by Arellano-Bond or Blundell-Bond GMM.
+
+# Arguments
+- `variant`: [`DifferenceGMM`](@ref) or [`SystemGMM`](@ref).
+- `Y_mat`: `N x T` matrix of the dependent variable — units by periods, not
+  stacked as the spatial panel estimators expect.
+- `X_ten`: `N x T x K` array of covariates.
+
+# Keywords
+- `max_lag`: how many lags to use as instruments. More lags mean more
+  moment conditions and, with many periods, an instrument count that grows
+  quadratically and overfits.
+- `collapsed`: collapse the instrument matrix, holding the count down. Worth
+  turning on whenever `T` is more than small.
+- `varnames`: covariate names.
+
+# Returns
+A [`SystemGMMModel`](@ref).
+
+!!! warning
+    Instrument proliferation is the standard failure here: too many
+    instruments relative to `N` makes the over-identification test lose all
+    power, so a comfortable p-value can be meaningless. Keep the instrument
+    count well below `N`, using `max_lag` and `collapsed`.
+
+!!! note
+    Note the data layout: `Y_mat` is `N x T` and `X_ten` is `N x T x K`,
+    unlike the stacked vectors the spatial panel estimators take.
+
+# References
+Roodman, D. (2009). How to do xtabond2. *Stata Journal*, 9(1).
+"""
 function fit_dynamic_gmm(
     variant::V,
     Y_mat::Matrix{T},

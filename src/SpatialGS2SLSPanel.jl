@@ -24,6 +24,26 @@ export SpatialVariant, SARAR,
 const SpatialVariant = SpatialUtils.SpatialVariant
 const SARAR = SpatialUtils.SARAR
 
+"""
+    GS2SLSModel
+
+A fitted GS2SLS / SARAR panel, returned by
+[`fit_gs2sls_panel`](@ref). Implements the `StatsAPI.RegressionModel`
+interface.
+
+Carries `coef` and `vcov`, both spatial parameters `rho` and `lambda`,
+`sigma2`, the Sargan over-identification statistic with its p-value, the
+weight matrix, residuals, `coefnames` and the panel dimensions.
+
+Estimated by instrumental variables rather than maximum likelihood, which
+is what lets it handle endogenous regressors alongside spatial dependence
+and avoids assuming normal errors.
+
+!!! note
+    Check `sargan_pval` before reading anything else. A small value says the
+    instruments are rejected, and then the coefficients are not credible
+    whatever their standard errors look like.
+"""
 struct GS2SLSModel{
     FE<:FixedEffectsSpec,
     T<:AbstractFloat,
@@ -111,6 +131,62 @@ function estimate_lambda_gmm(u::Vector{T}, Wu::Vector{T}, WWu::Vector{T}) where 
     return T(x)
 end
 
+"""
+    fit_gs2sls_panel(fe_spec, W, X_exog, X_endog, Z_iv, y, N, T_total;
+                     varnames, exog_names, endog_names)
+
+Fit a SARAR panel with endogenous regressors by generalized spatial
+two-stage least squares.
+
+Handles two problems at once: spatial dependence in both `y` and the errors
+(as in `SARAR`), and regressors correlated with the error for
+non-spatial reasons. Because it is an IV method it needs no distributional
+assumption, unlike the likelihood-based panel estimators.
+
+# Arguments
+- `fe_spec`: a `FixedEffectsSpec`.
+- `W`: `N x N` cross-sectional weight matrix.
+- `X_exog`: exogenous covariates.
+- `X_endog`: endogenous regressors.
+- `Z_iv`: excluded instruments — at least as many columns as `X_endog`, or
+  the model is not identified.
+- `y`: stacked response.
+- `N`, `T_total`: units and periods; one period is consumed, so estimation
+  uses `T_total - 1`.
+
+# Keywords
+- `varnames`, `exog_names`, `endog_names`: names for the output table.
+
+# Returns
+A [`GS2SLSModel`](@ref).
+
+!!! warning
+    Same stacking convention as the other panel estimators: units vary
+    fastest within each period. And read `sargan_pval` first — rejected
+    instruments invalidate the estimates.
+
+# Examples
+```julia
+m = fit_gs2sls_panel(TwoWayFE(), W, X_exog, X_endog, Z_iv, y, N, T_total)
+m.sargan_pval
+m.rho, m.lambda
+```
+
+A formula interface is available, which derives `N`, `T_total` and the
+stacking order from the table:
+
+```julia
+fit_gs2sls_panel(
+    @formula(y ~ x1 + endo(x2, z1 + z2) + fe(region) + fe(year)),
+    table, W; panel = :region, time = :year)
+```
+
+See also `endo`, `extract_panel_permutation`.
+
+# References
+Kelejian, H. & Prucha, I. (1998). *Journal of Real Estate Finance and
+Economics*, 17(1).
+"""
 function fit_gs2sls_panel(
     fe_spec::FE,
     W::M,

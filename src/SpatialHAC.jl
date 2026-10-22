@@ -145,8 +145,8 @@ end
 """
     AbstractRobustVCOV
 
-A robust covariance specification, passed to [`robust_vcov`](@ref),
-[`robust_coeftable`](@ref) or [`spatial_effects`](@ref).
+A robust covariance specification, passed to `robust_vcov`,
+`robust_coeftable` or `spatial_effects`.
 
 Subtypes: [`DriscollKraayVCOV`](@ref) and [`ConleySpatialHAC`](@ref).
 """
@@ -254,7 +254,7 @@ end
 
 Driscoll-Kraay covariance from a score matrix directly.
 
-The low-level routine behind [`robust_vcov`](@ref). Prefer that on a fitted
+The low-level routine behind `robust_vcov`. Prefer that on a fitted
 model, which builds `Z` and `bread_inv` correctly for you — in particular
 it maps maximum-likelihood scores through the Jacobian of the spatial
 transformation, which a raw call here will not do.
@@ -344,7 +344,7 @@ end
 
 Conley spatial HAC covariance from a score matrix directly.
 
-The low-level routine behind [`robust_vcov`](@ref); see
+The low-level routine behind `robust_vcov`; see
 [`vcov_driscoll_kraay`](@ref) for why the fitted-model path is usually the
 one you want. `spec` is a [`ConleySpatialHAC`](@ref), which carries the
 coordinates, cutoff, metric and kernels.
@@ -409,7 +409,7 @@ end
     RobustInferenceTable
 
 Coefficient table pairing robust with model-based standard errors, returned
-by [`robust_coeftable`](@ref). Pretty-prints via `show`.
+by `robust_coeftable`. Pretty-prints via `show`.
 
 # Fields
 - `estimator_name`: which robust estimator was used.

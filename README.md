@@ -6,6 +6,12 @@ A comprehensive spatial and structural econometrics suite in Julia, built around
 
 **Documentation:** [stable](https://randsley.github.io/SpatialEconometrics.jl/stable/) · [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/)
 
+Every exported name carries a docstring, so `?fit_spatial` works in the
+REPL. All 187 of them appear in the API reference — the 188th, `@formula`,
+is re-exported from StatsModels.jl and documented there. The docs build runs
+with no `warnonly` exemptions, so a missing docstring or a broken
+cross-reference fails CI.
+
 ---
 
 ## Table of Contents

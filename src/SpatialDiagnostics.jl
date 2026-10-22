@@ -124,7 +124,7 @@ I = (N/S_0) * (z' W z) / (z' z)
 where `z` is `y` in deviations from its mean and `S_0` is the sum of all
 weights. When `W` is row-standardized `S_0 = N` and `I` reduces to the
 slope of `Wz` on `z`, which is why it can be read off a Moran scatter plot
-([`plot_moran_scatter`](@ref)).
+(`plot_moran_scatter`).
 
 # Keywords
 - `inference`: `:asymptotic` uses the normal approximation with the exact
@@ -697,11 +697,11 @@ reading:
 | Plain tests | Robust tests | Indication |
 |---|---|---|
 | neither rejects | — | OLS is adequate |
-| only `lag` rejects | — | fit [`SAR`](@ref) |
+| only `lag` rejects | — | fit `SAR` |
 | only `error` rejects | — | fit a spatial error model |
-| both reject | `robust_lag` only | fit [`SAR`](@ref) |
+| both reject | `robust_lag` only | fit `SAR` |
 | both reject | `robust_error` only | fit a spatial error model |
-| both reject | both reject | consider [`SDM`](@ref) or `SARAR` |
+| both reject | both reject | consider `SDM` or `SARAR` |
 
 Each element is an [`LMTestResult`](@ref).
 

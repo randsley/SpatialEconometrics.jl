@@ -44,6 +44,20 @@ end
 
 # ─── Likelihood Ratio Test ───────────────────────────────────────────
 
+"""
+    LRTestResult
+
+Likelihood-ratio test between nested models, returned by
+[`lr_test`](@ref).
+
+Fields: `stat`, `df`, `p_value`, and both log-likelihoods
+(`ll_restricted`, `ll_unrestricted`).
+
+!!! warning
+    Valid only when one model genuinely nests the other and both were fitted
+    to the same data by maximum likelihood. For non-nested comparisons use
+    [`vuong_test`](@ref).
+"""
 struct LRTestResult
     stat::Float64
     df::Int
@@ -87,6 +101,20 @@ end
 
 # ─── Vuong Test (Non-Nested) ─────────────────────────────────────────
 
+"""
+    VuongTestResult
+
+Vuong test between two non-nested models, returned by
+[`vuong_test`](@ref).
+
+Fields: `stat`, `p_value`, `aic_correction`, and `preference`, which is
+`:model1`, `:model2` or `:indistinguishable`.
+
+Use this where [`lr_test`](@ref) does not apply — comparing a spatial lag
+against a spatial error specification, for instance, since neither nests
+the other. `:indistinguishable` is a genuine outcome, not a failure: the
+data may simply not separate the two.
+"""
 struct VuongTestResult
     stat::Float64
     p_value::Float64
@@ -143,6 +171,21 @@ end
 
 # ─── Common Factor Test ──────────────────────────────────────────────
 
+"""
+    CommonFactorTestResult
+
+Test of the common-factor restriction, returned by
+[`common_factor_test`](@ref).
+
+Fields: `stat`, `df`, `p_value`, `reject`.
+
+A Spatial Durbin model reduces to a spatial error model exactly when
+`theta = -rho * beta`. Failing to reject means the simpler error
+specification is adequate; rejecting means the Durbin terms carry
+information the error model cannot represent.
+
+See also `SDM`, `fit_spatial_error`.
+"""
 struct CommonFactorTestResult
     stat::Float64
     df::Int
@@ -211,6 +254,16 @@ end
 
 # ─── Wald Test ───────────────────────────────────────────────────────
 
+"""
+    WaldTestResult
+
+Wald test of a linear restriction `R*beta = r`, returned by
+[`wald_test`](@ref).
+
+Fields: `stat`, `df`, `p_value`. Needs only the fitted model's coefficients
+and covariance, so unlike [`lr_test`](@ref) it does not require refitting
+under the restriction.
+"""
 struct WaldTestResult
     stat::Float64
     df::Int

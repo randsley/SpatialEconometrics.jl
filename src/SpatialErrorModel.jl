@@ -40,9 +40,9 @@ parameter `lambda` with its standard error, `sigma2`, `loglik`, the weight
 matrix, residuals and `coefnames`.
 
 !!! note
-    Unlike [`SpatialRegressionModel`](@ref), `coef` **is** interpretable
+    Unlike `SpatialRegressionModel`, `coef` **is** interpretable
     directly: dependence sits in the error, so there is no feedback through
-    `y` and no need for [`spatial_effects`](@ref). What the model buys you
+    `y` and no need for `spatial_effects`. What the model buys you
     is correct standard errors, not different point estimates.
 """
 struct SpatialErrorRegressionModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
@@ -111,7 +111,7 @@ The likelihood is concentrated by spatially filtering `y` and `X` with
 alone.
 
 The first method fits a cross-section; the second fits a panel, taking a
-[`FixedEffectsSpec`](@ref) and the panel dimensions, with `X` and `y`
+`FixedEffectsSpec` and the panel dimensions, with `X` and `y`
 stacked units-fastest.
 
 # Arguments
@@ -120,7 +120,7 @@ stacked units-fastest.
 - `y`: response.
 
 # Keywords
-- `method`: a [`LogDetMethod`](@ref).
+- `method`: a `LogDetMethod`.
 - `varnames`: covariate names.
 - `lambda_bounds`: search interval for `lambda`, default
   `(-0.995, 0.995)`.
@@ -138,7 +138,7 @@ coef(m)                              # directly interpretable
 fit_spatial_error(TwoWayFE(), W, X, y, N, T_per)
 ```
 
-Use [`lm_tests`](@ref) to decide between this and [`fit_spatial`](@ref)
+Use `lm_tests` to decide between this and `fit_spatial`
 before fitting either.
 
 # References

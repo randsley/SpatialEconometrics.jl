@@ -27,6 +27,19 @@ export SLXModel, fit_slx,
 #   y = Xβ + WXθ + ε    (OLS — no spatial lag of y, no spatial error)
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SLXModel
+
+A fitted SLX model, `y = X*beta + W*X*theta + e`, returned by
+[`fit_slx`](@ref).
+
+The simplest way to admit spillovers: covariates of neighbours enter, but
+`y` does not depend on `W*y`. That makes it OLS on `[X W*X]`, so there is
+no log-determinant and no endogeneity, and `theta` is the spillover
+directly — no `(I - rho*W)^{-1}` decomposition needed.
+
+Often the right starting point before reaching for a lag model.
+"""
 struct SLXModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -95,6 +108,21 @@ end
 #   Allows different W matrices for lag and error components
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SACModel
+
+A fitted SAC / SARAR model, returned by [`fit_sac`](@ref):
+`y = rho*W*y + X*beta + u` with `u = lambda*W*u + e`.
+
+Dependence in both `y` and the errors, so it nests `SAR`
+(`lambda = 0`) and the spatial error model (`rho = 0`).
+
+!!! warning
+    With the same `W` in both roles, `rho` and `lambda` are only weakly
+    separated: the likelihood is often nearly flat along a ridge trading one
+    against the other, so individual estimates can be imprecise even when
+    the fit is good. Check them against the simpler nested models.
+"""
 struct SACModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -233,6 +261,17 @@ end
 #   y = Xβ + WXθ + u,  u = λWu + ε
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SDEMModel
+
+A fitted spatial Durbin error model, returned by [`fit_sdem`](@ref):
+`y = X*beta + W*X*theta + u` with `u = lambda*W*u + e`.
+
+Lagged covariates plus a spatial error, but no lag of `y`. Like
+[`SLXModel`](@ref), the absence of feedback through `y` means `theta` reads
+as the spillover directly; unlike it, the errors are modelled too, so
+inference accounts for residual spatial correlation.
+"""
 struct SDEMModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}

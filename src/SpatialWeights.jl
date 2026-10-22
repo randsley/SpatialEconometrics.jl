@@ -203,6 +203,17 @@ function row_standardize!(W::AbstractSparseMatrix)
     return W
 end
 
+"""
+    row_standardize(W) -> SparseMatrixCSC
+
+Row-standardized copy of `W`: every row with at least one neighbour sums
+to 1. See [`row_standardize!`](@ref) for the in-place version.
+
+This is the conventional normalization, and most of this package assumes
+it. It makes `W*y` a neighbourhood average, bounds the spatial parameter
+inside `(-1, 1)`, and makes Moran's I equal the slope in a Moran scatter
+plot. Rows with no neighbours stay all-zero.
+"""
 function row_standardize(W::AbstractSparseMatrix)
     W_copy = copy(W)
     row_standardize!(W_copy)
@@ -222,6 +233,18 @@ function spectral_standardize!(W::AbstractSparseMatrix)
     return W
 end
 
+"""
+    spectral_standardize(W) -> SparseMatrixCSC
+
+Copy of `W` divided by its spectral radius. See
+[`spectral_standardize!`](@ref) for the in-place version.
+
+Bounds the spatial parameter in `(-1, 1)` as row-standardization does, but
+without rescaling rows relative to one another, so differences in
+connectedness between units are preserved. Preferable when the number of
+neighbours is itself meaningful; the cost is that `W*y` is no longer a
+simple neighbourhood average.
+"""
 function spectral_standardize(W::AbstractSparseMatrix)
     W_copy = copy(W)
     spectral_standardize!(W_copy)
@@ -253,6 +276,16 @@ function minmax_standardize!(W::AbstractSparseMatrix)
     return W
 end
 
+"""
+    minmax_standardize(W) -> SparseMatrixCSC
+
+Copy of `W` divided by the smaller of its largest row sum and largest
+column sum. See [`minmax_standardize!`](@ref) for the in-place version.
+
+A middle course between [`row_standardize`](@ref) and
+[`spectral_standardize`](@ref): it keeps relative connectedness while being
+cheaper than an eigenvalue computation, which matters for large `W`.
+"""
 function minmax_standardize(W::AbstractSparseMatrix)
     W_copy = copy(W)
     minmax_standardize!(W_copy)
@@ -261,6 +294,29 @@ end
 
 # ─── Connectivity Diagnostics ────────────────────────────────────────
 
+"""
+    SpatialConnectivity
+
+Summary of a weight matrix's structure, returned by
+[`spatial_connectivity`](@ref). Worth looking at before fitting anything.
+
+# Fields
+- `N`, `n_nonzero`, `density`: size and sparsity.
+- `avg_neighbors`, `min_neighbors`, `max_neighbors`: the degree
+  distribution.
+- `n_islands`: units with no neighbours at all.
+- `is_symmetric`: whether `W == W'`. Row-standardizing a symmetric
+  contiguity matrix generally destroys symmetry, so `false` here is
+  normal and not a problem.
+- `spectral_radius`: largest eigenvalue magnitude; 1 for a
+  row-standardized matrix.
+
+!!! warning
+    `n_islands > 0` deserves attention. An isolated unit contributes
+    nothing to the spatial likelihood and its row of `W*y` is zero, so it
+    is effectively dropped from the spatial part of the model while still
+    counting towards `N`.
+"""
 struct SpatialConnectivity
     N::Int
     n_nonzero::Int

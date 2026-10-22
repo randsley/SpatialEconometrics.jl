@@ -51,7 +51,7 @@ struct ExactLU <: LogDetMethod end
 Approximate `log|I - ρW|` by a Chebyshev expansion in `ρ`.
 
 The traces the expansion needs depend only on `W`, so they are computed once
-by [`precompute_chebyshev_traces`](@ref) and every later evaluation is a
+by `precompute_chebyshev_traces` and every later evaluation is a
 polynomial in `ρ` — which is what makes repeated likelihood evaluation
 affordable.
 
@@ -64,7 +64,7 @@ affordable.
   which is exact and preferred unless `W` is too large for that.
 - `rng`: random source, used only when `n_probes > 0`.
 
-See also [`ExactLU`](@ref), [`chebyshev_logdet`](@ref).
+See also [`ExactLU`](@ref), `chebyshev_logdet`.
 """
 struct ChebyshevApprox{R<:AbstractRNG} <: LogDetMethod
     order::Int
@@ -91,8 +91,8 @@ end
 Which spatial structure a model places on the data.
 
 One tag type shared by every estimation module, so the same `SAR()` can be
-passed to [`fit_spatial`](@ref), [`fit_spatial_panel`](@ref) and
-[`fit_dynamic_spatial_panel`](@ref). Subtypes: [`SAR`](@ref), [`SDM`](@ref),
+passed to `fit_spatial`, `fit_spatial_panel` and
+`fit_dynamic_spatial_panel`. Subtypes: [`SAR`](@ref), [`SDM`](@ref),
 [`SARAR`](@ref).
 """
 abstract type SpatialVariant end
@@ -108,7 +108,7 @@ y = ρWy + Xβ + ε
 
 Because `y` appears on both sides, a change in one unit's `x` propagates
 through `(I - ρW)^{-1}` to every other unit, so coefficients are not
-marginal effects; use [`spatial_effects`](@ref) to decompose them into
+marginal effects; use `spatial_effects` to decompose them into
 direct, indirect and total.
 
 See also [`SDM`](@ref), [`SpatialVariant`](@ref).
@@ -126,7 +126,7 @@ y = ρWy + Xβ + WXθ + ε
 
 The design is augmented with the spatial lags of `X`, so the fitted
 coefficient vector carries `W_`-prefixed entries for the `θ` terms. It
-nests [`SAR`](@ref) at `θ = 0`, which [`common_factor_test`](@ref) tests.
+nests [`SAR`](@ref) at `θ = 0`, which `common_factor_test` tests.
 
 See also [`SpatialVariant`](@ref).
 """
@@ -141,7 +141,7 @@ Spatial dependence in both the dependent variable and the errors.
 y = ρWy + Xβ + u,  u = λWu + ε
 ```
 
-Used by [`fit_gs2sls_panel`](@ref), which estimates it by generalized
+Used by `fit_gs2sls_panel`, which estimates it by generalized
 spatial two-stage least squares rather than maximum likelihood, so
 endogenous regressors can be instrumented at the same time.
 
@@ -156,8 +156,8 @@ struct SARAR <: SpatialVariant end
 
 Which fixed effects a panel estimator sweeps out before estimating.
 
-The transform is applied by [`within_transform`](@ref), and the degrees of
-freedom it consumes are reported by [`effective_dims`](@ref). Subtypes:
+The transform is applied by `within_transform`, and the degrees of
+freedom it consumes are reported by `effective_dims`. Subtypes:
 [`NoFE`](@ref), [`IndivFE`](@ref), [`TimeFE`](@ref), [`TwoWayFE`](@ref).
 """
 abstract type FixedEffectsSpec end
@@ -168,7 +168,7 @@ abstract type FixedEffectsSpec end
 Pooled estimation: no fixed effects removed.
 
 Consistent only if the unobserved heterogeneity is uncorrelated with the
-regressors. [`spatial_hausman_test`](@ref) is the usual check.
+regressors. `spatial_hausman_test` is the usual check.
 
 See also [`FixedEffectsSpec`](@ref).
 """

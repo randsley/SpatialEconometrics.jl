@@ -1,153 +1,39 @@
 # API Reference
 
-## Estimation Functions
+Every exported name, grouped by the part of the package it
+belongs to. Variant and fixed-effects arguments are the shared
+tags under *Variants & Specification Tags*, usable unqualified
+in any call.
 
-Variant and fixed-effects arguments are the shared exported tags (`SAR`, `SDM`, `SARAR`, `NoFE`, `IndivFE`, `TimeFE`, `TwoWayFE`). The module column names the source file, not something you import.
+Submodules are not exported, so nothing here needs a module
+prefix; see [Getting Started](getting_started.md) for the
+reasoning.
 
-| Function | Model | Defined in |
-|---|---|---|
-| `fit_spatial(variant, W, X, y)` | Cross-section SAR/SDM | `CrossSection` |
-| `fit_spatial_panel(variant, fe, W, X, y, N, T)` | Static spatial panel | `StaticPanel` |
-| `fit_dynamic_spatial_panel(variant, fe, W, X, y, N, T)` | Dynamic spatial panel | `DynamicPanel` |
-| `fit_gs2sls_panel(fe, W, X_exog, X_endog, Z, y, N, T)` | GS2SLS with IV | `GS2SLSPanel` |
-| `fit_dynamic_gmm(variant, Y, X)` | System/Difference GMM | `SystemGMMMod` |
-| `fit_spatial_error(W, X, y)` | Spatial Error Model | `SEMMod` |
-| `fit_gwr(X, y, coords)` | Geographically Weighted Regression | `GWRMod` |
-| `fit_mgwr(X, y, coords)` | Multiscale GWR | `GWRMod` |
-| `fit_gravity(variant, flows, X, orig, dest)` | Gravity / flow models | `GravityMod` |
+- [Variants & Specification Tags](api/tags.md) — Shared tag types.
+- [Cross-Sectional Models](api/cross_section.md) — Cross-sectional SAR and SDM by concentrated maximum likelihood, and the effects decomposition that makes their coefficients interpretable.
+- [Static Spatial Panels](api/panel.md) — Static spatial panels with fixed effects.
+- [Dynamic Spatial Panels](api/dynamic_panel.md) — Panels carrying both a time lag and a spatial lag, with bias correction.
+- [GS2SLS / SARAR Panels](api/gs2sls.md) — Instrumental-variables estimation of SARAR panels with endogenous regressors.
+- [Dynamic Panel GMM](api/gmm.md) — Arellano-Bond and Blundell-Bond GMM for dynamic panels.
+- [Spatial Error Models](api/sem.md) — Models placing the dependence in the disturbance rather than in `y`.
+- [Higher-Order Models](api/higher_order.md) — SLX, SAC/SARAR and SDEM specifications.
+- [Spatial Regime Models](api/regime.md) — Coefficients that differ across groups of units, with SKATER regionalization.
+- [Spatial Discrete Choice](api/discrete_choice.md) — Spatial probit and ordered probit, by linearized GMM and by Gibbs sampling.
+- [Spatial Filtering](api/filtering.md) — Eigenvector spatial filtering (ESF) and its random-effects variant.
+- [Geographically Weighted Regression](api/gwr.md) — GWR and multiscale GWR: coefficient surfaces rather than single coefficients.
+- [Gravity & Flow Models](api/gravity.md) — PPML and negative binomial gravity models with high-dimensional fixed effects.
+- [Spatial Diagnostics](api/diagnostics.md) — Moran's I, Geary's c, LISA and the Anselin LM specification battery.
+- [Panel Diagnostics](api/panel_diagnostics.md) — Hausman, Chow and joint LM tests for panels.
+- [Model Selection](api/model_selection.md) — Information criteria and tests for choosing between specifications.
+- [Weight Matrices](api/weights.md) — Constructing, standardizing, inspecting and reading weight matrices.
+- [Robust Inference](api/robust.md) — Driscoll-Kraay and Conley spatial HAC covariance estimators.
+- [Simulation & Power Analysis](api/simulation.md) — Six data-generating processes, Monte Carlo experiments and power curves.
+- [Calibration & Input-Output](api/calibration.md) — GRAS and cross-entropy matrix balancing, and SAM multipliers.
+- [Formula Interface](api/formula.md) — The `@formula` terms this package adds, and panel reordering.
+- [Output & Tables](api/tables.md) — Coefficient tables and LaTeX / CSV / Markdown export.
+- [Package-Level & Extensions](api/package_level.md) — functions on the package itself and the extension entry points.
 
-## Weight Matrix Construction
-
-```@docs
-knn_weights
-distance_weights
-band_weights
-block_diagonal_weights
-row_standardize!
-spectral_standardize!
-minmax_standardize!
-spatial_connectivity
-```
-
-## Diagnostics
-
-| Function | Description |
-|---|---|
-| `moran_global(y, W)` | Global Moran's I with permutation inference |
-| `moran_local(y, W)` | LISA — local Moran's I with cluster classification |
-| `geary_c(y, W)` | Geary's C statistic |
-| `lm_tests(y, X, W)` | All four LM tests (lag, error, robust lag, robust error) |
-| `lm_test_lag(y, X, W)` | LM test for spatial lag |
-| `lm_test_error(y, X, W)` | LM test for spatial error |
-| `lm_test_robust_lag(y, X, W)` | Robust LM test for spatial lag |
-| `lm_test_robust_error(y, X, W)` | Robust LM test for spatial error |
-
-## Panel Diagnostics
-
-```@docs
-spatial_hausman_test
-spatial_chow_test
-panel_lm_tests
-panel_moran
-```
-
-## Model Selection
-
-```@docs
-spatial_aic
-spatial_bic
-lr_test
-vuong_test
-common_factor_test
-wald_test
-model_comparison_table
-```
-
-## I/O
-
-```@docs
-read_gal
-write_gal
-read_gwt
-write_gwt
-```
-
-## Higher-Order Models
-
-```@docs
-fit_slx
-fit_sac
-fit_sdem
-```
-
-## Regime Models
-
-```@docs
-fit_spatial_regime
-skater_regimes
-regime_chow_test
-```
-
-## Discrete Choice
-
-```@docs
-fit_spatial_probit
-fit_bayesian_spatial_probit
-fit_spatial_ordered_probit
-marginal_effects
-```
-
-## Spatial Filtering
-
-```@docs
-SpatialEigen
-spatial_eigenvectors
-moran_coefficient
-fit_esf
-selected_eigenvectors
-fit_re_esf
-```
-
-## Simulation
-
-```@docs
-simulate_spatial
-monte_carlo_spatial
-power_analysis
-```
-
-## Output & Tables
-
-```@docs
-coeftable
-summary_stats
-to_latex
-to_csv
-to_markdown
-regression_table
-```
-
-## Grid Weights
-
-| Function | Description |
-|---|---|
-| `make_rook_weights(L)` | L×L grid, 4-connected rook contiguity |
-| `make_queen_weights(L)` | L×L grid, 8-connected queen contiguity |
-
-## Robust Inference
-
-| Function | Description |
-|---|---|
-| `robust_vcov(m, spec)` | Robust variance-covariance matrix |
-| `robust_coeftable(m, spec)` | Coefficient table with robust SEs |
-| `spatial_effects(m)` | Direct/indirect/total spatial effects |
-| `dynamic_spatial_effects(m)` | Dynamic spatial effects (short/long run) |
-
-## Calibration
-
-| Function | Description |
-|---|---|
-| `balance_gras(X0, u, v)` | GRAS matrix balancing |
-| `balance_gras_full(X0, u, v)` | GRAS with full diagnostics |
-| `balance_generalized_ce(X0, u, v)` | Generalized cross-entropy balancing |
-| `sam_leontief_multipliers(SAM)` | Leontief multipliers from a SAM |
+`@formula` is re-exported from
+[StatsModels.jl](https://juliastats.org/StatsModels.jl/stable/);
+see [`slag`](@ref), [`fe`](@ref) and [`endo`](@ref) for the
+spatial terms this package adds to it.

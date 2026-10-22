@@ -319,6 +319,23 @@ end
 # ESFModel — eigenvector spatial filtering with forward selection
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    ESFModel
+
+An eigenvector spatial filtering fit, returned by [`fit_esf`](@ref).
+
+Spatial structure is absorbed by adding selected eigenvectors of the
+doubly-centred weight matrix to the design as synthetic regressors, chosen
+stepwise. Because they are orthogonal to the intercept and to each other,
+the covariate coefficients stay interpretable as ordinary regression
+coefficients — the appeal of the method over a lag model.
+
+Inspect the chosen basis with [`selected_eigenvectors`](@ref).
+
+!!! note
+    Selecting zero eigenvectors is a valid outcome, not a failure: it means
+    the residuals were already free of spatial autocorrelation.
+"""
 struct ESFModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -529,6 +546,25 @@ end
 # REESFModel — random-effects ESF (Murakami & Griffith 2015)
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    REESFModel
+
+A random-effects eigenvector spatial filtering fit, returned by
+[`fit_re_esf`](@ref).
+
+Instead of selecting eigenvectors stepwise as [`fit_esf`](@ref) does, this
+keeps the whole screened pool and shrinks every coefficient towards zero,
+governed by one variance ratio `theta = tau2/sigma2` estimated by profile
+REML. That avoids the model-selection variance stepwise search introduces.
+
+!!! warning
+    The reported residual Moran coefficient is for the *conditional*
+    residual and is **supposed to be substantially negative** — do not
+    compare it against zero. Subtracting the fitted spatial term leaves the
+    remainder in the orthogonal complement of the retained eigenvectors,
+    which is itself negatively autocorrelated. Compare it against
+    `moran_reference`, the closed-form expectation stored on the model.
+"""
 struct REESFModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
