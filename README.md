@@ -914,7 +914,7 @@ activates this project itself.
 ## Development
 
 This package was developed with assistance from a generative AI coding tool
-(Anthropic's Claude). The AI was used to draft the module code, the test
+(Anthropic's Claude). The AI was used to draft module code, the test
 suite, the documentation, and examples. All estimators were specified against
 the published econometric literature cited in [References](#references), and
 the numerical results are checked by the test suite and the Monte Carlo

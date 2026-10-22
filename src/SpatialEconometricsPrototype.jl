@@ -25,6 +25,36 @@ const SpatialVariant = SpatialUtils.SpatialVariant
 const SAR = SpatialUtils.SAR
 const SDM = SpatialUtils.SDM
 
+"""
+    SpatialRegressionModel
+
+A fitted cross-sectional spatial model, as returned by
+[`fit_spatial`](@ref). Implements the `StatsAPI.RegressionModel` interface,
+so `coef`, `vcov`, `nobs`, `loglikelihood`, `residuals` and `coefnames` all
+work on it.
+
+# Fields
+- `variant`: the [`SpatialVariant`](@ref) that was fitted.
+- `coef`: estimated coefficients, ordered as `coefnames`.
+- `vcov`: covariance matrix of `coef`.
+- `rho`, `rho_se`: the spatial autoregressive parameter and its standard
+  error.
+- `sigma2`: estimated error variance.
+- `loglik`: maximized log-likelihood.
+- `W`: the weight matrix used.
+- `X_aug`: the design actually estimated, including the intercept and, for
+  [`SDM`](@ref), the `WX` block.
+- `y`, `residuals`: response and residuals.
+- `trace_powers`: traces of powers of `W`, reused by
+  [`spatial_effects`](@ref).
+- `coefnames`: `"(Intercept)"`, the covariate names, then `W_`-prefixed
+  names for an [`SDM`](@ref).
+
+!!! note
+    `coef` holds the structural `β`, not marginal effects. In a spatial-lag
+    model a change in `x` feeds back through `(I - ρW)^{-1}`, so use
+    [`spatial_effects`](@ref) for interpretable quantities.
+"""
 struct SpatialRegressionModel{V<:SpatialVariant, T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     variant::V
     coef::Vector{T}
@@ -41,6 +71,21 @@ struct SpatialRegressionModel{V<:SpatialVariant, T<:AbstractFloat, M<:AbstractSp
     coefnames::Vector{String}
 end
 
+"""
+    SpatialEffectsResult
+
+Direct, indirect and total marginal effects with standard errors, as
+returned by [`spatial_effects`](@ref). All six vectors are aligned with
+`varnames`.
+
+# Fields
+- `varnames`: covariate names, excluding the intercept.
+- `direct`, `direct_se`: the own-unit effect — the average diagonal of
+  `∂y/∂x`.
+- `indirect`, `indirect_se`: the spillover onto other units, i.e. the
+  average off-diagonal row sum.
+- `total`, `total_se`: `direct + indirect`.
+"""
 struct SpatialEffectsResult{T<:AbstractFloat}
     varnames::Vector{String}
     direct::Vector{T}
@@ -67,6 +112,56 @@ function build_design_matrix(::SDM, X::AbstractMatrix{T}, W::AbstractSparseMatri
     return X_aug, names_aug
 end
 
+"""
+    fit_spatial(variant, W, X, y; method, varnames, rho_bounds)
+
+Fit a cross-sectional spatial regression by concentrated maximum
+likelihood.
+
+The likelihood is concentrated so that `β` and `σ²` are solved in closed
+form at each trial `ρ`, leaving a one-dimensional maximization over `ρ`
+alone, which is done by Brent search within `rho_bounds`.
+
+# Arguments
+- `variant`: [`SAR`](@ref) or [`SDM`](@ref).
+- `W`: `N × N` sparse weight matrix, conventionally row-standardized.
+- `X`: `N × K` covariates, **without** an intercept — one is added.
+- `y`: response of length `N`.
+
+# Keywords
+- `method`: how `log|I - ρW|` is evaluated — [`ExactLU`](@ref) or
+  [`ChebyshevApprox`](@ref) (default, order 6).
+- `varnames`: covariate names; defaults to `x1, x2, …`.
+- `rho_bounds`: search interval for `ρ`, default `(-0.995, 0.995)`. The
+  bounds stay inside `±1` because `I - ρW` is singular at the edge of the
+  stationary region.
+
+# Returns
+A [`SpatialRegressionModel`](@ref).
+
+# Examples
+```julia
+W = make_rook_weights(10)
+m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
+m.rho
+coef(m)
+spatial_effects(m)          # interpretable effects, not coef
+```
+
+A formula interface is also available: `fit_spatial(@formula(y ~ x1 +
+slag(x2)), table, W)`.
+
+!!! note
+    Read `coef` as structural parameters. [`spatial_effects`](@ref) gives
+    the marginal effects, which differ whenever `ρ ≠ 0`.
+
+See also [`fit_spatial_panel`](@ref), [`fit_spatial_error`](@ref),
+[`lm_tests`](@ref) for choosing between lag and error specifications.
+
+# References
+LeSage, J. & Pace, R. K. (2009). *Introduction to Spatial Econometrics*.
+CRC Press.
+"""
 function fit_spatial(
     variant::V,
     W::M,
@@ -179,6 +274,39 @@ function compute_asymptotic_vcov(
     return V_coef, ρ_se
 end
 
+"""
+    spatial_effects(model; max_power = 50, vcov_mat = model.vcov)
+
+Decompose a fitted spatial model into direct, indirect and total marginal
+effects.
+
+In a spatial-lag model `∂y/∂x' = (I - ρW)^{-1} (Iβ + Wθ)`, so a coefficient
+is not a marginal effect. The average diagonal of that matrix is the direct
+effect, the average off-diagonal row sum the indirect (spillover) effect,
+and their sum the total. Standard errors come from the delta method applied
+to `vcov_mat`.
+
+`(I - ρW)^{-1}` is evaluated from the trace sequence stored on the model
+rather than by inversion, truncated at `max_power` terms; the default is
+ample for `|ρ|` away from 1, and large `|ρ|` needs more terms to converge.
+
+Pass `vcov_mat` to propagate a robust covariance instead of the model's own
+— see [`robust_vcov`](@ref).
+
+# Returns
+A [`SpatialEffectsResult`](@ref).
+
+# Examples
+```julia
+m  = fit_spatial(SDM(), W, X, y; varnames = ["income", "density"])
+ef = spatial_effects(m)
+ef.total ./ ef.total_se        # z-statistics on the total effects
+```
+
+# References
+LeSage, J. & Pace, R. K. (2009). *Introduction to Spatial Econometrics*,
+ch. 2.
+"""
 function spatial_effects(
     model::SpatialRegressionModel{V, T};
     max_power::Int=50,

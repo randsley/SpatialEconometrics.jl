@@ -82,6 +82,42 @@ import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to
 import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianSpatialProbitModel, fit_bayesian_spatial_probit, SpatialOrderedProbitModel, fit_spatial_ordered_probit, SpatialProbitEffects, marginal_effects
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf
 
+"""
+    robust_vcov(model, spec) -> Matrix
+
+Recompute a fitted model's coefficient covariance under a robust
+specification.
+
+`spec` selects the estimator: [`DriscollKraayVCOV`](@ref) for spatial
+correlation of unrestricted form within each period plus serial
+correlation, or [`ConleySpatialHAC`](@ref) for distance-decayed spatial
+correlation using a kernel and cutoff.
+
+Both are sandwich estimators. Because a spatial-lag model is estimated by
+maximum likelihood rather than least squares, the scores are first mapped
+through the Jacobian of the spatial transformation, so the result is a
+covariance for the same `coef` vector and can be substituted wherever the
+model's own `vcov` is used.
+
+Accepts [`SpatialRegressionModel`](@ref), [`SpatialPanelModel`](@ref) and
+[`DynamicSpatialPanelModel`](@ref).
+
+# Examples
+```julia
+m = fit_spatial_panel(SAR(), W, X, y, N, T; fe = TwoWayFE())
+V = robust_vcov(m, DriscollKraayVCOV(lags = 2))
+
+robust_coeftable(m, DriscollKraayVCOV(lags = 2))
+spatial_effects(m, DriscollKraayVCOV(lags = 2))
+```
+
+See also [`robust_coeftable`](@ref), [`vcov_driscoll_kraay`](@ref),
+[`vcov_conley`](@ref).
+
+# References
+Driscoll, J. & Kraay, A. (1998). *Review of Economics and Statistics*,
+80(4). Conley, T. (1999). *Journal of Econometrics*, 92(1).
+"""
 function robust_vcov(m::SpatialRegressionModel, spec::ConleySpatialHAC)
     Z_eff, bread_inv = SpatialHAC.extract_spatial_jacobian_scores(m.X_aug, m.W, m.coef, m.rho, m.sigma2, m.vcov, length(m.y), 1)
     return vcov_conley(Z_eff, m.residuals, length(m.y), 1, spec; bread_inv=bread_inv)
@@ -107,6 +143,25 @@ function robust_vcov(m::DynamicSpatialPanelModel, spec::ConleySpatialHAC)
     return vcov_conley(Z_eff, m.residuals, m.N, m.T_post, spec; bread_inv=bread_inv)
 end
 
+"""
+    robust_coeftable(model, spec) -> RobustInferenceTable
+
+Coefficient table showing robust and model-based standard errors together.
+
+Printing both is the point: the gap between them is the diagnostic. If the
+robust errors are much larger, the model's own covariance was understating
+uncertainty, usually because of spatial correlation the specification did
+not capture.
+
+`spec` is a [`DriscollKraayVCOV`](@ref) or [`ConleySpatialHAC`](@ref); the
+covariance itself comes from [`robust_vcov`](@ref).
+
+# Examples
+```julia
+m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
+robust_coeftable(m, ConleySpatialHAC(cutoff = 2.0, coords = coords))
+```
+"""
 function robust_coeftable(m::StatsAPI.RegressionModel, spec::AbstractRobustVCOV)
     V_rob = robust_vcov(m, spec)
     # Qualify these: this module has both `using StatsAPI` and `using StatsModels`,
@@ -120,6 +175,47 @@ function robust_coeftable(m::StatsAPI.RegressionModel, spec::AbstractRobustVCOV)
         StatsAPI.coef(m) ./ se_rob, V_rob)
 end
 
+"""
+    spatial_effects(model; max_power = 50, vcov_mat = model.vcov)
+    spatial_effects(model, spec::AbstractRobustVCOV; max_power = 50)
+
+Decompose a fitted spatial model into direct, indirect and total marginal
+effects, with standard errors.
+
+A coefficient in a spatial-lag model is not a marginal effect: since
+`dy/dx' = (I - rho*W)^{-1} (I*beta + W*theta)`, a change in one unit's
+covariate feeds back through the whole system. The average diagonal of that
+matrix is the **direct** effect, the average off-diagonal row sum the
+**indirect** (spillover) effect, and their sum the **total**. Standard
+errors are obtained by the delta method.
+
+Works on [`SpatialRegressionModel`](@ref), [`SpatialPanelModel`](@ref) and
+[`DynamicSpatialPanelModel`](@ref); for the dynamic case see
+[`dynamic_spatial_effects`](@ref), which separates short-run from long-run.
+
+# Keywords
+- `max_power`: truncation of the series used for `(I - rho*W)^{-1}`. The
+  default is ample for moderate `rho`; values near 1 converge more slowly.
+- `vcov_mat`: covariance to propagate. Pass a robust specification as the
+  second positional argument instead to use [`robust_vcov`](@ref).
+
+# Returns
+A [`SpatialEffectsResult`](@ref) with `direct`, `indirect`, `total` and the
+matching `_se` vectors, aligned with `varnames`.
+
+# Examples
+```julia
+m  = fit_spatial(SDM(), W, X, y; varnames = ["income", "density"])
+ef = spatial_effects(m)
+ef.indirect ./ ef.indirect_se
+
+spatial_effects(m, ConleySpatialHAC(cutoff = 2.0, coords = coords))
+```
+
+# References
+LeSage, J. & Pace, R. K. (2009). *Introduction to Spatial Econometrics*,
+ch. 2.
+"""
 spatial_effects(m::SpatialRegressionModel; max_power::Int=50, vcov_mat::AbstractMatrix=m.vcov) = SpatialEconometricsPrototype.spatial_effects(m; max_power=max_power, vcov_mat=vcov_mat)
 spatial_effects(m::SpatialPanelModel; max_power::Int=50, vcov_mat::AbstractMatrix=m.vcov) = SpatialPanelEconometrics.spatial_effects(m; max_power=max_power, vcov_mat=vcov_mat)
 spatial_effects(m::DynamicSpatialPanelModel; max_power::Int=50, vcov_mat::AbstractMatrix=m.vcov) = DynamicSpatialPanelEconometrics.dynamic_spatial_effects(m; max_power=max_power, vcov_mat=vcov_mat)
@@ -127,6 +223,29 @@ spatial_effects(m::DynamicSpatialPanelModel; max_power::Int=50, vcov_mat::Abstra
 spatial_effects(m::Union{SpatialRegressionModel, SpatialPanelModel, DynamicSpatialPanelModel}, spec::AbstractRobustVCOV; max_power::Int=50) = spatial_effects(m; max_power=max_power, vcov_mat=robust_vcov(m, spec))
 dynamic_spatial_effects(m::DynamicSpatialPanelModel, spec::AbstractRobustVCOV; max_power::Int=50) = DynamicSpatialPanelEconometrics.dynamic_spatial_effects(m; max_power=max_power, vcov_mat=robust_vcov(m, spec))
 
+"""
+    make_rook_weights(L; T = Float64) -> SparseMatrixCSC
+
+Row-standardized rook-contiguity weights for an `L x L` regular lattice.
+
+Two cells are neighbours when they share an edge, so interior cells have
+four neighbours, edge cells three and corners two. Units are numbered
+row-major, `u = (r - 1) * L + c`, and each row is divided by its own
+neighbour count, so every row sums to 1 and `rho` is comparable across
+lattice sizes.
+
+Returns an `N x N` sparse matrix with `N = L^2`. Intended for examples,
+tests and Monte Carlo work; build weights for real data with
+[`knn_weights`](@ref), [`distance_weights`](@ref) or [`read_gal`](@ref).
+
+# Examples
+```julia
+W = make_rook_weights(10)        # 100 units
+sum(W, dims = 2)                 # all ones
+```
+
+See also [`make_queen_weights`](@ref).
+"""
 function make_rook_weights(L::Int; T::Type{<:AbstractFloat}=Float64)
     N = L * L; I_idx = Int[]; J_idx = Int[]; V_val = T[]
     for r in 1:L, c in 1:L
@@ -139,6 +258,25 @@ function make_rook_weights(L::Int; T::Type{<:AbstractFloat}=Float64)
     return sparse(I_idx, J_idx, V_val, N, N)
 end
 
+"""
+    make_queen_weights(L; T = Float64) -> SparseMatrixCSC
+
+Row-standardized queen-contiguity weights for an `L x L` regular lattice.
+
+Like [`make_rook_weights`](@ref) but counting diagonal neighbours too, so
+interior cells have eight neighbours rather than four. Rows are divided by
+their neighbour count and sum to 1.
+
+Denser connectivity spreads any given `rho` over more neighbours, so the
+two schemes are not interchangeable in a simulation: the implied strength
+of dependence per neighbour differs.
+
+# Examples
+```julia
+W = make_queen_weights(10)
+count(!iszero, W) / 100          # average neighbours per unit
+```
+"""
 function make_queen_weights(L::Int; T::Type{<:AbstractFloat}=Float64)
     N = L * L; I_idx = Int[]; J_idx = Int[]; V_val = T[]
     for r in 1:L, c in 1:L
@@ -198,6 +336,118 @@ for (f, pkg, ext) in ((:plot_coefficients,      "Makie",  :SpatialEconometricsMa
         end
     end
 end
+
+@doc """
+    plot_coefficients(model; level = 0.95)
+
+Horizontal coefficient plot with confidence intervals. Returns a
+`Makie.Figure`.
+
+Requires a Makie backend: run `using CairoMakie` (or `GLMakie`) to activate
+the `SpatialEconometricsMakieExt` extension. The critical value is the
+normal quantile for `level`; a `level` outside `(0, 1)` raises an
+`ArgumentError`.
+""" plot_coefficients
+
+@doc """
+    plot_moran_scatter(y, W)
+
+Moran scatter plot: standardized `y` against its spatial lag `Wy`, with the
+fitted slope drawn through it. Returns a `Makie.Figure`.
+
+When `W` is row-standardized that slope is Moran's I, so it should agree
+with `moran_global(y, W).I_stat`.
+
+Requires a Makie backend - see [`plot_coefficients`](@ref).
+""" plot_moran_scatter
+
+@doc """
+    plot_local_moran(lisa, coords)
+
+LISA cluster map, colouring units by `cluster_type` (`:HH`, `:LL`, `:HL`,
+`:LH`, `:ns`). Returns a `Makie.Figure`.
+
+`lisa` is a [`LISAResult`](@ref) from [`moran_local`](@ref) and `coords` an
+`N x 2` matrix for the same units; a mismatch raises `DimensionMismatch`
+rather than plotting the shorter of the two.
+
+Requires a Makie backend - see [`plot_coefficients`](@ref).
+""" plot_local_moran
+
+@doc """
+    plot_gwr_coefficients(model, varname)
+
+Map one GWR local coefficient over the estimation coordinates. Returns a
+`Makie.Figure`.
+
+`varname` must be one of `model.coefnames`; an unknown name raises an error
+listing the names available.
+
+Requires a Makie backend - see [`plot_coefficients`](@ref).
+""" plot_gwr_coefficients
+
+@doc """
+    plot_spatial_effects(effects)
+
+Grouped bar chart of the direct, indirect and total effects in a
+[`SpatialEffectsResult`](@ref). Returns a `Makie.Figure`.
+
+Requires a Makie backend - see [`plot_coefficients`](@ref).
+""" plot_spatial_effects
+
+@doc """
+    bayesian_sar(W, X, y; n_samples = 1000, n_chains = 2, varnames = nothing, rng = Random.default_rng())
+
+Sample the posterior of a SAR model by NUTS.
+
+Requires Turing: run `using Turing, Distributions` to activate the
+`SpatialEconometricsTuringExt` extension. An intercept is added, so `X`
+holds covariates only.
+
+Priors are diffuse - `beta ~ MvNormal(0, 10I)`, `rho ~ Uniform(-0.99,
+0.99)`, `sigma ~ truncated(Normal(0, 5), 0, Inf)` - and are not
+configurable. Because they are diffuse, the posterior mean should land on
+the maximum-likelihood estimate for the same data, which is the most useful
+check on a fit. Each likelihood evaluation uses the Chebyshev approximation
+to the log-determinant, which is what makes thousands of draws affordable.
+
+Returns a `BayesianSpatialResult` (a subtype of
+[`AbstractBayesianSpatialResult`](@ref)) carrying `posterior_mean`,
+`posterior_std`, `coefnames` and the raw `chain`.
+
+!!! note
+    `chain` is not version-stable: Turing returns `MCMCChains.Chains`
+    before v0.45 and `FlexiChains.FlexiChain` from v0.45 on, and the two
+    index vector-valued parameters differently. Prefer `posterior_mean`
+    and `posterior_std`, which are stable across both.
+
+See also [`bayesian_sdm`](@ref), [`bayesian_sem`](@ref),
+[`fit_spatial`](@ref).
+""" bayesian_sar
+
+@doc """
+    bayesian_sdm(W, X, y; n_samples = 1000, n_chains = 2, varnames = nothing, rng = Random.default_rng())
+
+Sample the posterior of a Spatial Durbin model by NUTS.
+
+As [`bayesian_sar`](@ref), but the design is augmented with `WX`, so
+`coefnames` carries `W_`-prefixed entries between the slopes and `rho`.
+
+Requires `using Turing, Distributions`.
+""" bayesian_sdm
+
+@doc """
+    bayesian_sem(W, X, y; n_samples = 1000, n_chains = 2, varnames = nothing, rng = Random.default_rng())
+
+Sample the posterior of a spatial error model by NUTS.
+
+Dependence is placed in the errors rather than in `y`: the likelihood is
+built from the filtered residual `(I - lambda*W)(y - X*beta)`, and the
+spatial parameter is reported as `lambda`.
+
+Requires `using Turing, Distributions`. See [`bayesian_sar`](@ref) for the
+priors and the note about `chain`.
+""" bayesian_sem
 
 export
     # Model variants and specification tags, shared by every estimator
