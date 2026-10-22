@@ -2,7 +2,9 @@
 
 A comprehensive spatial and structural econometrics suite in Julia, built around sparse linear algebra, multiple dispatch and automatic differentiation. The package provides 22 submodules covering cross-sectional, panel and higher-order spatial models, spatial discrete choice, eigenvector spatial filtering, regime models, spatial and panel diagnostics, model selection, non-parametric spatial regression, gravity models, HAC-robust inference, weight-matrix construction, input-output calibration, Monte Carlo simulation and publication-ready output — all with a unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** (registered) — 492 test assertions across 26 testsets (527 with the two package extensions installed), passing on Julia 1.13.2. See [Validation Status](#validation-status) for Monte Carlo results.
+> **Version 0.3.0** (registration in review) — 492 test assertions across 26 testsets (527 with the two package extensions installed), passing on Julia 1.13.2. See [Validation Status](#validation-status) for Monte Carlo results.
+
+**Documentation:** [stable](https://randsley.github.io/SpatialEconometrics.jl/stable/) · [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/)
 
 ---
 
@@ -43,9 +45,23 @@ A comprehensive spatial and structural econometrics suite in Julia, built around
 
 ```julia
 using Pkg
-Pkg.activate("path/to/SpatialEconometrics")
-Pkg.instantiate()
-Pkg.test()
+Pkg.add("SpatialEconometrics")
+```
+
+> Registration in the General registry is still in review, so `Pkg.add` by name
+> does not resolve yet. Until it merges, install from the repository:
+>
+> ```julia
+> using Pkg
+> Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl")
+> ```
+
+To work on the package itself, develop a local checkout and run the suite:
+
+```julia
+using Pkg
+Pkg.develop(path = "path/to/SpatialEconometrics")
+Pkg.test("SpatialEconometrics")
 ```
 
 **Dependencies:** `ChainRulesCore`, `ForwardDiff`, `NearestNeighbors`, `StatsAPI`, `StatsModels`, `Tables`, plus standard libraries (`LinearAlgebra`, `SparseArrays`, `Statistics`, `Random`, `Printf`). Julia 1.10 or later.
@@ -75,8 +91,8 @@ println(lms.robust_lag)    # significant → SAR
 println(lms.robust_error)  # not significant → not SEM
 
 # Step 2: Estimate
-m = fit_spatial(CrossSection.SAR(), W, X, y;
-    method = CrossSection.ChebyshevApprox(order=12),
+m = fit_spatial(SAR(), W, X, y;
+    method = ChebyshevApprox(order=12),
     varnames = ["income", "density"])
 println(m)
 
@@ -256,7 +272,7 @@ regimes = skater_regimes(W, X, 3; min_size = 10)
 m_regime = fit_spatial_regime(W, X, y, regimes)
 
 # Are the coefficients actually different across regimes?
-m_pooled = fit_spatial(CrossSection.SAR(), W, X, y)
+m_pooled = fit_spatial(SAR(), W, X, y)
 ct = regime_chow_test(m_pooled, m_regime)   # ct.stat, ct.df, ct.p_value
 ```
 
@@ -367,7 +383,7 @@ de = dynamic_spatial_effects(m)
 For models with both spatial lag in y AND spatial error, plus endogenous regressors:
 
 ```julia
-m = fit_gs2sls_panel(GS2SLSPanel.TwoWayFE(), W, X_exog, X_endog, Z_iv, y, N, T;
+m = fit_gs2sls_panel(TwoWayFE(), W, X_exog, X_endog, Z_iv, y, N, T;
     exog_names = ["x1", "x2"],
     endog_names = ["tax_rate"])
 # m.rho: spatial lag parameter
@@ -550,7 +566,7 @@ y, X = simulate_spatial(dgp, W, X)
 
 # Monte Carlo: bias, RMSE and coverage
 mc = monte_carlo_spatial(dgp, W, N, 2,
-    (W, X, y) -> fit_spatial(CrossSection.SAR(), W, X, y);
+    (W, X, y) -> fit_spatial(SAR(), W, X, y);
     config = MonteCarloConfig(n_replications = 500, seed = 42))
 # mc.n_successful vs mc.n_replications — failed replications are reported, not hidden
 
