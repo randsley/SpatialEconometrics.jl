@@ -76,8 +76,10 @@ y = (I - 0.5 * W) \ (2.0 .+ X * [1.5, -0.8] .+ 0.5 .* randn(rng, N))
 # Step 1: Diagnostics — is there spatial autocorrelation?
 println(moran_global(y, W))
 lms = lm_tests(y, hcat(ones(N), X), W)
-println(lms.robust_lag)    # significant → SAR
-println(lms.robust_error)  # not significant → not SEM
+println(lms.robust_lag)    # 278.55, p < 1e-4
+println(lms.robust_error)  # 4.43,  p = 0.035
+# Both reject at 5%, so read them against each other: the robust lag
+# statistic is two orders of magnitude larger, which points to SAR.
 
 # Step 2: Estimate
 m = fit_spatial(SAR(), W, X, y;
