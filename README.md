@@ -4,7 +4,7 @@ A comprehensive spatial and structural econometrics suite in Julia, built around
 
 > **Version 0.3.0** (registration in review) — 492 test assertions across 26 testsets (527 with the two package extensions installed), passing on Julia 1.13.2. See [Validation Status](#validation-status) for Monte Carlo results.
 
-**Documentation:** [stable](https://randsley.github.io/SpatialEconometrics.jl/stable/) · [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/)
+**Documentation:** [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/) — a `stable` build appears with the first tagged release.
 
 Every exported name carries a docstring, so `?fit_spatial` works in the
 REPL. All 187 of them appear in the API reference — the 188th, `@formula`,
