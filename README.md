@@ -37,6 +37,7 @@ A comprehensive spatial and structural econometrics suite in Julia, built around
 - [Repository Layout](#repository-layout)
 - [Validation Status](#validation-status)
 - [Known Limitations](#known-limitations)
+- [Development](#development)
 - [References](#references)
 
 ---
@@ -907,6 +908,17 @@ activates this project itself.
 - **Gravity FE:** Bilateral FE demeaning uses alternating projections (iterative). Very large O-D matrices may need more iterations.
 - **Type stability:** Some `0.0` literals will promote `Float32` to `Float64`. Use `Float64` consistently.
 - **Panel data ordering:** Data must be stacked with N units varying fastest within each time period: `[unit₁_t₁, unit₂_t₁, ..., unitN_t₁, unit₁_t₂, ...]`.
+
+---
+
+## Development
+
+This package was developed with assistance from a generative AI coding tool
+(Anthropic's Claude). The AI was used to draft the test suite, the
+documentation, and examples. All estimators were specified against the
+published econometric literature cited in [References](#references), and the
+numerical results are checked by the test suite and the Monte Carlo studies
+reported in [Validation Status](#validation-status).
 
 ---
 
