@@ -17,6 +17,8 @@ makedocs(
             "Panel" => "models/panel.md",
             "Dynamic Panel" => "models/dynamic_panel.md",
             "Spatial Error (SEM)" => "models/sem.md",
+            "GS2SLS / SARAR Panels" => "models/gs2sls.md",
+            "Dynamic Panel GMM" => "models/gmm.md",
             "GWR & MGWR" => "models/gwr.md",
             "Gravity Models" => "models/gravity.md",
         ],
@@ -34,6 +36,8 @@ makedocs(
         "Weight Matrices" => "weights.md",
         "Robust Inference" => "robust.md",
         "Simulation" => "simulation.md",
+        "Calibration & Input-Output" => "calibration.md",
+        "Formula Interface" => "formula.md",
         "Output & Tables" => "tables.md",
         "Package Extensions" => "extensions.md",
         "API Reference" => vcat(
