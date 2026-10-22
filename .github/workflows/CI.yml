@@ -65,7 +65,19 @@ jobs:
           version: '1'
           arch: x64
       - uses: julia-actions/cache@v2
+      # Pkg 1.13.0 bug, not a fault in this package. When a dev'd package
+      # declares [extensions], the auto-precompile at the end of Pkg.add
+      # hands the precompiler a newly installed *indirect* dependency by bare
+      # name; Base.identify_package resolves only direct deps and returns
+      # nothing, so precompilation.jl:720 throws "Unknown package:
+      # SpecialFunctions" -- after the install has already succeeded.
+      # Reproduced with a two-line package whose only content is a [weakdeps]
+      # /[extensions] pair; it goes away if those are removed, if nothing is
+      # dev'd, or if precompilation runs as its own call. So the add defers
+      # precompilation and the next step does it.
       - name: Build an environment with both weak dependencies
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: '0'
         run: |
           mkdir -p ext-test-env
           julia --project=ext-test-env -e '
@@ -73,8 +85,9 @@ jobs:
             Pkg.develop(PackageSpec(path = pwd()))
             Pkg.add(["Test", "ForwardDiff", "ChainRulesCore", "StatsAPI",
                      "StatsModels", "Tables", "NearestNeighbors",
-                     "Makie", "Turing", "Distributions"])
-            Pkg.instantiate()'
+                     "Makie", "Turing", "Distributions"])'
+      - name: Precompile the environment
+        run: julia --project=ext-test-env -e 'using Pkg; Pkg.precompile()'
       # Without this guard a failure to precompile either extension would
       # merely skip testsets 25 and 26 and leave the job green.
       - name: Check that both extensions actually load
