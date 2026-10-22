@@ -40,7 +40,7 @@ using SpatialEconometrics
 W = make_rook_weights(20)
 
 # Fit a spatial autoregressive model
-m = fit_spatial(CrossSection.SAR(), W, X, y)
+m = fit_spatial(SAR(), W, X, y)
 
 # Diagnostics
 mr = moran_global(residuals(m), W)

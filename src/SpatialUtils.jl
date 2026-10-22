@@ -7,6 +7,7 @@ using Random
 using Printf
 
 export LogDetMethod, ExactLU, ChebyshevApprox,
+       SpatialVariant, SAR, SDM, SARAR,
        FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
        precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, brent_maximize,
@@ -30,6 +31,20 @@ struct ChebyshevApprox{R<:AbstractRNG} <: LogDetMethod
         return new{typeof(rng)}(order, n_probes, rng)
     end
 end
+
+# ─── Model variants ───────────────────────────────────────────────────
+#
+# One hierarchy shared by every estimation module. These tags previously
+# existed as a separate, unrelated copy inside each of
+# SpatialEconometricsPrototype, SpatialPanelEconometrics,
+# DynamicSpatialPanelEconometrics and SpatialGS2SLSPanel, which is why
+# calling code had to write `CrossSection.SAR()` to say which `SAR` it
+# meant. Defining them once lets `SAR` and `SDM` be exported directly.
+
+abstract type SpatialVariant end
+struct SAR   <: SpatialVariant end
+struct SDM   <: SpatialVariant end
+struct SARAR <: SpatialVariant end
 
 # ─── Fixed effects ────────────────────────────────────────────────────
 

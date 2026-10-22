@@ -21,8 +21,8 @@ export SpatialVariant, SARAR,
        FixedEffectsSpec, IndivFE, TwoWayFE,
        GS2SLSModel, fit_gs2sls_panel
 
-abstract type SpatialVariant end
-struct SARAR <: SpatialVariant end
+const SpatialVariant = SpatialUtils.SpatialVariant
+const SARAR = SpatialUtils.SARAR
 
 struct GS2SLSModel{
     FE<:FixedEffectsSpec,

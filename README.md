@@ -104,7 +104,25 @@ println(spatial_effects(m))
 
 ## Modules
 
-| Submodule | Alias | Description | Key Reference |
+The package exports functions, result types and specification tags — not
+submodules. Model variants (`SAR`, `SDM`, `SARAR`), fixed-effects specs
+(`NoFE`, `IndivFE`, `TimeFE`, `TwoWayFE`) and log-determinant methods
+(`ExactLU`, `ChebyshevApprox`) are single shared types usable unqualified:
+
+```julia
+m = fit_spatial(SAR(), W, X, y)                       # cross-section
+m = fit_spatial_panel(SAR(), W, X, y, N, T; fe = TwoWayFE())   # panel
+```
+
+The submodules below organise the source. They are **not** exported, so they
+cannot collide with packages of the same name; reach one explicitly when you
+want an internal helper:
+
+```julia
+const CS = SpatialEconometrics.CrossSection
+```
+
+| Submodule | Internal alias | Description | Key Reference |
 |---|---|---|---|
 | `SpatialUtils` | `UtilsMod` | Shared numerical utilities (Chebyshev log-det, Brent optimizer, panel transforms) | — |
 | `SpatialEconometricsPrototype` | `CrossSection` | Cross-sectional SAR & SDM by concentrated ML | LeSage & Pace (2009) |
@@ -743,6 +761,35 @@ See `docs/src/extensions.md` for the full reference,
 `examples/18_visualization.jl` and `examples/19_bayesian.jl` for runnable
 walk-throughs, and `notebooks/interactive_extensions_explorer.jl` for an
 interactive version.
+
+---
+
+## Relationship to Other Packages
+
+[SpatialDependence.jl](https://github.com/javierbarbero/SpatialDependence.jl)
+is the Julia package for **exploratory** spatial data analysis: polygon
+contiguity weights, Getis-Ord and local Geary statistics, significance
+adjustment, and choropleth mapping. If your work is ESDA and mapping, use it
+— this package does none of those things.
+
+SpatialEconometrics.jl is an **estimation** package. The overlap is Moran's I,
+Geary's c, local Moran and the k-NN / distance weight constructors. We keep
+our own because:
+
+- The LM specification tests (`lm_test_lag`, `lm_test_error` and their robust
+  variants) have no counterpart there, and they are what tells you whether to
+  fit SAR or SEM. They are regression diagnostics, so they would be out of
+  scope upstream.
+- Our estimators operate on `SparseMatrixCSC` directly — Chebyshev trace
+  precomputation, `log|I - ρW|`, GS2SLS instruments. SpatialDependence.jl's
+  `SpatialWeights` type exposes neighbours and weights per row rather than the
+  underlying sparse matrix, so a dependency would mean a conversion layer and
+  we would still hold our own matrix.
+- `monte_carlo_spatial` and `power_analysis` call `moran_global` and the four
+  LM tests inside replication loops using analytic normal inference.
+  SpatialDependence.jl's statistics are permutation-based by default
+  (`permutations = 9999`), which is both a different inferential basis and far
+  too slow in that position.
 
 ---
 

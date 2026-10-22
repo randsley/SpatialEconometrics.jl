@@ -36,7 +36,7 @@ Based on Assunção et al. (2006).
 Test whether coefficients are equal across regimes using a likelihood ratio (Chow-type) test:
 
 ```julia
-m_pooled = fit_spatial(CrossSection.SAR(), W, X, y)
+m_pooled = fit_spatial(SAR(), W, X, y)
 m_regime = fit_spatial_regime(W, X, y, regimes)
 ct = regime_chow_test(m_pooled, m_regime)
 ```

@@ -55,7 +55,7 @@ rest of Makie (`save`, further axes, custom layouts).
 ```julia
 using SpatialEconometrics, CairoMakie
 
-m = fit_spatial(CrossSection.SAR(), W, X, y; varnames = ["income", "density"])
+m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
 
 save("coefs.png", plot_coefficients(m))              # 95% CI by default
 save("coefs99.png", plot_coefficients(m; level = 0.99))
@@ -179,7 +179,7 @@ AbstractBayesianSpatialResult
 Each likelihood evaluation needs `log|I - ρW|`, and NUTS asks for thousands
 of them at a new `ρ` every time. A dense factorization per draw would be
 prohibitive, so the extension uses the Chebyshev approximation
-(`CrossSection.chebyshev_logdet`), which precomputes traces once and
+(`SpatialEconometrics.CrossSection.chebyshev_logdet`), which precomputes traces once and
 then costs a polynomial evaluation per draw. At order 12 it agrees with the
 exact log-determinant to several decimal places across the whole parameter
 space, so this is the likelihood rather than a stand-in for it.

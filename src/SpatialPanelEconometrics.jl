@@ -30,9 +30,9 @@ export SpatialVariant, SAR, SDM,
        SpatialPanelModel, SpatialEffectsResult,
        fit_spatial_panel, spatial_effects
 
-abstract type SpatialVariant end
-struct SAR <: SpatialVariant end
-struct SDM <: SpatialVariant end
+const SpatialVariant = SpatialUtils.SpatialVariant
+const SAR = SpatialUtils.SAR
+const SDM = SpatialUtils.SDM
 
 abstract type PanelEstimationApproach end
 struct LeeYuTransformation <: PanelEstimationApproach end

@@ -35,7 +35,7 @@ Run Monte Carlo experiments to assess estimator properties:
 mc = monte_carlo_spatial(
     SAR_DGP(0.5, [1.5, -0.8], 0.5),
     W, N, 2,
-    (W, X, y) -> fit_spatial(CrossSection.SAR(), W, X, y);
+    (W, X, y) -> fit_spatial(SAR(), W, X, y);
     config=MonteCarloConfig(n_replications=500, seed=42)
 )
 ```

@@ -10,20 +10,20 @@ y_{it} = \rho W y_{it} + X_{it} \beta + \mu_i + \xi_t + \varepsilon_{it}
 
 | Type | Alias | Removes |
 |---|---|---|
-| `StaticPanel.NoFE()` | No fixed effects | — |
-| `StaticPanel.IndivFE()` | Individual FE | Unit-specific means |
-| `StaticPanel.TimeFE()` | Time FE | Period-specific means |
-| `StaticPanel.TwoWayFE()` | Two-way FE | Both |
+| `NoFE()` | No fixed effects | — |
+| `IndivFE()` | Individual FE | Unit-specific means |
+| `TimeFE()` | Time FE | Period-specific means |
+| `TwoWayFE()` | Two-way FE | Both |
 
 ## Estimation Approaches
 
 ```julia
 # Lee-Yu bias-corrected transformation (default)
-m = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T;
+m = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T;
     approach=LeeYuTransformation())
 
 # Direct QML with analytical bias correction
-m = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.IndivFE(), W, X, y, N, T;
+m = fit_spatial_panel(SAR(), IndivFE(), W, X, y, N, T;
     approach=DirectQML(bias_correct=true))
 ```
 

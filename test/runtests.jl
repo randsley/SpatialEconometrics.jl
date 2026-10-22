@@ -18,12 +18,12 @@ using NearestNeighbors
         rng = MersenneTwister(101); W = make_rook_weights(20); N = size(W, 1)
         X = randn(rng, N, 2); β_true = [2.0, 1.5, -1.0]; θ_true = [0.8, -0.5]; ρ_true = 0.55; σ_true = 0.50
         y = (I - ρ_true * W) \ (β_true[1] .+ X * β_true[2:3] .+ (W * X) * θ_true .+ σ_true .* randn(rng, N))
-        m_cheb = fit_spatial(CrossSection.SDM(), W, X, y; method=CrossSection.ChebyshevApprox(order=7))
+        m_cheb = fit_spatial(SDM(), W, X, y; method=ChebyshevApprox(order=7))
         @test isapprox(m_cheb.rho, ρ_true; atol=0.08)
         @test length(coef(m_cheb)) == 6  # intercept + 2 β + 2 θ + ρ
         @test length(residuals(m_cheb)) == N
 
-        m_sar = fit_spatial(CrossSection.SAR(), W, X, y; method=CrossSection.ChebyshevApprox(order=7))
+        m_sar = fit_spatial(SAR(), W, X, y; method=ChebyshevApprox(order=7))
         @test length(coef(m_sar)) == 4  # intercept + 2 β + ρ
     end
 
@@ -38,13 +38,13 @@ using NearestNeighbors
             y[idx] = S_lu \ (μ_i .+ ξ_t[t] .+ X[idx, :] * β_true .+ σ_true .* randn(rng, N))
         end
 
-        m_panel = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T_per; approach=LeeYuTransformation())
+        m_panel = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per; approach=LeeYuTransformation())
         @test isapprox(m_panel.rho, ρ_true; atol=0.12)
         @test length(coef(m_panel)) == 3  # x1, x2, ρ
         @test nobs(m_panel) == NT
         @test length(residuals(m_panel)) == NT
 
-        m_dqml = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.IndivFE(), W, X, y, N, T_per; approach=DirectQML(bias_correct=true))
+        m_dqml = fit_spatial_panel(SAR(), IndivFE(), W, X, y, N, T_per; approach=DirectQML(bias_correct=true))
         @test length(coef(m_dqml)) == 3
     end
 
@@ -61,7 +61,7 @@ using NearestNeighbors
             y[idx] = S_lu \ (μ_i .+ γ_true .* y[idx_prev] .+ η_true .* (W * y[idx_prev]) .+ X[idx, :] * β_true .+ σ_true .* randn(rng, N))
         end
 
-        m_dyn = fit_dynamic_spatial_panel(DynamicPanel.SAR(), DynamicPanel.IndivFE(), W, X, y, N, T_tot)
+        m_dyn = fit_dynamic_spatial_panel(SAR(), IndivFE(), W, X, y, N, T_tot)
         @test length(coef(m_dyn)) == 4  # y_lag, Wy_lag, x1, ρ
         @test m_dyn.T_post == T_tot - 1
         @test isapprox(m_dyn.rho, ρ_true; atol=0.15)
@@ -82,7 +82,7 @@ using NearestNeighbors
             y[idx] = S_lu \ (X_exog[idx, :] * β_true .+ endog[idx] .* δ_true .+ u_t)
         end
 
-        m_gs = fit_gs2sls_panel(GS2SLSPanel.IndivFE(), W, X_exog, reshape(endog, NT, 1), hcat(z1, z2), y, N, T_tot)
+        m_gs = fit_gs2sls_panel(IndivFE(), W, X_exog, reshape(endog, NT, 1), hcat(z1, z2), y, N, T_tot)
         @test length(coef(m_gs)) == 5  # ρ, exog1, exog2, endog1, λ
         @test m_gs.T_post == T_tot - 1
         @test size(vcov(m_gs)) == (5, 5)
@@ -132,7 +132,7 @@ using NearestNeighbors
             y[idx] = S_lu \ (μ_i .+ X[idx, :] * [1.0, -0.5] .+ (0.3 .+ 0.5 .* abs.(randn(rng, N))) .* randn(rng, N))
         end
 
-        m_pan = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T_per)
+        m_pan = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per)
         V_dk = robust_vcov(m_pan, DriscollKraayVCOV())
         @test size(V_dk) == size(vcov(m_pan))
         @test all(eigvals(Symmetric(V_dk)) .>= -1e-10)  # PSD
@@ -217,7 +217,7 @@ using NearestNeighbors
             u_t = B_lu \ (0.4 .* randn(rng, N))
             y_pan[idx] = μ_i .+ X_pan[idx, :] * [1.5, -0.7] .+ u_t
         end
-        m_sem_pan = fit_spatial_error(SEMMod.IndivFE(), W, X_pan, y_pan, N, T_per)
+        m_sem_pan = fit_spatial_error(IndivFE(), W, X_pan, y_pan, N, T_per)
         @test isapprox(m_sem_pan.lambda, λ_true; atol=0.15)
         @test coefnames(m_sem_pan) == ["x1", "x2", "λ"]
     end
@@ -321,8 +321,8 @@ using NearestNeighbors
         X = randn(rng, N, 2)
         y = (I - 0.5 * W) \ (fill(1.0, N) .+ X * [1.5, -0.8] .+ (W * X) * [0.6, -0.3] .+ 0.5 .* randn(rng, N))
 
-        m_sar = fit_spatial(CrossSection.SAR(), W, X, y)
-        m_sdm = fit_spatial(CrossSection.SDM(), W, X, y)
+        m_sar = fit_spatial(SAR(), W, X, y)
+        m_sdm = fit_spatial(SDM(), W, X, y)
 
         # AIC/BIC
         aic_sar = spatial_aic(m_sar); aic_sdm = spatial_aic(m_sdm)
@@ -399,15 +399,15 @@ using NearestNeighbors
         @test plm.lag_p < 0.10 || plm.error_p < 0.10
 
         # Panel Moran's I
-        m_pan = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T_per)
+        m_pan = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per)
         pm = panel_moran(residuals(m_pan), W, N, T_per)
         @test pm.T_periods == T_per
         @test length(pm.period_results) == T_per
         @test isfinite(pm.pooled.I_stat)
 
         # Hausman test (compare two panel models with different FE)
-        m_fe = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.IndivFE(), W, X, y, N, T_per)
-        m_twfe = fit_spatial_panel(StaticPanel.SAR(), StaticPanel.TwoWayFE(), W, X, y, N, T_per)
+        m_fe = fit_spatial_panel(SAR(), IndivFE(), W, X, y, N, T_per)
+        m_twfe = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per)
         ht = spatial_hausman_test(m_fe, m_twfe)
         @test ht.stat >= 0.0
         @test 0.0 <= ht.p_value <= 1.0
@@ -490,7 +490,7 @@ using NearestNeighbors
         @test length(coef(m_ols)) == 6  # 2 regimes × 3 params
 
         # Regime Chow test
-        m_pooled = fit_spatial(CrossSection.SAR(), W, X, y)
+        m_pooled = fit_spatial(SAR(), W, X, y)
         ct = regime_chow_test(m_pooled, m_reg)
         @test ct.stat >= 0.0
         @test 0.0 <= ct.p_value <= 1.0
@@ -543,7 +543,7 @@ using NearestNeighbors
         # Monte Carlo with few reps (just checking it runs)
         mc = monte_carlo_spatial(
             SAR_DGP(0.5, [1.5, -0.8], 0.5), W, N, 2,
-            (W, X, y) -> fit_spatial(CrossSection.SAR(), W, X, y);
+            (W, X, y) -> fit_spatial(SAR(), W, X, y);
             config=MonteCarloConfig(n_replications=10, seed=42)
         )
         @test length(mc.param_means) == 3  # β1, β2, ρ
@@ -557,7 +557,7 @@ using NearestNeighbors
         X = randn(rng, N, 2)
         y = (I - 0.4 * W) \ (fill(1.0, N) .+ X * [1.5, -0.8] .+ 0.5 .* randn(rng, N))
 
-        m = fit_spatial(CrossSection.SAR(), W, X, y)
+        m = fit_spatial(SAR(), W, X, y)
 
         # CoefTable
         ct = coeftable(m)
@@ -920,7 +920,7 @@ using NearestNeighbors
             η[i] = b[1] + X[i, 1] * b[2] + X[i, 2] * b[3]
         end
         y_br = (IN - 0.45 * W) \ (η .+ 0.4 .* randn(MersenneTwister(9), N))
-        m_pool = fit_spatial(SpatialEconometrics.CrossSection.SAR(), W, X, y_br)
+        m_pool = fit_spatial(SpatialEconometrics.SAR(), W, X, y_br)
         m_reg = fit_spatial_regime(W, X, y_br, ExogenousRegimes(labels))
         chow = regime_chow_test(m_pool, m_reg)
         @test chow.stat > 0.0
@@ -984,10 +984,10 @@ using NearestNeighbors
                 idx = ((t - 1) * Nh + 1):(t * Nh)
                 yh[idx] = Sh \ (μh .+ Xh[idx, :] * [1.0, -0.5] .+ 0.5 .* randn(rngh, Nh))
             end
-            fp(fe) = fit_spatial_panel(StaticPanel.SAR(), fe, Wh, Xh, yh, Nh, Th;
+            fp(fe) = fit_spatial_panel(SAR(), fe, Wh, Xh, yh, Nh, Th;
                                        varnames = ["a", "b"])
-            m_feh = fp(StaticPanel.IndivFE())
-            m_pooh = fp(StaticPanel.NoFE())
+            m_feh = fp(IndivFE())
+            m_pooh = fp(NoFE())
 
             # The premise of the bug: the two layouts genuinely differ.
             @test coefnames(m_feh) == ["a", "b", "ρ"]
@@ -1245,7 +1245,7 @@ using NearestNeighbors
             coords = hcat(repeat(1.0:L, outer = L), repeat(1.0:L, inner = L))
             X = randn(rng, N, 2)
             y = (I - 0.5 * W) \ (1.0 .+ X * [1.5, -0.8] .+ 0.5 .* randn(rng, N))
-            m = fit_spatial(CrossSection.SAR(), W, X, y; varnames = ["income", "density"])
+            m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
 
             @test plot_coefficients(m) isa Makie.Figure
             @test plot_moran_scatter(y, W) isa Makie.Figure
@@ -1309,7 +1309,7 @@ using NearestNeighbors
             @test all(r.posterior_std[1:3] .< 0.5)
 
             # ... and it has to agree with the MLE on the same data.
-            mle = fit_spatial(CrossSection.SAR(), W, X, y)
+            mle = fit_spatial(SAR(), W, X, y)
             @test isapprox(r.posterior_mean[4], mle.rho; atol = 0.05)
 
             λ_true = 0.6

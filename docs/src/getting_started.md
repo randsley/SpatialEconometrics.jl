@@ -44,10 +44,10 @@ lm = lm_tests(y, hcat(ones(length(y)), X), W)
 
 ```julia
 # Cross-sectional SAR
-m_sar = fit_spatial(CrossSection.SAR(), W, X, y)
+m_sar = fit_spatial(SAR(), W, X, y)
 
 # Cross-sectional SDM (Spatial Durbin)
-m_sdm = fit_spatial(CrossSection.SDM(), W, X, y)
+m_sdm = fit_spatial(SDM(), W, X, y)
 
 # Spatial Error Model
 m_sem = fit_spatial_error(W, X, y)
@@ -74,11 +74,28 @@ effects = spatial_effects(m_sdm)
 # effects.direct, effects.indirect, effects.total
 ```
 
-## Module Aliases
+## Specification Tags
 
-For convenience, the package exports short aliases for each submodule:
+Model variants, fixed-effects specs and log-determinant methods are single
+shared types, exported directly. You never qualify them with a module name:
 
-| Full name | Alias |
+```julia
+fit_spatial(SAR(), W, X, y)                                  # SAR, SDM
+fit_spatial_panel(SDM(), W, X, y, N, T; fe = TwoWayFE())     # NoFE, IndivFE, TimeFE, TwoWayFE
+fit_spatial(SAR(), W, X, y; method = ChebyshevApprox(order = 8))  # ExactLU, ChebyshevApprox
+```
+
+## Submodules
+
+The submodules organise the source and are **not** exported, so they cannot
+collide with registered packages that share a name. Reach one explicitly if
+you need an internal helper:
+
+```julia
+const CS = SpatialEconometrics.CrossSection
+```
+
+| Full name | Internal alias |
 |---|---|
 | `SpatialEconometricsPrototype` | `CrossSection` |
 | `SpatialPanelEconometrics` | `StaticPanel` |

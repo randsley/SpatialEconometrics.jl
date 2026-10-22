@@ -5,7 +5,7 @@
 Create Tables.jl-compatible coefficient tables from any fitted model:
 
 ```julia
-m = fit_spatial(CrossSection.SAR(), W, X, y)
+m = fit_spatial(SAR(), W, X, y)
 ct = coeftable(m; level=0.95)
 ```
 
@@ -43,7 +43,7 @@ ss = summary_stats(m; model_type="SAR")
 Stargazer-style side-by-side comparison:
 
 ```julia
-m_sar = fit_spatial(CrossSection.SAR(), W, X, y)
+m_sar = fit_spatial(SAR(), W, X, y)
 m_sem = fit_spatial_error(W, X, y)
 println(regression_table(m_sar, m_sem; model_names=["SAR", "SEM"]))
 ```

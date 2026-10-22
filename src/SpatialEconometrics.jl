@@ -57,10 +57,13 @@ const TablesMod     = SpatialTables
 const DiscreteMod   = SpatialDiscreteChoice
 const FilterMod     = SpatialFiltering
 
+import .SpatialUtils: SpatialVariant, SAR, SDM, SARAR,
+       FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
+       LogDetMethod, ExactLU, ChebyshevApprox
 import .SpatialEconometricsPrototype: SpatialRegressionModel, fit_spatial
 import .SpatialPanelEconometrics: SpatialPanelModel, LeeYuTransformation, DirectQML, fit_spatial_panel
 import .DynamicSpatialPanelEconometrics: DynamicSpatialPanelModel, DynamicSpatialEffectsResult, fit_dynamic_spatial_panel, dynamic_spatial_effects
-import .SpatialGS2SLSPanel: GS2SLSModel, SARAR, fit_gs2sls_panel
+import .SpatialGS2SLSPanel: GS2SLSModel, fit_gs2sls_panel
 import .DynamicPanelSystemGMM: GMMVariant, DifferenceGMM, SystemGMM, SystemGMMModel, fit_dynamic_gmm
 import .StructuralMacroCalibration: CalibrationResult, balance_gras, balance_gras_full, balance_generalized_ce, sam_leontief_multipliers
 import .SpatialHAC: KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel, DistanceMetric, EuclideanDistance, HaversineDistance, AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC, vcov_driscoll_kraay, vcov_conley, RobustInferenceTable
@@ -197,24 +200,13 @@ for (f, pkg, ext) in ((:plot_coefficients,      "Makie",  :SpatialEconometricsMa
 end
 
 export
-    SpatialEconometricsPrototype, CrossSection,
-    SpatialPanelEconometrics, StaticPanel,
-    DynamicSpatialPanelEconometrics, DynamicPanel,
-    SpatialGS2SLSPanel, GS2SLSPanel,
-    DynamicPanelSystemGMM, SystemGMMMod,
-    StructuralMacroCalibration, MacroCalib,
-    SpatialHAC, HACMod,
-    SpatialDiagnostics, DiagMod,
-    SpatialErrorModel, SEMMod,
-    GWREstimation, GWRMod,
-    SpatialGravityModels, GravityMod,
-    FormulaDSL, DSLMod,
-    SpatialWeights, WeightsMod,
-    SpatialModelSelection, SelectionMod,
-    SpatialPanelDiagnostics, PanelDiagMod,
+    # Model variants and specification tags, shared by every estimator
+    SpatialVariant, SAR, SDM, SARAR,
+    FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
+    LogDetMethod, ExactLU, ChebyshevApprox,
 
     SpatialRegressionModel, SpatialPanelModel, DynamicSpatialPanelModel, DynamicSpatialEffectsResult, GS2SLSModel, SystemGMMModel, CalibrationResult, SpatialErrorRegressionModel, SpatialErrorPanelModel,
-    LeeYuTransformation, DirectQML, SARAR, GMMVariant, DifferenceGMM, SystemGMM,
+    LeeYuTransformation, DirectQML, GMMVariant, DifferenceGMM, SystemGMM,
     KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel,
     DistanceMetric, EuclideanDistance, HaversineDistance,
     AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC,
@@ -241,29 +233,23 @@ export
     HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test,
     PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran,
     # HigherOrderSpatial
-    HigherOrderSpatial, HigherMod,
     SLXModel, fit_slx, SACModel, fit_sac, SDEMModel, fit_sdem,
     # SpatialRegimeModels
-    SpatialRegimeModels, RegimeMod,
     SpatialRegimeModel, fit_spatial_regime, ExogenousRegimes, skater_regimes,
     ChowRegimeTest, regime_chow_test,
     # SpatialSimulation
-    SpatialSimulation, SimMod,
     SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP,
     simulate_spatial, MonteCarloConfig, monte_carlo_spatial,
     MonteCarloResult, PowerAnalysisResult, power_analysis,
     # SpatialTables
-    SpatialTables, TablesMod,
     CoefTable, coeftable, summary_stats,
     to_latex, to_csv, to_markdown, regression_table,
     # SpatialDiscreteChoice
-    SpatialDiscreteChoice, DiscreteMod,
     SpatialProbitModel, fit_spatial_probit,
     BayesianSpatialProbitModel, fit_bayesian_spatial_probit,
     SpatialOrderedProbitModel, fit_spatial_ordered_probit,
     SpatialProbitEffects, marginal_effects,
     # SpatialFiltering
-    SpatialFiltering, FilterMod,
     SpatialEigen, spatial_eigenvectors, moran_coefficient,
     ESFModel, fit_esf, selected_eigenvectors,
     REESFModel, fit_re_esf,

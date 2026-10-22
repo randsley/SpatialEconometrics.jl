@@ -9,7 +9,7 @@ y_{it} = \rho W y_{it} + \gamma y_{i,t-1} + \eta W y_{i,t-1} + X_{it} \beta + \m
 ## Usage
 
 ```julia
-m = fit_dynamic_spatial_panel(DynamicPanel.SAR(), DynamicPanel.IndivFE(),
+m = fit_dynamic_spatial_panel(SAR(), IndivFE(),
     W, X, y, N, T)
 ```
 
@@ -25,7 +25,7 @@ effects = dynamic_spatial_effects(m)
 For models with endogenous variables, use the GS2SLS estimator:
 
 ```julia
-m = fit_gs2sls_panel(GS2SLSPanel.IndivFE(), W, X_exog, X_endog, Z, y, N, T)
+m = fit_gs2sls_panel(IndivFE(), W, X_exog, X_endog, Z, y, N, T)
 ```
 
 ## System GMM

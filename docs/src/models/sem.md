@@ -16,8 +16,8 @@ m = fit_spatial_error(W, X, y)
 ## Panel SEM
 
 ```julia
-m = fit_spatial_error(SEMMod.IndivFE(), W, X, y, N, T)
-m = fit_spatial_error(SEMMod.TwoWayFE(), W, X, y, N, T)
+m = fit_spatial_error(IndivFE(), W, X, y, N, T)
+m = fit_spatial_error(TwoWayFE(), W, X, y, N, T)
 ```
 
 ## When to Use SEM

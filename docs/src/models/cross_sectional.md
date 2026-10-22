@@ -7,7 +7,7 @@ y = \rho W y + X \beta + \varepsilon
 ```
 
 ```julia
-m = fit_spatial(CrossSection.SAR(), W, X, y)
+m = fit_spatial(SAR(), W, X, y)
 ```
 
 ## SDM (Spatial Durbin Model)
@@ -17,7 +17,7 @@ y = \rho W y + X \beta + W X \theta + \varepsilon
 ```
 
 ```julia
-m = fit_spatial(CrossSection.SDM(), W, X, y)
+m = fit_spatial(SDM(), W, X, y)
 ```
 
 ## Estimation Methods
@@ -26,11 +26,11 @@ Both models support exact (LU decomposition) and approximate (Chebyshev) log-det
 
 ```julia
 # Exact (default, good for N < 5000)
-m = fit_spatial(CrossSection.SAR(), W, X, y)
+m = fit_spatial(SAR(), W, X, y)
 
 # Chebyshev approximation (for large N)
-m = fit_spatial(CrossSection.SAR(), W, X, y;
-    method=CrossSection.ChebyshevApprox(order=7))
+m = fit_spatial(SAR(), W, X, y;
+    method=ChebyshevApprox(order=7))
 ```
 
 ## Spatial Effects

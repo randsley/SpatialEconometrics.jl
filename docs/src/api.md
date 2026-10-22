@@ -2,7 +2,9 @@
 
 ## Estimation Functions
 
-| Function | Model | Module |
+Variant and fixed-effects arguments are the shared exported tags (`SAR`, `SDM`, `SARAR`, `NoFE`, `IndivFE`, `TimeFE`, `TwoWayFE`). The module column names the source file, not something you import.
+
+| Function | Model | Defined in |
 |---|---|---|
 | `fit_spatial(variant, W, X, y)` | Cross-section SAR/SDM | `CrossSection` |
 | `fit_spatial_panel(variant, fe, W, X, y, N, T)` | Static spatial panel | `StaticPanel` |

@@ -21,9 +21,9 @@ export SpatialVariant, SAR, SDM,
        SpatialEffectsResult, SpatialRegressionModel,
        fit_spatial, spatial_effects
 
-abstract type SpatialVariant end
-struct SAR <: SpatialVariant end
-struct SDM <: SpatialVariant end
+const SpatialVariant = SpatialUtils.SpatialVariant
+const SAR = SpatialUtils.SAR
+const SDM = SpatialUtils.SDM
 
 struct SpatialRegressionModel{V<:SpatialVariant, T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     variant::V

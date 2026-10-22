@@ -27,9 +27,9 @@ export SpatialVariant, SAR, SDM,
        DynamicSpatialPanelModel, DynamicSpatialEffectsResult,
        fit_dynamic_spatial_panel, dynamic_spatial_effects
 
-abstract type SpatialVariant end
-struct SAR <: SpatialVariant end
-struct SDM <: SpatialVariant end
+const SpatialVariant = SpatialUtils.SpatialVariant
+const SAR = SpatialUtils.SAR
+const SDM = SpatialUtils.SDM
 
 struct DynamicSpatialPanelModel{
     V<:SpatialVariant,

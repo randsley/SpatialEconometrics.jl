@@ -42,7 +42,7 @@ for t in 1:T_tot
 end
 
 # Matrix interface
-m_gs = fit_gs2sls_panel(GS2SLSPanel.TwoWayFE(), W,
+m_gs = fit_gs2sls_panel(TwoWayFE(), W,
     X_exog, reshape(tax, NT, 1), hcat(z1, z2), y, N, T_tot;
     exog_names=["investment", "openness"], endog_names=["tax_rate"])
 println(m_gs)
