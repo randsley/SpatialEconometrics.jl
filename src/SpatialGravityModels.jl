@@ -15,15 +15,116 @@ export GravityVariant, PoissonGravity, NegBinGravity,
 
 # ─── Types ────────────────────────────────────────────────────────────
 
+"""
+    GravityVariant
+
+Which count model a gravity equation is estimated with. Subtypes:
+[`PoissonGravity`](@ref) and [`NegBinGravity`](@ref).
+"""
 abstract type GravityVariant end
+"""
+    PoissonGravity()
+
+Poisson pseudo-maximum likelihood (PPML) estimation of a gravity equation.
+
+The standard choice, for two reasons. Trade and migration flow data are
+full of zeros, which log-linear estimation simply drops; and under
+heteroskedasticity — the norm for flows — log-linear OLS is inconsistent
+because `E[log y] != log E[y]`. PPML is consistent under either, needing
+only the conditional mean to be correctly specified, and handles zeros
+natively.
+
+See also [`NegBinGravity`](@ref), [`fit_gravity`](@ref).
+
+# References
+Santos Silva, J. M. C. & Tenreyro, S. (2006). The log of gravity. *Review
+of Economics and Statistics*, 88(4).
+"""
 struct PoissonGravity <: GravityVariant end
+"""
+    NegBinGravity()
+
+Negative binomial estimation of a gravity equation, adding a dispersion
+parameter `alpha` to accommodate variance above the Poisson mean.
+
+More efficient than [`PoissonGravity`](@ref) when the overdispersion is
+real, but it buys that by assuming the variance function, so it is less
+robust to getting that assumption wrong. Fitted starting from the Poisson
+estimates. The estimated `alpha` is on the fitted model; near zero means
+the Poisson restriction was adequate.
+
+See also [`fit_gravity`](@ref).
+"""
 struct NegBinGravity  <: GravityVariant end
 
+"""
+    GravityFE
+
+Which fixed effects a gravity equation absorbs. Subtypes:
+[`OriginFE`](@ref), [`DestinationFE`](@ref), [`BilateralFE`](@ref).
+"""
 abstract type GravityFE end
+"""
+    OriginFE()
+
+Origin fixed effects only — one per sending unit.
+
+Absorbs everything about the origin, including its outward multilateral
+resistance, but leaves destination characteristics in the error.
+
+See also [`BilateralFE`](@ref).
+"""
 struct OriginFE      <: GravityFE end
+"""
+    DestinationFE()
+
+Destination fixed effects only — one per receiving unit.
+
+The mirror of [`OriginFE`](@ref).
+"""
 struct DestinationFE <: GravityFE end
+"""
+    BilateralFE()
+
+Both origin and destination fixed effects. The default.
+
+This is the theory-consistent specification: structural gravity implies
+origin and destination terms that absorb both multilateral resistances, and
+omitting them is the classic gold-medal error that biases the distance and
+border coefficients. They are swept out by alternating projection, so the
+cost stays manageable as the number of units grows.
+
+Recover the absorbed terms with [`multilateral_resistance`](@ref).
+
+# References
+Anderson, J. & van Wincoop, E. (2003). Gravity with gravitas. *American
+Economic Review*, 93(1).
+"""
 struct BilateralFE   <: GravityFE end
 
+"""
+    GravityModel
+
+A fitted gravity / flow model, returned by [`fit_gravity`](@ref).
+Implements the `StatsAPI.RegressionModel` interface.
+
+# Fields
+- `variant`: [`PoissonGravity`](@ref) or [`NegBinGravity`](@ref).
+- `coef`, `vcov`, `coefnames`: the structural coefficients on `X`. The
+  fixed effects are **not** in here.
+- `origin_fe`, `dest_fe`: the absorbed fixed effects, i.e. the multilateral
+  resistance terms — see [`multilateral_resistance`](@ref).
+- `alpha`: negative binomial dispersion; `NaN` for Poisson.
+- `loglik`, `deviance`, `pseudo_R2`: fit measures.
+- `residuals`, `fitted`: on the scale of the flows, not logs.
+- `N_obs`, `N_origin`, `N_dest`: observation and unit counts.
+- `converged`, `iterations`: state of the IRLS loop. **Check `converged`.**
+
+!!! note
+    Coefficients are semi-elasticities on the flow scale, since the model
+    is `E[y] = exp(X*beta + FE)`. A log-distance coefficient is therefore
+    read as an elasticity directly.
+"""
 struct GravityModel{V<:GravityVariant, T<:AbstractFloat} <: StatsAPI.RegressionModel
     variant::V
     coef::Vector{T}
@@ -111,6 +212,52 @@ end
 
 # ─── PPML via IRLS ───────────────────────────────────────────────────
 
+"""
+    fit_gravity(variant, flows, X, origin_id, dest_id; fe = BilateralFE(),
+                varnames = nothing, maxiter = 100, tol = 1e-8)
+
+Fit a gravity / flow model by pseudo-maximum likelihood, absorbing
+high-dimensional origin and destination fixed effects.
+
+Estimates `E[flows] = exp(X*beta + origin FE + destination FE)` by IRLS,
+with the fixed effects swept out by alternating projection rather than
+expanded into dummies, so the number of units is not a constraint.
+
+# Arguments
+- `variant`: [`PoissonGravity`](@ref) or [`NegBinGravity`](@ref).
+- `flows`: the dependent flow variable, **on its own scale, not logged**.
+  Zeros are fine and should be kept.
+- `X`: `N_obs x K` bilateral covariates — log distance, contiguity, common
+  language and so on. No intercept, and nothing that varies only by origin
+  or only by destination, since the fixed effects absorb that.
+- `origin_id`, `dest_id`: integer unit indices per observation.
+
+# Keywords
+- `fe`: a [`GravityFE`](@ref); [`BilateralFE`](@ref) by default and
+  generally what theory calls for.
+- `varnames`: covariate names; defaults to `x1, x2, ...`.
+- `maxiter`, `tol`: IRLS iteration cap and convergence tolerance.
+
+# Returns
+A [`GravityModel`](@ref).
+
+# Examples
+```julia
+m = fit_gravity(PoissonGravity(), flows, X, orig, dest;
+                varnames = ["log_dist", "contiguous"])
+m.converged || @warn "IRLS did not converge"
+coef(m)
+multilateral_resistance(m)
+```
+
+!!! warning
+    Do not log the flows and do not drop the zeros. Doing either is the
+    practice PPML exists to replace.
+
+# References
+Santos Silva, J. M. C. & Tenreyro, S. (2006). *Review of Economics and
+Statistics*, 88(4).
+"""
 function fit_gravity(
     ::PoissonGravity,
     flows::AbstractVector,
@@ -377,6 +524,28 @@ end
 
 # ─── Multilateral resistance ─────────────────────────────────────────
 
+"""
+    multilateral_resistance(model) -> NamedTuple
+
+Recover the fitted fixed effects as `(; outward, inward)`.
+
+In structural gravity the origin and destination fixed effects *are* the
+multilateral resistance terms: `outward` measures how hard it is for each
+origin to reach all markets, `inward` how accessible each destination is
+from all sources. They are nuisance parameters for estimating `beta` but
+often the quantity of substantive interest.
+
+Both vectors are identified only up to a normalization, so compare values
+within a vector rather than reading levels.
+
+# Examples
+```julia
+mr = multilateral_resistance(m)
+sortperm(mr.inward, rev = true)      # most accessible destinations
+```
+
+See also [`GravityModel`](@ref), [`BilateralFE`](@ref).
+"""
 function multilateral_resistance(m::GravityModel)
     return (outward = m.origin_fe, inward = m.dest_fe)
 end

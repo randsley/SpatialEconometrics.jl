@@ -18,20 +18,74 @@ export SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP,
 # Data Generating Processes
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    SpatialDGP
+
+A data-generating process for simulation, passed to
+[`simulate_spatial`](@ref) and [`monte_carlo_spatial`](@ref).
+
+Six processes are provided, spanning the usual specification ladder:
+[`SAR_DGP`](@ref), [`SEM_DGP`](@ref), [`SDM_DGP`](@ref),
+[`SLX_DGP`](@ref), [`SAC_DGP`](@ref), [`SDEM_DGP`](@ref).
+
+!!! note
+    None of them includes an intercept, while the estimators all fit one.
+    [`monte_carlo_spatial`](@ref) drops the leading `(Intercept)`
+    coefficient before comparing, so `beta` lines up with the estimates.
+"""
 abstract type SpatialDGP end
 
+"""
+    SAR_DGP(rho, beta, sigma)
+
+Spatial autoregressive process: `y = rho*W*y + X*beta + e`, with
+`e ~ N(0, sigma^2)`.
+
+Drawn as `y = (I - rho*W)^{-1} (X*beta + e)`. Parameter order for
+comparison is `beta` then `rho`.
+
+# Examples
+```julia
+dgp = SAR_DGP(0.5, [1.5, -0.8], 0.5)
+y, X = simulate_spatial(dgp, W, X)
+```
+
+See also [`SpatialDGP`](@ref).
+"""
 struct SAR_DGP{T<:AbstractFloat} <: SpatialDGP
     rho::T
     beta::Vector{T}
     sigma::T
 end
 
+"""
+    SEM_DGP(lambda, beta, sigma)
+
+Spatial error process: `y = X*beta + u` with `u = lambda*W*u + e`.
+
+Dependence is in the disturbance only, so OLS stays unbiased but its
+standard errors are wrong — which is what makes this the useful null for
+[`lm_test_error`](@ref). Parameter order is `beta` then `lambda`.
+
+See also [`SpatialDGP`](@ref).
+"""
 struct SEM_DGP{T<:AbstractFloat} <: SpatialDGP
     lambda::T
     beta::Vector{T}
     sigma::T
 end
 
+"""
+    SDM_DGP(rho, beta, theta, sigma)
+
+Spatial Durbin process: `y = rho*W*y + X*beta + W*X*theta + e`.
+
+Nests [`SAR_DGP`](@ref) at `theta = 0` and [`SLX_DGP`](@ref) at `rho = 0`,
+so it is the natural process for checking
+[`common_factor_test`](@ref). Parameter order is `beta`, `theta`, `rho`.
+
+See also [`SpatialDGP`](@ref).
+"""
 struct SDM_DGP{T<:AbstractFloat} <: SpatialDGP
     rho::T
     beta::Vector{T}
@@ -39,12 +93,35 @@ struct SDM_DGP{T<:AbstractFloat} <: SpatialDGP
     sigma::T
 end
 
+"""
+    SLX_DGP(beta, theta, sigma)
+
+Spatially lagged covariates only: `y = X*beta + W*X*theta + e`.
+
+No feedback through `y`, so OLS on `[X W*X]` is consistent and the
+spillovers are read straight off `theta` without inverting
+`(I - rho*W)`. Parameter order is `beta` then `theta`.
+
+See also [`SpatialDGP`](@ref).
+"""
 struct SLX_DGP{T<:AbstractFloat} <: SpatialDGP
     beta::Vector{T}
     theta::Vector{T}
     sigma::T
 end
 
+"""
+    SAC_DGP(rho, lambda, beta, sigma)
+
+Dependence in both `y` and the errors (SAC / SARAR):
+`y = rho*W*y + X*beta + u`, `u = lambda*W*u + e`.
+
+With one weight matrix doing both jobs, `rho` and `lambda` are only weakly
+separated in finite samples — useful precisely for showing how hard the
+specification search gets. Parameter order is `beta`, `rho`, `lambda`.
+
+See also [`SpatialDGP`](@ref), [`SARAR`](@ref).
+"""
 struct SAC_DGP{T<:AbstractFloat} <: SpatialDGP
     rho::T
     lambda::T
@@ -52,6 +129,17 @@ struct SAC_DGP{T<:AbstractFloat} <: SpatialDGP
     sigma::T
 end
 
+"""
+    SDEM_DGP(lambda, beta, theta, sigma)
+
+Spatial Durbin error process: `y = X*beta + W*X*theta + u` with
+`u = lambda*W*u + e`.
+
+Lagged covariates plus a spatial error, but no lag of `y`. Parameter order
+is `beta`, `theta`, `lambda`.
+
+See also [`SpatialDGP`](@ref).
+"""
 struct SDEM_DGP{T<:AbstractFloat} <: SpatialDGP
     lambda::T
     beta::Vector{T}
@@ -141,6 +229,15 @@ end
 # Monte Carlo Framework
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    MonteCarloConfig(; n_replications = 500, seed = 42)
+
+Replication count and seed for [`monte_carlo_spatial`](@ref).
+
+The seed fixes the whole experiment, so a run is reproducible; raising
+`n_replications` is what tightens the Monte Carlo standard error on the
+reported bias and RMSE.
+"""
 struct MonteCarloConfig
     n_replications::Int
     seed::Int
@@ -148,6 +245,31 @@ end
 MonteCarloConfig(; n_replications::Int=500, seed::Int=42) =
     MonteCarloConfig(n_replications, seed)
 
+"""
+    MonteCarloResult
+
+Output of [`monte_carlo_spatial`](@ref): sampling behaviour of an estimator
+over repeated draws from a known process.
+
+# Fields
+- `param_means`, `param_stds`: mean and standard deviation of the estimates
+  across replications.
+- `param_bias`: mean estimate minus the true value.
+- `param_rmse`: root mean squared error, the summary that trades bias
+  against variance.
+- `param_names`: row labels, taken from the **DGP**.
+- `rejection_rates`: empirical rejection rate per test — size when the null
+  holds, power when it does not.
+- `n_successful`, `n_replications`: replications that produced an estimate,
+  and replications attempted. Failures are excluded rather than averaged
+  in, so a gap between these two is itself a finding.
+
+!!! warning
+    `param_names` describes the DGP, not the estimator. Fitting a
+    deliberately misspecified model still gives meaningful `beta` rows, but
+    a trailing row labelled `rho` or `lambda` holds whatever parameter the
+    estimator returned in that position.
+"""
 struct MonteCarloResult{T<:AbstractFloat}
     param_means::Vector{T}
     param_stds::Vector{T}
@@ -355,6 +477,22 @@ end
 # Power Analysis
 # ═══════════════════════════════════════════════════════════════════════
 
+"""
+    PowerAnalysisResult
+
+Power surfaces from [`power_analysis`](@ref), for the three standard tests
+for spatial dependence.
+
+# Fields
+- `sample_sizes`: the `N` values examined (one per grid side length).
+- `rho_values`: the spatial parameter strengths examined.
+- `power_moran`, `power_lm_lag`, `power_lm_error`: matrices of rejection
+  rates, indexed `[sample size, rho]`.
+- `alpha`: nominal size used.
+
+Read the `rho = 0` column as a check on size: it should sit near `alpha`,
+and a test that fails there has no credible power anywhere else.
+"""
 struct PowerAnalysisResult{T<:AbstractFloat}
     sample_sizes::Vector{Int}
     rho_values::Vector{T}
