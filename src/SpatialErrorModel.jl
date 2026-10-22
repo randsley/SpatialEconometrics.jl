@@ -28,6 +28,23 @@ export SpatialErrorRegressionModel, SpatialErrorPanelModel,
 
 # ─── Cross-section SEM result ─────────────────────────────────────────
 
+"""
+    SpatialErrorRegressionModel
+
+A fitted cross-sectional spatial error model, returned by
+[`fit_spatial_error`](@ref). Implements the `StatsAPI.RegressionModel`
+interface.
+
+Carries `coef` and `vcov` for the regression parameters, the spatial error
+parameter `lambda` with its standard error, `sigma2`, `loglik`, the weight
+matrix, residuals and `coefnames`.
+
+!!! note
+    Unlike [`SpatialRegressionModel`](@ref), `coef` **is** interpretable
+    directly: dependence sits in the error, so there is no feedback through
+    `y` and no need for [`spatial_effects`](@ref). What the model buys you
+    is correct standard errors, not different point estimates.
+"""
 struct SpatialErrorRegressionModel{T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     coef::Vector{T}
     vcov::Matrix{T}
@@ -44,6 +61,15 @@ end
 
 # ─── Panel SEM result ─────────────────────────────────────────────────
 
+"""
+    SpatialErrorPanelModel
+
+A fitted spatial error panel, returned by the panel method of
+[`fit_spatial_error`](@ref).
+
+As [`SpatialErrorRegressionModel`](@ref), with the fixed-effects
+specification and the panel dimensions `N` and `T_per` recorded alongside.
+"""
 struct SpatialErrorPanelModel{FE<:FixedEffectsSpec, T<:AbstractFloat, M<:AbstractSparseMatrix{T}} <: StatsAPI.RegressionModel
     fe_spec::FE
     N::Int
@@ -65,6 +91,59 @@ end
 
 # ─── Cross-section SEM estimation ─────────────────────────────────────
 
+"""
+    fit_spatial_error(W, X, y; method, varnames, lambda_bounds)
+    fit_spatial_error(fe_spec, W, X, y, N, T_per; method, varnames, lambda_bounds)
+
+Fit a spatial error model by concentrated maximum likelihood.
+
+```math
+y = X*beta + u,  u = lambda*W*u + e
+```
+
+Dependence is in the disturbance rather than in `y`. OLS stays unbiased
+under this process but its standard errors are wrong, so the gain is
+inferential: `beta` is interpretable as it stands, with no spillover
+decomposition needed.
+
+The likelihood is concentrated by spatially filtering `y` and `X` with
+`(I - lambda*W)` at each trial `lambda`, then maximizing over `lambda`
+alone.
+
+The first method fits a cross-section; the second fits a panel, taking a
+[`FixedEffectsSpec`](@ref) and the panel dimensions, with `X` and `y`
+stacked units-fastest.
+
+# Arguments
+- `W`: `N x N` sparse weight matrix.
+- `X`: covariates without an intercept — one is added.
+- `y`: response.
+
+# Keywords
+- `method`: a [`LogDetMethod`](@ref).
+- `varnames`: covariate names.
+- `lambda_bounds`: search interval for `lambda`, default
+  `(-0.995, 0.995)`.
+
+# Returns
+A [`SpatialErrorRegressionModel`](@ref) or
+[`SpatialErrorPanelModel`](@ref).
+
+# Examples
+```julia
+m = fit_spatial_error(W, X, y; varnames = ["income", "density"])
+m.lambda
+coef(m)                              # directly interpretable
+
+fit_spatial_error(TwoWayFE(), W, X, y, N, T_per)
+```
+
+Use [`lm_tests`](@ref) to decide between this and [`fit_spatial`](@ref)
+before fitting either.
+
+# References
+Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
+"""
 function fit_spatial_error(
     W::M,
     X::AbstractMatrix{T},

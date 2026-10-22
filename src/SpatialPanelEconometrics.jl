@@ -35,12 +35,67 @@ const SAR = SpatialUtils.SAR
 const SDM = SpatialUtils.SDM
 
 abstract type PanelEstimationApproach end
+"""
+    LeeYuTransformation()
+
+Estimate a spatial panel using the Lee-Yu orthogonal transformation.
+
+Sweeping out fixed effects by demeaning leaves the variance estimate
+inconsistent as the number of periods grows slowly, because the demeaned
+errors are no longer independent. The Lee-Yu transformation instead
+projects onto an orthonormal basis of the demeaning operator's complement,
+which removes the fixed effects while keeping the errors independent, so no
+bias correction is needed afterwards.
+
+The default, and the right choice for short panels.
+
+See also [`DirectQML`](@ref).
+
+# References
+Lee, L.-F. & Yu, J. (2010). Estimation of spatial autoregressive panel data
+models with fixed effects. *Journal of Econometrics*, 154(2).
+"""
 struct LeeYuTransformation <: PanelEstimationApproach end
+"""
+    DirectQML(; bias_correct = true)
+
+Estimate a spatial panel by quasi-maximum likelihood on the demeaned data,
+optionally applying an analytical bias correction.
+
+The straightforward approach: demean, then maximize the likelihood. With
+`bias_correct = true` the known `O(1/T)` bias in the variance and spatial
+parameter is corrected analytically after the fact; setting it to `false`
+leaves the raw QML estimates, which is useful mainly for showing what the
+correction does.
+
+[`LeeYuTransformation`](@ref) avoids the bias by construction and is
+preferred unless you want this estimator specifically.
+
+# References
+Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).
+"""
 struct DirectQML <: PanelEstimationApproach
     bias_correct::Bool
     DirectQML(; bias_correct::Bool=true) = new(bias_correct)
 end
 
+"""
+    SpatialPanelModel
+
+A fitted static spatial panel, returned by [`fit_spatial_panel`](@ref).
+Implements the `StatsAPI.RegressionModel` interface.
+
+Carries the fitted `variant`, `fe_spec` and estimation `approach`
+alongside `coef`, `vcov`, the spatial parameter `rho` with its standard
+error, `sigma2`, `loglik`, the weight matrix, the transformed design
+`X_tilde`, residuals and `coefnames`, plus the panel dimensions `N` and
+`T_periods`.
+
+As in the cross-section, `coef` holds structural parameters rather than
+marginal effects — use [`spatial_effects`](@ref).
+
+See also [`fit_spatial_panel`](@ref), [`robust_vcov`](@ref).
+"""
 struct SpatialPanelModel{
     V<:SpatialVariant,
     FE<:FixedEffectsSpec,
@@ -111,6 +166,51 @@ function build_design_matrix(
     return X_aug, names_aug
 end
 
+"""
+    fit_spatial_panel(variant, fe_spec, W, X, y, N, T_per; approach, method,
+                      varnames, rho_bounds)
+
+Fit a static spatial panel by quasi-maximum likelihood with fixed effects.
+
+# Arguments
+- `variant`: [`SAR`](@ref) or [`SDM`](@ref).
+- `fe_spec`: a [`FixedEffectsSpec`](@ref) — [`NoFE`](@ref),
+  [`IndivFE`](@ref), [`TimeFE`](@ref) or [`TwoWayFE`](@ref).
+- `W`: `N x N` sparse weight matrix for the cross-section, **not** the
+  stacked `NT x NT` matrix.
+- `X`: `(N*T_per) x K` covariates, no intercept.
+- `y`: stacked response of length `N*T_per`.
+- `N`, `T_per`: units and periods.
+
+# Keywords
+- `approach`: [`LeeYuTransformation`](@ref) (default) or
+  [`DirectQML`](@ref).
+- `method`: a [`LogDetMethod`](@ref).
+- `varnames`, `rho_bounds`: as for [`fit_spatial`](@ref).
+
+# Returns
+A [`SpatialPanelModel`](@ref).
+
+!!! warning "Stacking order"
+    `X` and `y` must be stacked with **units varying fastest** within each
+    period: `[unit_1 t_1, unit_2 t_1, ..., unit_N t_1, unit_1 t_2, ...]`.
+    The wrong order will not error; it will silently misalign every unit
+    with its neighbours.
+
+# Examples
+```julia
+m = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per;
+                      varnames = ["income", "density"])
+m.rho
+robust_coeftable(m, DriscollKraayVCOV())
+```
+
+See also [`fit_dynamic_spatial_panel`](@ref), [`panel_lm_tests`](@ref),
+[`spatial_hausman_test`](@ref).
+
+# References
+Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).
+"""
 function fit_spatial_panel(
     variant::V,
     fe_spec::FE,

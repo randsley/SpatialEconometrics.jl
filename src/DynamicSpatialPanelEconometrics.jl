@@ -31,6 +31,39 @@ const SpatialVariant = SpatialUtils.SpatialVariant
 const SAR = SpatialUtils.SAR
 const SDM = SpatialUtils.SDM
 
+"""
+    DynamicSpatialPanelModel
+
+A fitted dynamic spatial panel, returned by
+[`fit_dynamic_spatial_panel`](@ref). Implements the
+`StatsAPI.RegressionModel` interface.
+
+The specification carries **three** dependence parameters, all reported
+separately:
+
+| Field | Term | Meaning |
+|---|---|---|
+| `gamma` | `y_{t-1}` | pure time lag |
+| `eta` | `W*y_{t-1}` | space-time lag: last period's neighbours |
+| `rho` | `W*y_t` | contemporaneous spatial lag |
+
+# Other fields
+- `coef`, `vcov`, `coefnames`, `sigma2`, `loglik`, `residuals`: as usual.
+  `coefnames` runs `"y_lag"`, `"Wy_lag"`, the covariates, the `W_`-prefixed
+  terms for an [`SDM`](@ref), then `"ρ"`.
+- `coef_uncorrected`, `sigma2_uncorrected`: the estimates before the bias
+  correction, so you can see what it moved.
+- `spectral_radius_A`: stability diagnostic for the implied system. The
+  long-run effects only exist if this is below 1.
+- `W`, `Z_tilde`, `y_tilde`, `trace_powers`: the weight matrix, the
+  transformed design and response, and traces reused by
+  [`dynamic_spatial_effects`](@ref).
+- `N`, `T_total`, `T_post`: one period is consumed in forming the lag, so
+  estimation uses `T_post = T_total - 1`.
+
+Because dependence runs over both space and time, short-run and long-run
+effects differ — see [`dynamic_spatial_effects`](@ref).
+"""
 struct DynamicSpatialPanelModel{
     V<:SpatialVariant,
     FE<:FixedEffectsSpec,
@@ -60,6 +93,16 @@ struct DynamicSpatialPanelModel{
     coefnames::Vector{String}
 end
 
+"""
+    DynamicSpatialEffectsResult
+
+Short-run and long-run direct, indirect and total effects for a dynamic
+spatial panel, returned by [`dynamic_spatial_effects`](@ref).
+
+The short-run effects are the impact within the period of the shock; the
+long-run effects cumulate the time dynamics to the new steady state and are
+larger whenever the autoregressive coefficient is positive.
+"""
 struct DynamicSpatialEffectsResult{T<:AbstractFloat}
     varnames::Vector{String}
     sr_direct::Vector{T}
@@ -76,6 +119,53 @@ struct DynamicSpatialEffectsResult{T<:AbstractFloat}
     lr_total_se::Vector{T}
 end
 
+"""
+    fit_dynamic_spatial_panel(variant, fe_spec, W, X, y, N, T_total; method,
+                              varnames, rho_bounds, n_bias_probes, rng)
+
+Fit a dynamic spatial panel — one carrying both a time lag and a spatial
+lag of the dependent variable — by bias-corrected quasi-maximum
+likelihood.
+
+With fixed effects and a lagged dependent variable the QML estimator
+suffers the Nickell bias, of order `1/T`. The Yu, de Jong and Lee
+analytical correction is applied, using stochastic probes to estimate the
+traces the correction needs.
+
+# Arguments
+- `variant`: [`SAR`](@ref) or [`SDM`](@ref).
+- `fe_spec`: a [`FixedEffectsSpec`](@ref); [`IndivFE`](@ref) or
+  [`TwoWayFE`](@ref) are the meaningful choices here.
+- `W`: `N x N` cross-sectional weight matrix.
+- `X`, `y`: stacked over all `T_total` periods, units varying fastest.
+- `N`, `T_total`: units and periods **including** the one consumed by the
+  lag; estimation uses `T_total - 1`.
+
+# Keywords
+- `n_bias_probes`, `rng`: probes used by the bias correction, and the
+  random source for them. Results vary slightly with `rng`; pass a seeded
+  one for reproducibility.
+- `method`, `varnames`, `rho_bounds`: as for [`fit_spatial_panel`](@ref).
+
+# Returns
+A [`DynamicSpatialPanelModel`](@ref).
+
+!!! warning
+    Same stacking requirement as [`fit_spatial_panel`](@ref): units vary
+    fastest within each period. The bias correction also assumes `T` is
+    small relative to `N`; with long panels the correction matters less and
+    the uncorrected estimates are already close.
+
+# Examples
+```julia
+m = fit_dynamic_spatial_panel(SAR(), IndivFE(), W, X, y, N, T_total;
+                              rng = MersenneTwister(1))
+dynamic_spatial_effects(m)
+```
+
+# References
+Yu, J., de Jong, R. & Lee, L.-F. (2008). *Journal of Econometrics*, 146(1).
+"""
 function fit_dynamic_spatial_panel(
     variant::V,
     fe_spec::FE,
@@ -304,6 +394,36 @@ function yudjlee_bias_correction(
     return V_coef, δ_bc, ρ_bc, σ2_bc, res_bc, spec_rad
 end
 
+"""
+    dynamic_spatial_effects(model; max_power = 50, vcov_mat = model.vcov)
+    dynamic_spatial_effects(model, spec::AbstractRobustVCOV; max_power = 50)
+
+Short-run and long-run marginal effects for a dynamic spatial panel.
+
+The short-run effects are the within-period response through
+`(I - rho*W)^{-1}`, so the total is `(beta + theta) / (1 - rho)`.
+
+The long-run effects cumulate the time dynamics to the steady state, which
+brings in both lag parameters: the total becomes
+
+```math
+(beta + theta) / (1 - gamma - rho - eta)
+```
+
+and the direct effect is evaluated at the long-run spatial parameter
+`(rho + eta) / (1 - gamma)`, scaled by `1 / (1 - gamma)`. Each of the six
+quantities comes with a delta-method standard error.
+
+# Returns
+A [`DynamicSpatialEffectsResult`](@ref), whose fields are prefixed `sr_`
+for short-run and `lr_` for long-run.
+
+!!! warning
+    The long-run effects exist only if `gamma + rho + eta < 1`. As that sum
+    approaches 1 the denominator goes to zero, the effects diverge, and the
+    delta-method standard errors become unreliable well before that point.
+    Check `model.spectral_radius_A` first.
+"""
 function dynamic_spatial_effects(
     model::DynamicSpatialPanelModel{V, FE, T};
     max_power::Int=50,
