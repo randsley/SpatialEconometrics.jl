@@ -17,19 +17,96 @@ export BandwidthType, FixedBandwidth, AdaptiveBandwidth,
 
 # ─── Bandwidth types ──────────────────────────────────────────────────
 
+"""
+    BandwidthType
+
+How the GWR neighbourhood around each location is sized. Subtypes:
+[`FixedBandwidth`](@ref) and [`AdaptiveBandwidth`](@ref).
+
+The bandwidth is the single most consequential GWR choice: too small and
+the local coefficients chase noise, too large and they flatten towards the
+global regression.
+"""
 abstract type BandwidthType end
+"""
+    FixedBandwidth(h)
+
+A constant kernel bandwidth `h`, in the units of the coordinates, used at
+every location.
+
+Appropriate when units are spread evenly. Where density varies, a fixed
+radius means sparse regions contribute few observations to their local
+fit — sometimes fewer than there are parameters — so
+[`AdaptiveBandwidth`](@ref) is usually safer with irregular data.
+
+# Examples
+```julia
+fit_gwr(X, y, coords; bandwidth = FixedBandwidth(2.5))
+```
+"""
 struct FixedBandwidth{T<:AbstractFloat} <: BandwidthType
     h::T
 end
+"""
+    AdaptiveBandwidth(k)
+
+A nearest-neighbour bandwidth: each local regression uses its `k` closest
+observations, so the radius expands in sparse areas and contracts in dense
+ones.
+
+The more robust default for irregularly spaced data, since every local fit
+gets the same number of observations. `k` must comfortably exceed the
+number of parameters.
+
+# Examples
+```julia
+fit_gwr(X, y, coords; bandwidth = AdaptiveBandwidth(30))
+```
+"""
 struct AdaptiveBandwidth <: BandwidthType
     k::Int
 end
 
 # ─── Kernel functions ─────────────────────────────────────────────────
 
+"""
+    KernelFunction
+
+Weighting applied to neighbours within a GWR bandwidth. Subtypes:
+[`GaussianKernel`](@ref), [`BisquareKernel`](@ref),
+[`ExponentialKernel`](@ref).
+"""
 abstract type KernelFunction end
+"""
+    GaussianKernel()
+
+Gaussian weighting, `exp(-0.5 (d/h)^2)`.
+
+Weights decline smoothly and never reach zero, so every observation
+contributes to every local fit. That makes the coefficient surface smooth
+but means the "local" regression is never strictly local.
+
+See also [`BisquareKernel`](@ref).
+"""
 struct GaussianKernel    <: KernelFunction end
+"""
+    BisquareKernel()
+
+Bisquare weighting, `(1 - (d/h)^2)^2` inside the bandwidth and exactly zero
+outside.
+
+The default here and the usual GWR choice: the hard cut-off makes each
+local fit genuinely local and keeps the computation sparse.
+
+See also [`GaussianKernel`](@ref), [`ExponentialKernel`](@ref).
+"""
 struct BisquareKernel    <: KernelFunction end
+"""
+    ExponentialKernel()
+
+Exponential weighting, `exp(-d/h)`. Decays faster near the origin than
+[`GaussianKernel`](@ref) and, like it, has no hard cut-off.
+"""
 struct ExponentialKernel <: KernelFunction end
 
 @inline function kernel_weight(::GaussianKernel, d::T, h::T) where {T<:AbstractFloat}
@@ -47,6 +124,34 @@ end
 
 # ─── GWR result type ─────────────────────────────────────────────────
 
+"""
+    GWRModel
+
+A fitted geographically weighted regression, returned by
+[`fit_gwr`](@ref). Implements the `StatsAPI.RegressionModel` interface.
+
+Rather than one coefficient vector, GWR estimates a separate regression at
+every location, so the headline output is the `N x K` surface
+`coef_local`.
+
+# Fields
+- `coef_local`, `se_local`: `N x K` local coefficients and their standard
+  errors, columns ordered as `coefnames`.
+- `coef_global`: column means of `coef_local`, a summary only.
+- `y`, `X`, `coords`, `residuals`, `fitted`: the data and the fit. `X`
+  includes the intercept column that was added for you.
+- `local_R2`: goodness of fit of each local regression.
+- `bandwidth`, `bandwidth_type`, `kernel`: the neighbourhood actually used.
+- `AICc`, `R2`, `sigma2`: global fit measures.
+- `hat_trace`: `tr(S)`, the effective number of parameters.
+- `coefnames`: `"(Intercept)"` followed by the covariate names.
+
+!!! warning
+    The local standard errors are not adjusted for the fact that `N`
+    regressions were run on overlapping data, so pointwise `t`-statistics
+    overstate significance. Read the surface as description, and use
+    [`plot_gwr_coefficients`](@ref) to look at it.
+"""
 struct GWRModel{T<:AbstractFloat} <: StatsAPI.RegressionModel
     coef_local::Matrix{T}       # N × K local coefficients
     se_local::Matrix{T}         # N × K local standard errors
@@ -67,6 +172,28 @@ struct GWRModel{T<:AbstractFloat} <: StatsAPI.RegressionModel
     coefnames::Vector{String}
 end
 
+"""
+    MGWRModel
+
+A fitted multiscale geographically weighted regression, returned by
+[`fit_mgwr`](@ref).
+
+Differs from [`GWRModel`](@ref) in carrying `bandwidths`, one per
+covariate, instead of a single bandwidth.
+
+# Fields
+- `coef_local`, `se_local`: `N x K` local coefficients and standard errors.
+- `coef_global`: column means of `coef_local`.
+- `y`, `X`, `coords`, `residuals`, `fitted`: the data and the fit.
+- `bandwidths`: the selected bandwidth per fitted coefficient, aligned with
+  `coefnames` (intercept first). This is the substantive result — a large
+  value means that relationship is close to constant in space, a small one
+  that it varies locally.
+- `kernel`, `AICc`, `R2`, `sigma2`, `coefnames`: as for
+  [`GWRModel`](@ref).
+- `iterations`, `converged`: state of the back-fitting loop. **Check
+  `converged`** before interpreting anything.
+"""
 struct MGWRModel{T<:AbstractFloat} <: StatsAPI.RegressionModel
     coef_local::Matrix{T}
     se_local::Matrix{T}
@@ -254,6 +381,54 @@ end
 
 # ─── Main GWR fit function ───────────────────────────────────────────
 
+"""
+    fit_gwr(X, y, coords; bandwidth = nothing, kernel = BisquareKernel(), varnames = nothing)
+
+Fit a geographically weighted regression: a separate weighted least squares
+at every location.
+
+Each local fit weights observations by their distance from the target
+location, so the result is a coefficient *surface* rather than a single
+vector. This describes how a relationship varies over space; it does not
+model spatial dependence in the error, which is what
+[`fit_spatial`](@ref) and [`fit_spatial_error`](@ref) are for.
+
+# Arguments
+- `X`: `N x K` covariates, **without** an intercept — one is added.
+- `y`: response of length `N`.
+- `coords`: `N x 2` matrix of locations.
+
+# Keywords
+- `bandwidth`: a [`FixedBandwidth`](@ref) or [`AdaptiveBandwidth`](@ref).
+  `nothing` (the default) selects an adaptive bandwidth by minimizing
+  corrected AIC, which costs an extra search but is the sensible default.
+- `kernel`: a [`KernelFunction`](@ref).
+- `varnames`: covariate names; defaults to `x1, x2, ...`.
+
+# Returns
+A [`GWRModel`](@ref).
+
+# Examples
+```julia
+m = fit_gwr(X, y, coords; varnames = ["income", "density"])
+m.bandwidth
+m.coef_local[:, 2]                        # the surface for "income"
+
+fit_gwr(X, y, coords; bandwidth = AdaptiveBandwidth(30), kernel = GaussianKernel())
+plot_gwr_coefficients(m, "income")        # needs a Makie backend
+```
+
+!!! warning
+    Local standard errors ignore the multiplicity of running `N`
+    overlapping regressions, so pointwise significance is overstated.
+
+See also [`fit_mgwr`](@ref), which lets each covariate have its own
+bandwidth.
+
+# References
+Fotheringham, A. S., Brunsdon, C. & Charlton, M. (2002). *Geographically
+Weighted Regression*. Wiley.
+"""
 function fit_gwr(
     X::AbstractMatrix{T},
     y::AbstractVector{T},
@@ -320,6 +495,49 @@ end
 
 # ─── MGWR (Multiscale GWR via backfitting) ───────────────────────────
 
+"""
+    fit_mgwr(X, y, coords; kernel = BisquareKernel(), varnames = nothing,
+             max_iter = 50, tol = 1e-4)
+
+Fit a multiscale GWR, giving every covariate its own bandwidth.
+
+Standard [`fit_gwr`](@ref) forces one bandwidth on all relationships, which
+is a real restriction: some processes genuinely operate at a regional scale
+and others very locally. MGWR relaxes it by back-fitting, cycling through
+the covariates and re-selecting each bandwidth with the others held fixed
+until the coefficients stop moving.
+
+The selected `bandwidths` are themselves the interesting output — a
+bandwidth near `N` says that relationship is effectively global.
+
+# Arguments
+As [`fit_gwr`](@ref): `X` without an intercept, `y`, and `N x 2` `coords`.
+
+# Keywords
+- `kernel`: a [`KernelFunction`](@ref).
+- `varnames`: covariate names.
+- `max_iter`, `tol`: back-fitting iteration cap and convergence tolerance.
+
+# Returns
+An [`MGWRModel`](@ref).
+
+!!! warning
+    Back-fitting is not guaranteed to converge. Check `m.converged` before
+    reading the coefficients; if it is `false`, raise `max_iter` or loosen
+    `tol`.
+
+# Examples
+```julia
+m = fit_mgwr(X, y, coords; varnames = ["income", "density"])
+m.converged || @warn "back-fitting did not converge"
+m.bandwidths               # aligned with m.coefnames, intercept first
+```
+
+# References
+Fotheringham, A. S., Yang, W. & Kang, W. (2017). Multiscale
+geographically weighted regression. *Annals of the American Association of
+Geographers*, 107(6).
+"""
 function fit_mgwr(
     X::AbstractMatrix{T},
     y::AbstractVector{T},

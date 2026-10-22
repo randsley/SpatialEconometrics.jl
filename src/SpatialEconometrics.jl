@@ -105,10 +105,10 @@ Accepts [`SpatialRegressionModel`](@ref), [`SpatialPanelModel`](@ref) and
 # Examples
 ```julia
 m = fit_spatial_panel(SAR(), W, X, y, N, T; fe = TwoWayFE())
-V = robust_vcov(m, DriscollKraayVCOV(lags = 2))
+V = robust_vcov(m, DriscollKraayVCOV(max_lag = 2))
 
-robust_coeftable(m, DriscollKraayVCOV(lags = 2))
-spatial_effects(m, DriscollKraayVCOV(lags = 2))
+robust_coeftable(m, DriscollKraayVCOV(max_lag = 2))
+spatial_effects(m, DriscollKraayVCOV(max_lag = 2))
 ```
 
 See also [`robust_coeftable`](@ref), [`vcov_driscoll_kraay`](@ref),
@@ -159,7 +159,7 @@ covariance itself comes from [`robust_vcov`](@ref).
 # Examples
 ```julia
 m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
-robust_coeftable(m, ConleySpatialHAC(cutoff = 2.0, coords = coords))
+robust_coeftable(m, ConleySpatialHAC(coords, 2.0))
 ```
 """
 function robust_coeftable(m::StatsAPI.RegressionModel, spec::AbstractRobustVCOV)
@@ -209,7 +209,7 @@ m  = fit_spatial(SDM(), W, X, y; varnames = ["income", "density"])
 ef = spatial_effects(m)
 ef.indirect ./ ef.indirect_se
 
-spatial_effects(m, ConleySpatialHAC(cutoff = 2.0, coords = coords))
+spatial_effects(m, ConleySpatialHAC(coords, 2.0))
 ```
 
 # References
