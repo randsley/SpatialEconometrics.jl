@@ -12,7 +12,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays
 import StatsAPI: coef, loglikelihood, nobs, stderror
 
-const CS = SpatialEconometrics.CrossSection
 
 rng = MersenneTwister(2024)
 W = make_rook_weights(18)        # 324 units
@@ -71,7 +70,7 @@ println()
 # endogenous feedback, so it pays for that in log-likelihood.
 
 println("═══ Which specification? (data are SAC) ═══")
-m_sar_on_sac  = fit_spatial(CS.SAR(), W, X, y_sac; varnames = ["income", "density"])
+m_sar_on_sac  = fit_spatial(SAR(), W, X, y_sac; varnames = ["income", "density"])
 m_slx_on_sac  = fit_slx(W, X, y_sac; varnames = ["income", "density"])
 m_sdem_on_sac = fit_sdem(W, X, y_sac; varnames = ["income", "density"])
 

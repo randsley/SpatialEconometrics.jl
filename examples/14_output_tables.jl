@@ -12,7 +12,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays
 using Tables
 
-const CS = SpatialEconometrics.CrossSection
 
 rng = MersenneTwister(1001)
 W = make_rook_weights(16)
@@ -20,8 +19,8 @@ N = size(W, 1)
 X = randn(rng, N, 2)
 y = (I - 0.55 * W) \ (1.0 .+ X * [1.5, -0.9] .+ (W * X) * [0.7, -0.4] .+ 0.5 * randn(rng, N))
 
-m_sar  = fit_spatial(CS.SAR(), W, X, y; varnames = ["income", "density"])
-m_sdm  = fit_spatial(CS.SDM(), W, X, y; varnames = ["income", "density"])
+m_sar  = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
+m_sdm  = fit_spatial(SDM(), W, X, y; varnames = ["income", "density"])
 m_slx  = fit_slx(W, X, y; varnames = ["income", "density"])
 m_sdem = fit_sdem(W, X, y; varnames = ["income", "density"])
 

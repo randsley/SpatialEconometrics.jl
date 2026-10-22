@@ -59,8 +59,7 @@ println()
 # ─── Compare with SAR (misspecified) ─────────────────────────────────
 
 println("═══ Comparison: SAR Model (misspecified for this DGP) ═══")
-const CS = SpatialEconometrics.CrossSection
-m_sar = fit_spatial(CS.SAR(), W, X, y; varnames=["income", "education"])
+m_sar = fit_spatial(SAR(), W, X, y; varnames=["income", "education"])
 println(m_sar)
 println()
 
@@ -87,8 +86,7 @@ for t in 1:T_per
     y_pan[idx] = μ_i .+ X_pan[idx, :] * [1.5, -0.7] .+ u_t
 end
 
-const SEM = SpatialEconometrics.SEMMod
-m_sem_pan = fit_spatial_error(SEM.IndivFE(), W, X_pan, y_pan, N, T_per;
+m_sem_pan = fit_spatial_error(IndivFE(), W, X_pan, y_pan, N, T_per;
     varnames=["income", "education"])
 println(m_sem_pan)
 println("True λ = $λ_true,  Panel λ̂ = $(m_sem_pan.lambda)")

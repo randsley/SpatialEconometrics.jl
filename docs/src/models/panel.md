@@ -8,7 +8,7 @@ y_{it} = \rho W y_{it} + X_{it} \beta + \mu_i + \xi_t + \varepsilon_{it}
 
 ## Fixed Effects
 
-| Type | Alias | Removes |
+| Type | Meaning | Removes |
 |---|---|---|
 | `NoFE()` | No fixed effects | — |
 | `IndivFE()` | Individual FE | Unit-specific means |

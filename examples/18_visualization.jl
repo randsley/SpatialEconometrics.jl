@@ -23,7 +23,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays, Statistics
 import StatsAPI: coef, residuals
 
-CS = SpatialEconometrics.CrossSection
 
 # ─── Before Makie is loaded ──────────────────────────────────────────
 
@@ -63,7 +62,7 @@ X = randn(rng, N, 2)
 y = (sparse(1.0I, N, N) - 0.55 * W) \
     (1.0 .+ X * [1.5, -0.8] .+ 0.5 .* randn(rng, N))
 
-m = fit_spatial(CS.SAR(), W, X, y; varnames = ["income", "density"])
+m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
 println("SAR fit: ρ̂ = ", round(m.rho; digits = 4),
         ",  β̂ = ", round.(coef(m)[2:3]; digits = 4))
 println()

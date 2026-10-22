@@ -92,7 +92,8 @@ collide with registered packages that share a name. Reach one explicitly if
 you need an internal helper:
 
 ```julia
-const CS = SpatialEconometrics.CrossSection
+τ = SpatialEconometrics.CrossSection.precompute_chebyshev_traces(W,
+        ChebyshevApprox(order = 12))
 ```
 
 | Full name | Internal alias |

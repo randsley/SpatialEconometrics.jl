@@ -18,7 +18,6 @@ rng = MersenneTwister(707)
 L = 10; N = L * L; T_per = 10
 W = make_rook_weights(L)
 
-const SP = SpatialEconometrics.StaticPanel
 
 X = randn(rng, N * T_per, 2)
 μ_i = randn(rng, N)
@@ -35,7 +34,7 @@ end
 
 # ─── Fit baseline model ──────────────────────────────────────────────
 
-m = fit_spatial_panel(SP.SAR(), SP.TwoWayFE(), W, X, y, N, T_per;
+m = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per;
     varnames = ["investment", "trade"])
 println("═══ Baseline Model ═══")
 println(m)

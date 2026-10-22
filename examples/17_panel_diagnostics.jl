@@ -16,7 +16,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays, Statistics
 import StatsAPI: coef, coefnames, residuals
 
-SP = SpatialEconometrics.StaticPanel
 
 rng = MersenneTwister(31337)
 L = 10; N = L * L; T_per = 6; NT = N * T_per
@@ -43,7 +42,7 @@ println("Panel: N = $N units × T = $T_per periods = $NT observations")
 println("DGP:   spatial lag ρ = 0.45, β = $β_true")
 println()
 
-fit_panel(fe, yy) = fit_spatial_panel(SP.SAR(), fe, W, X, yy, N, T_per;
+fit_panel(fe, yy) = fit_spatial_panel(SAR(), fe, W, X, yy, N, T_per;
     varnames = ["income", "density"])
 
 # Pick coefficients out by NAME, never by position: the two specifications
@@ -57,8 +56,8 @@ end
 
 println("═══ Spatial Hausman Test ═══")
 
-m_fe   = fit_panel(SP.IndivFE(), y)
-m_pool = fit_panel(SP.NoFE(), y)
+m_fe   = fit_panel(IndivFE(), y)
+m_pool = fit_panel(NoFE(), y)
 
 println("  The test matches coefficients BY NAME, and the two specifications")
 println("  do not carry the same terms:")
@@ -88,8 +87,8 @@ println()
 
 # Size: the same DGP with no individual effects at all. Pooled is now
 # correctly specified, FE is merely wasteful, and the test should be quiet.
-ht0 = spatial_hausman_test(fit_panel(SP.IndivFE(), y_nofe),
-                           fit_panel(SP.NoFE(), y_nofe))
+ht0 = spatial_hausman_test(fit_panel(IndivFE(), y_nofe),
+                           fit_panel(NoFE(), y_nofe))
 println("  Data with NO individual effects:")
 println("    stat = ", round(ht0.stat; digits = 3), " on ", ht0.df,
         " df,  p = ", round(ht0.p_value; sigdigits = 4))

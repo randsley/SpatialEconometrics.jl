@@ -11,7 +11,6 @@
 using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays
 
-const CS = SpatialEconometrics.CrossSection
 
 # ─── Generate synthetic spatial data ──────────────────────────────────
 
@@ -45,8 +44,8 @@ println()
 # ─── Fit SAR model ───────────────────────────────────────────────────
 
 println("═══ SAR Model ═══")
-m_sar = fit_spatial(CS.SAR(), W, X, y;
-    method = CS.ChebyshevApprox(order=12),
+m_sar = fit_spatial(SAR(), W, X, y;
+    method = ChebyshevApprox(order=12),
     varnames = ["income", "density"])
 println(m_sar)
 println()
@@ -54,8 +53,8 @@ println()
 # ─── Fit SDM model ───────────────────────────────────────────────────
 
 println("═══ SDM Model ═══")
-m_sdm = fit_spatial(CS.SDM(), W, X, y;
-    method = CS.ChebyshevApprox(order=12),
+m_sdm = fit_spatial(SDM(), W, X, y;
+    method = ChebyshevApprox(order=12),
     varnames = ["income", "density"])
 println(m_sdm)
 println()
@@ -70,8 +69,8 @@ println()
 # ─── Exact LU for comparison ─────────────────────────────────────────
 
 println("═══ Exact LU (for comparison) ═══")
-m_exact = fit_spatial(CS.SDM(), W, X, y;
-    method = CS.ExactLU(),
+m_exact = fit_spatial(SDM(), W, X, y;
+    method = ExactLU(),
     varnames = ["income", "density"])
 println("Chebyshev ρ̂ = $(m_sdm.rho),  Exact LU ρ̂ = $(m_exact.rho)")
 println("Difference: $(abs(m_sdm.rho - m_exact.rho))")

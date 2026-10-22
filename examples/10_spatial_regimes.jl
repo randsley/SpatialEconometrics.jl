@@ -11,7 +11,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays, Statistics
 import StatsAPI: coef, loglikelihood, nobs, stderror
 
-const CS = SpatialEconometrics.CrossSection
 
 rng = MersenneTwister(77)
 L = 16
@@ -39,7 +38,7 @@ y = (I - ρ_true * W) \ (η .+ 0.4 .* randn(rng, N))
 # ─── Pooled model ignores the break ──────────────────────────────────
 
 println("═══ Pooled SAR (ignores the regime break) ═══")
-m_pooled = fit_spatial(CS.SAR(), W, X, y; varnames = ["x1", "x2"])
+m_pooled = fit_spatial(SAR(), W, X, y; varnames = ["x1", "x2"])
 println(m_pooled)
 println("The pooled slopes land between the two regimes and fit neither.")
 println()

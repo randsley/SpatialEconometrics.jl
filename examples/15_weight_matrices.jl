@@ -14,7 +14,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays, Statistics
 import StatsAPI: coef
 
-CS = SpatialEconometrics.CrossSection
 
 rng = MersenneTwister(2024)
 
@@ -167,7 +166,7 @@ for (lbl, Wc) in [("rook (true)", Wg),
                   ("knn k=4", knn_weights(grid_coords, 4)),
                   ("knn k=8", knn_weights(grid_coords, 8)),
                   ("scrambled (wrong)", scrambled)]
-    mc = fit_spatial(CS.SAR(), Wc, Xg, yg)
+    mc = fit_spatial(SAR(), Wc, Xg, yg)
     println(rpad("  $lbl", 26), rpad(round(mc.rho; digits = 4), 10),
             round(coef(mc)[2]; digits = 4))
 end

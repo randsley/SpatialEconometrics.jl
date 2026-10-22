@@ -21,7 +21,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays, Statistics
 import StatsAPI: coef, coefnames, stderror
 
-CS = SpatialEconometrics.CrossSection
 
 # ─── Before Turing is loaded ─────────────────────────────────────────
 
@@ -67,11 +66,11 @@ println("═══ The Log-Determinant Term ═══")
 # thousands of them, each at a new ρ, so a dense factorization per draw is
 # out of the question. The Chebyshev approximation precomputes traces once
 # and then costs a polynomial evaluation per draw.
-τ = CS.precompute_chebyshev_traces(W, CS.ChebyshevApprox(order = 12))
+τ = SpatialEconometrics.CrossSection.precompute_chebyshev_traces(W, ChebyshevApprox(order = 12))
 println(rpad("  ρ", 8), rpad("exact", 14), rpad("Chebyshev", 14), "abs. error")
 for ρ in (-0.8, -0.4, 0.0, 0.4, 0.6, 0.8, 0.95)
     ex = logdet(Matrix(IN - ρ * W))
-    ap = CS.chebyshev_logdet(ρ, τ)
+    ap = SpatialEconometrics.CrossSection.chebyshev_logdet(ρ, τ)
     println(rpad("  $ρ", 8), rpad(round(ex; digits = 5), 14),
             rpad(round(ap; digits = 5), 14), round(abs(ex - ap); sigdigits = 3))
 end
@@ -93,7 +92,7 @@ println(r)
 # The posterior and the MLE are answering the same question on the same
 # data, with priors this diffuse. If they disagreed, one of them would be
 # wrong — which makes this the single most useful check to run.
-m = fit_spatial(CS.SAR(), W, X, y; varnames = ["income", "density"])
+m = fit_spatial(SAR(), W, X, y; varnames = ["income", "density"])
 println("═══ Posterior Mean vs. MLE ═══")
 println(rpad("  parameter", 15), rpad("post. mean", 13), rpad("post. SD", 11),
         rpad("MLE", 13), "MLE SE")

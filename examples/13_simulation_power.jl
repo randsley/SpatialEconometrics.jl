@@ -13,7 +13,6 @@
 using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays, Statistics
 
-const CS = SpatialEconometrics.CrossSection
 
 W = make_rook_weights(14)
 N = size(W, 1)
@@ -56,7 +55,7 @@ println("═══ Monte Carlo: SAR ML Estimator ═══")
 println("(100 replications, N = $N — this takes a moment)")
 println()
 
-sar_estimator = (Wm, Xm, ym) -> fit_spatial(CS.SAR(), Wm, Xm, ym)
+sar_estimator = (Wm, Xm, ym) -> fit_spatial(SAR(), Wm, Xm, ym)
 
 mc = monte_carlo_spatial(
     SAR_DGP(0.6, beta, 0.5), W, N, 2, sar_estimator;

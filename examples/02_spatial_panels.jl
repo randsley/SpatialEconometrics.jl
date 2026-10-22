@@ -12,8 +12,6 @@
 using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays
 
-const SP = SpatialEconometrics.StaticPanel
-const DP = SpatialEconometrics.DynamicPanel
 
 # ─── Generate panel data ─────────────────────────────────────────────
 
@@ -37,7 +35,7 @@ end
 # ─── Static panel: Lee-Yu with two-way FE ────────────────────────────
 
 println("═══ Static Panel SAR — Lee-Yu Transformation (Two-Way FE) ═══")
-m_leeyu = fit_spatial_panel(SP.SAR(), SP.TwoWayFE(), W, X, y, N, T_per;
+m_leeyu = fit_spatial_panel(SAR(), TwoWayFE(), W, X, y, N, T_per;
     approach = LeeYuTransformation(),
     varnames = ["investment", "trade"])
 println(m_leeyu)
@@ -46,7 +44,7 @@ println()
 # ─── Static panel: Direct QML with bias correction ───────────────────
 
 println("═══ Static Panel SAR — Direct QML (Individual FE) ═══")
-m_dqml = fit_spatial_panel(SP.SAR(), SP.IndivFE(), W, X, y, N, T_per;
+m_dqml = fit_spatial_panel(SAR(), IndivFE(), W, X, y, N, T_per;
     approach = DirectQML(bias_correct=true),
     varnames = ["investment", "trade"])
 println(m_dqml)
@@ -101,7 +99,7 @@ for t in 2:T_dyn
     y_dyn[idx] = S_lu \ (μ_i .+ γ_true .* y_dyn[idx_prev] .+ η_true .* (W * y_dyn[idx_prev]) .+ X_dyn[idx, :] * [0.8] .+ 0.4 .* randn(rng, N))
 end
 
-m_dyn = fit_dynamic_spatial_panel(DP.SAR(), DP.IndivFE(), W, X_dyn, y_dyn, N, T_dyn;
+m_dyn = fit_dynamic_spatial_panel(SAR(), IndivFE(), W, X_dyn, y_dyn, N, T_dyn;
     varnames=["productivity"])
 println(m_dyn)
 

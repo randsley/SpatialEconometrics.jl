@@ -17,7 +17,6 @@ using SpatialEconometrics
 using Random, LinearAlgebra, SparseArrays
 import StatsAPI: coef, vcov, loglikelihood, nobs, dof_residual
 
-CS = SpatialEconometrics.CrossSection
 
 rng = MersenneTwister(4242)
 L = 14; N = L * L
@@ -32,9 +31,9 @@ y = (IN - ρ_true * W) \ (1.0 .+ X * β_true .+ (W * X) * θ_true .+ 0.5 * randn
 
 vn = ["income", "density"]
 m_slx  = fit_slx(W, X, y; varnames = vn)
-m_sar  = fit_spatial(CS.SAR(), W, X, y; varnames = vn)
+m_sar  = fit_spatial(SAR(), W, X, y; varnames = vn)
 m_sem  = fit_spatial_error(W, X, y; varnames = vn)
-m_sdm  = fit_spatial(CS.SDM(), W, X, y; varnames = vn)
+m_sdm  = fit_spatial(SDM(), W, X, y; varnames = vn)
 m_sdem = fit_sdem(W, X, y; varnames = vn)
 
 println("True DGP: SDM with ρ = $ρ_true, β = $β_true, θ = $θ_true")
@@ -117,7 +116,7 @@ println()
 # the restriction genuinely holds and confirm it is not rejected.
 λ_sem = 0.5
 y_sem = 1.0 .+ X * β_true .+ ((IN - λ_sem * W) \ (0.5 .* randn(rng, N)))
-m_sdm2 = fit_spatial(CS.SDM(), W, X, y_sem; varnames = vn)
+m_sdm2 = fit_spatial(SDM(), W, X, y_sem; varnames = vn)
 cft2 = common_factor_test(coef(m_sdm2)[2:3], coef(m_sdm2)[4:5],
                           m_sdm2.rho, vcov(m_sdm2))
 println("  On SEM-generated data (restriction true): p = ",
