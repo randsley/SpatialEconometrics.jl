@@ -20,7 +20,6 @@ begin
     using Random, LinearAlgebra, SparseArrays, Statistics
     import StatsAPI: coef, coefnames, stderror, residuals
 
-    CS = SpatialEconometrics.CrossSection
     md"**Setup complete** — Makie and Turing extensions loaded"
 end
 
@@ -85,7 +84,7 @@ begin
     y_ext = (sparse(1.0I, N_ext, N_ext) - ρ_ext * W_ext) \
             (1.0 .+ X_ext * [1.5, -0.8] .+ σ_ext .* randn(rng_ext, N_ext))
 
-    m_ext = fit_spatial(CS.SAR(), W_ext, X_ext, y_ext;
+    m_ext = fit_spatial(SAR(), W_ext, X_ext, y_ext;
                         varnames = ["income", "density"])
 
     Markdown.parse("""

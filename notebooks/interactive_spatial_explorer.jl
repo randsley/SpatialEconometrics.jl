@@ -91,8 +91,7 @@ md"## Model Estimation"
 
 # ╔═╡ d0e1f2a3
 begin
-    const CS = SpatialEconometrics.CrossSection
-    m_sar = fit_spatial(CS.SAR(), W, X, y; method=CS.ChebyshevApprox(order=8), varnames=["x1", "x2"])
+    m_sar = fit_spatial(SAR(), W, X, y; method=ChebyshevApprox(order=8), varnames=["x1", "x2"])
 
     md"""
     ### SAR Results

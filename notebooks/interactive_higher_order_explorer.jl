@@ -12,7 +12,6 @@ begin
     using SpatialEconometrics
     using Random, LinearAlgebra, SparseArrays, Statistics
     import StatsAPI: coef, stderror, nobs, loglikelihood
-    const CS = SpatialEconometrics.CrossSection
     md"**Setup complete** — SpatialEconometrics.jl loaded"
 end
 
@@ -148,8 +147,8 @@ models have to earn their place.
 begin
     fits = Any[]
     push!(fits, ("SLX", fit_slx(W, Xv, yv; varnames = ["x1", "x2"])))
-    push!(fits, ("SAR", fit_spatial(CS.SAR(), W, Xv, yv; varnames = ["x1", "x2"])))
-    push!(fits, ("SDM", fit_spatial(CS.SDM(), W, Xv, yv; varnames = ["x1", "x2"])))
+    push!(fits, ("SAR", fit_spatial(SAR(), W, Xv, yv; varnames = ["x1", "x2"])))
+    push!(fits, ("SDM", fit_spatial(SDM(), W, Xv, yv; varnames = ["x1", "x2"])))
     push!(fits, ("SDEM", fit_sdem(W, Xv, yv; varnames = ["x1", "x2"])))
     push!(fits, ("SAC", fit_sac(W, W, Xv, yv; varnames = ["x1", "x2"])))
 
@@ -233,7 +232,7 @@ begin
     end
     y_reg = (IN - 0.45 * W) \ (eta .+ 0.4 .* randn(MersenneTwister(seed_sl + 1), Nv))
 
-    m_pool = fit_spatial(CS.SAR(), W, Xv, y_reg; varnames = ["x1", "x2"])
+    m_pool = fit_spatial(SAR(), W, Xv, y_reg; varnames = ["x1", "x2"])
     m_reg = fit_spatial_regime(W, Xv, y_reg, ExogenousRegimes(labels_true);
         varnames = ["x1", "x2"])
     chow = regime_chow_test(m_pool, m_reg)

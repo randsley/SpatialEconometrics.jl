@@ -1,7 +1,6 @@
 # Monte Carlo validation of the cross-sectional SDM (run: julia --project=. validation/mc_sdm.jl)
 using SpatialEconometrics, LinearAlgebra, SparseArrays, Random, Statistics, Printf
 const CS = SpatialEconometrics.CrossSection
-const SDM = CS.SDM; const ExactLU = CS.ExactLU; const ChebyshevApprox = CS.ChebyshevApprox
 
 L = 20; N = L^2
 W = make_rook_weights(L)
