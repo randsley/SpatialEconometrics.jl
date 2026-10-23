@@ -12,7 +12,8 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
-       precompute_neumann_traces, brent_maximize, _normcdf, _print_coef_table
+       precompute_neumann_traces, g_traces,
+       brent_maximize, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -80,7 +81,13 @@ function fit_slx(
     σ2 = dot(res, res) / N
     ll = -T(0.5) * N * (log(T(2π)) + log(σ2) + one(T))
 
-    V = σ2 .* inv(Symmetric(X_aug' * X_aug))
+    # SLX is plain OLS, so the exact finite-sample covariance is available.
+    # This used the ML σ² = RSS/N that the log-likelihood needs, which
+    # understates every standard error by sqrt((N-P)/N) -- 1.75% at N = 144
+    # with P = 5 -- while dof_residual already reported N - P. The stored
+    # σ2 stays the ML value so the likelihood is unchanged.
+    s2_unbiased = dot(res, res) / max(N - size(X_aug, 2), 1)
+    V = s2_unbiased .* inv(Symmetric(X_aug' * X_aug))
 
     return SLXModel{T, M}(β, V, σ2, ll, W, X_aug, Vector{T}(y), res, cnames)
 end
@@ -155,7 +162,10 @@ function fit_sac(
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
     varnames::Union{Nothing, Vector{String}}=nothing,
     rho_bounds::Tuple{T, T}=(T(-0.99), T(0.99)),
-    lambda_bounds::Tuple{T, T}=(T(-0.99), T(0.99))
+    lambda_bounds::Tuple{T, T}=(T(-0.99), T(0.99)),
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
     N, K = size(X)
@@ -226,12 +236,9 @@ function fit_sac(
     σ2_hat = dot(res, res) / N
     max_ll = concentrated_ll((ρ_hat, λ_hat))
 
-    V_β = σ2_hat .* inv(Symmetric(X_f' * X_f))
-    n_total = P + 2
-    V_full = zeros(T, n_total, n_total)
-    V_full[1:P, 1:P] .= V_β
-    V_full[P+1, P+1] = T(1) / N
-    V_full[P+2, P+2] = T(1) / N
+    V_full = _sac_asymptotic_vcov(X_f, β_hat, W_lag, W_error, ρ_hat, λ_hat,
+                                  σ2_hat, N; max_exact_n=max_exact_n,
+                                  n_probes=vcov_probes, rng=rng)
     full_coef = vcat(β_hat, ρ_hat, λ_hat)
 
     return SACModel{T, M}(full_coef, V_full, ρ_hat, λ_hat, σ2_hat, max_ll,
@@ -254,6 +261,127 @@ function Base.show(io::IO, m::SACModel{T}) where {T}
     @printf(io, "  σ² = %.4f,  Log-Lik = %.2f\n", m.sigma2, m.loglik)
     println(io, "")
     _print_coef_table(io, m.coefnames, m.coef, stderror(m))
+end
+
+"""
+    _sac_asymptotic_vcov(X_f, β, W_lag, W_error, ρ, λ, σ2, N; kwargs...)
+
+Asymptotic covariance of `(β, ρ, λ)` for the SAC/SARAR model, from the
+expected information matrix.
+
+Previously the two spatial parameters had no variance computed at all: the
+diagonal slots were filled with `1/N`, so every reported standard error for
+`ρ` and `λ` came out as exactly `1/sqrt(N)` — identical across datasets,
+unchanged when the estimates themselves ranged from 0.08 to 0.36, and so
+every z-statistic and p-value built on them was meaningless.
+
+Writing `A = I - ρW₁`, `B = I - λW₂`, `X* = BX`, `G_A = W₁A⁻¹`,
+`G_B = W₂B⁻¹` and `M = B G_A B⁻¹`, the residual is `ε = B(Ay - Xβ)` and
+`c = M X*β`. Differentiating the log-likelihood gives
+
+    I_ββ = X*ᵀX*/σ²
+    I_βρ = X*ᵀc/σ²
+    I_βλ = 0
+    I_ρρ = cᵀc/σ² + tr(MᵀM) + tr(M²)
+    I_ρλ = tr(MᵀG_B) + tr(M G_B)
+    I_λλ = tr(G_BᵀG_B) + tr(G_B²)
+    I_ρσ² = tr(M)/σ²,  I_λσ² = tr(G_B)/σ²,  I_σ²σ² = N/(2σ⁴)
+
+`I_βλ` vanishes because `∂ε/∂λ = -G_B ε` has mean zero, which is the same
+reason the pure error model is block diagonal; `I_βρ` does not, because the
+lag term puts `Xβ` into `∂ε/∂ρ`. `M` is similar to `G_A`, so `tr(M)` and
+`tr(M²)` could be taken from `G_A` — they are computed from `M` here so the
+exact and probe paths agree term by term.
+
+Exact below `max_exact_n`; above it the traces come from Hutchinson probes
+drawn against `rng`.
+"""
+function _sac_asymptotic_vcov(
+    X_f::AbstractMatrix{T},
+    β::Vector{T},
+    W_lag::AbstractSparseMatrix{T},
+    W_error::AbstractSparseMatrix{T},
+    ρ::T,
+    λ::T,
+    σ2::T,
+    N::Int;
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
+) where {T<:AbstractFloat}
+    P = size(X_f, 2)
+    Isp = sparse(one(T) * I, N, N)
+    A_lu = lu(Isp - ρ * W_lag)
+    B_lu = lu(Isp - λ * W_error)
+    Bmat = Isp - λ * W_error
+
+    Xfβ = X_f * β
+
+    if N <= max_exact_n
+        # A and W commute, so A_lu \ W is G_A.
+        G_A = A_lu \ Matrix{T}(W_lag)
+        G_B = B_lu \ Matrix{T}(W_error)
+        M = Bmat * (G_A * (B_lu \ Matrix{T}(I, N, N)))
+        c = M * Xfβ
+
+        tr_M = zero(T); tr_M2 = zero(T); tr_MtM = zero(T)
+        tr_GB = zero(T); tr_GB2 = zero(T); tr_GBtGB = zero(T)
+        tr_MtGB = zero(T); tr_MGB = zero(T)
+        @inbounds for j in 1:N
+            tr_M += M[j, j]
+            tr_GB += G_B[j, j]
+            for i in 1:N
+                tr_M2 += M[i, j] * M[j, i]
+                tr_MtM += M[i, j]^2
+                tr_GB2 += G_B[i, j] * G_B[j, i]
+                tr_GBtGB += G_B[i, j]^2
+                tr_MtGB += M[i, j] * G_B[i, j]
+                tr_MGB += M[i, j] * G_B[j, i]
+            end
+        end
+    else
+        V = Matrix{T}(undef, N, n_probes)
+        rand!(rng, V, (-one(T), one(T)))
+        GAV = A_lu \ (W_lag * V)
+        MV = Bmat * (A_lu \ (W_lag * (B_lu \ V)))
+        GBV = B_lu \ (W_error * V)
+        MMV = Bmat * (A_lu \ (W_lag * (B_lu \ MV)))
+        GBGBV = B_lu \ (W_error * GBV)
+        MGBV = Bmat * (A_lu \ (W_lag * (B_lu \ GBV)))
+
+        tr_M = dot(V, MV) / n_probes
+        tr_M2 = dot(V, MMV) / n_probes
+        tr_MtM = dot(MV, MV) / n_probes
+        tr_GB = dot(V, GBV) / n_probes
+        tr_GB2 = dot(V, GBGBV) / n_probes
+        tr_GBtGB = dot(GBV, GBV) / n_probes
+        tr_MtGB = dot(MV, GBV) / n_probes
+        tr_MGB = dot(V, MGBV) / n_probes
+        c = Bmat * (A_lu \ (W_lag * (B_lu \ Xfβ)))
+    end
+
+    nt = P + 3
+    Info = zeros(T, nt, nt)
+    iρ = P + 1; iλ = P + 2; iσ = P + 3
+
+    Info[1:P, 1:P] .= (X_f' * X_f) ./ σ2
+    Info[1:P, iρ] .= (X_f' * c) ./ σ2
+    Info[iρ, 1:P] .= Info[1:P, iρ]
+    # Info[1:P, iλ] stays zero: β and λ are asymptotically independent.
+
+    Info[iρ, iρ] = dot(c, c) / σ2 + tr_MtM + tr_M2
+    Info[iρ, iλ] = tr_MtGB + tr_MGB
+    Info[iλ, iρ] = Info[iρ, iλ]
+    Info[iλ, iλ] = tr_GBtGB + tr_GB2
+
+    Info[iρ, iσ] = tr_M / σ2
+    Info[iσ, iρ] = Info[iρ, iσ]
+    Info[iλ, iσ] = tr_GB / σ2
+    Info[iσ, iλ] = Info[iλ, iσ]
+    Info[iσ, iσ] = N / (2 * σ2^2)
+
+    V_full = inv(Symmetric(Info))
+    return Matrix{T}(V_full[1:(P + 2), 1:(P + 2)])
 end
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -301,7 +429,10 @@ function fit_sdem(
     y::AbstractVector{T};
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
     varnames::Union{Nothing, Vector{String}}=nothing,
-    lambda_bounds::Tuple{T, T}=(T(-0.995), T(0.995))
+    lambda_bounds::Tuple{T, T}=(T(-0.995), T(0.995)),
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
     N, K = size(X)
@@ -341,11 +472,24 @@ function fit_sdem(
     res = y_f .- X_f * β_hat
     σ2_hat = dot(res, res) / N
 
+    # SDEM is an error model in augmented regressors, so β is asymptotically
+    # independent of (λ, σ²) and σ²(X_f'X_f)⁻¹ is its correct variance. λ's
+    # was not computed at all: the slot held 1/N, making every reported
+    # standard error for λ exactly 1/sqrt(N) whatever the data said. Here it
+    # comes from the same information matrix the error model uses,
+    # I_λλ = tr(G² + G'G) with G = W(I - λW)⁻¹, inverted jointly with σ².
+    tr_G, tr_G2, tr_GtG = g_traces(W, λ_hat; max_exact_n=max_exact_n,
+                                   n_probes=vcov_probes, rng=rng)
+    I_λλ = tr_G2 + tr_GtG
+    I_λσ2 = tr_G / σ2_hat
+    I_σ2σ2 = N / (2 * σ2_hat^2)
+    V_nuis = inv(Symmetric([I_λλ I_λσ2; I_λσ2 I_σ2σ2]))
+
     V_β = σ2_hat .* inv(Symmetric(X_f' * X_f))
     n_total = P + 1
     V_full = zeros(T, n_total, n_total)
     V_full[1:P, 1:P] .= V_β
-    V_full[n_total, n_total] = T(1) / N
+    V_full[n_total, n_total] = max(zero(T), V_nuis[1, 1])
     λ_se = sqrt(V_full[n_total, n_total])
 
     full_coef = vcat(β_hat, λ_hat)

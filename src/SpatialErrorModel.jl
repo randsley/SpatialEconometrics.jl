@@ -10,7 +10,8 @@ using StatsAPI
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
-       precompute_neumann_traces, brent_maximize, panel_spatial_lag!, panel_spatial_lag,
+       precompute_neumann_traces, g_traces,
+       brent_maximize, panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform, effective_dims, has_indiv_fe, has_time_fe,
        _normcdf, _print_coef_table
 
@@ -150,7 +151,10 @@ function fit_spatial_error(
     y::AbstractVector{T};
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
     varnames::Union{Nothing, Vector{String}}=nothing,
-    lambda_bounds::Tuple{T, T}=(T(-0.995), T(0.995))
+    lambda_bounds::Tuple{T, T}=(T(-0.995), T(0.995)),
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
     N, K = size(X)
@@ -218,7 +222,9 @@ function fit_spatial_error(
     σ2_hat = dot(res, res) / N
 
     # Asymptotic variance
-    vcov_mat, λ_se = _sem_asymptotic_vcov(X_filt, W, λ_hat, σ2_hat, N)
+    vcov_mat, λ_se = _sem_asymptotic_vcov(X_filt, W, λ_hat, σ2_hat, N;
+                                          max_exact_n=max_exact_n,
+                                          n_probes=vcov_probes, rng=rng)
     full_coef = vcat(β_hat, λ_hat)
 
     return SpatialErrorRegressionModel{T, M}(
@@ -232,28 +238,24 @@ function _sem_asymptotic_vcov(
     W::AbstractSparseMatrix{T},
     λ::T,
     σ2::T,
-    N::Int
+    N::Int;
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat}
     P = size(X_filt, 2)
-    I_sparse = sparse(one(T) * I, N, N)
-    B_lu = lu(I_sparse - λ * W)
 
-    # tr(G) where G = W(I - λW)^{-1}
-    n_p = 30
-    V_probe = rand((-one(T), one(T)), N, n_p)
-    GV = W * (B_lu \ V_probe)
-    tr_G = tr(GV' * V_probe) / n_p
+    # G = W(I - λW)⁻¹. These three traces were estimated from 30 Hutchinson
+    # probes drawn off the global RNG, which left λ's standard error moving
+    # by 8% between runs on identical data while β's -- built from
+    # X_filt'X_filt -- stayed put.
+    tr_G, tr_G2, tr_GtG = g_traces(W, λ; max_exact_n=max_exact_n,
+                                   n_probes=n_probes, rng=rng)
 
-    # tr(G² + G'G)
-    GGV = W * (B_lu \ GV)
-    tr_G2 = tr(GV' * GV) / n_p  # tr(G'G)
-    tr_GG = tr(V_probe' * GGV) / n_p  # tr(G²)
-    tr_G2_GtG = tr_GG + tr_G2
-
+    # In the error model β is asymptotically independent of (λ, σ²), so the
+    # information matrix is block diagonal and I_βλ stays zero.
     I_ββ = (X_filt' * X_filt) ./ σ2
-    I_λλ = tr_G2_GtG + tr_G^2 / σ2  # simplified: just use trace terms
-    # More precisely: I_λλ = tr(G² + G'G)
-    I_λλ = tr_G2_GtG
+    I_λλ = tr_G2 + tr_GtG
     I_λσ2 = tr_G / σ2
     I_σ2σ2 = N / (2 * σ2^2)
 
@@ -283,7 +285,10 @@ function fit_spatial_error(
     T_per::Int;
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
     varnames::Union{Nothing, Vector{String}}=nothing,
-    lambda_bounds::Tuple{T, T}=(T(-0.995), T(0.995))
+    lambda_bounds::Tuple{T, T}=(T(-0.995), T(0.995)),
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {FE<:FixedEffectsSpec, T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
     NT, K = size(X)
@@ -341,7 +346,10 @@ function fit_spatial_error(
     res = y_filt .- X_filt * β_hat
     σ2_hat = dot(res, res) / NT_eff
 
-    vcov_mat, λ_se = _sem_panel_vcov(X_filt, W, λ_hat, σ2_hat, N, T_per, N_eff, T_eff, fe_spec)
+    vcov_mat, λ_se = _sem_panel_vcov(X_filt, W, λ_hat, σ2_hat, N, T_per,
+                                     N_eff, T_eff, fe_spec;
+                                     max_exact_n=max_exact_n,
+                                     n_probes=vcov_probes, rng=rng)
     full_coef = vcat(β_hat, λ_hat)
 
     return SpatialErrorPanelModel{FE, T, M}(
@@ -360,32 +368,23 @@ function _sem_panel_vcov(
     T_per::Int,
     N_eff::Int,
     T_eff::Int,
-    fe_spec::FixedEffectsSpec
+    fe_spec::FixedEffectsSpec;
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat}
     P = size(X_filt, 2)
     NT_eff = N_eff * T_eff
-    I_sparse = sparse(one(T) * I, N, N)
-    B_lu = lu(I_sparse - λ * W)
 
-    n_p = 30
-    V_probe = rand((-one(T), one(T)), N, n_p)
-    has_time_fe(fe_spec) && (V_probe .-= mean(V_probe; dims=1))
-    GV = W * (B_lu \ V_probe)
-    has_time_fe(fe_spec) && (GV .-= mean(GV; dims=1))
-
-    tr_GtG = dot(GV, GV) / n_p
-    GGV = W * (B_lu \ GV)
-    has_time_fe(fe_spec) && (GGV .-= mean(GGV; dims=1))
-    tr_G2 = dot(V_probe, GGV) / n_p
-
-    tr_G = zero(T)
-    # Stochastic trace of G
-    V_id = rand((-one(T), one(T)), N, n_p)
-    GV_id = W * (B_lu \ V_id)
-    tr_G = dot(V_id, GV_id) / n_p
-    if has_time_fe(fe_spec)
-        tr_G -= one(T) / (one(T) - λ)
-    end
+    # As in the cross-section, all three traces came from 30 unseeded
+    # probes. tr(G) used a second, independent probe set, and the time-FE
+    # case mixed a projected estimate for two of the traces with a
+    # closed-form subtraction for the third; g_traces projects G itself, so
+    # all three are handled the same way.
+    tr_G, tr_G2, tr_GtG = g_traces(W, λ;
+                                   project_constant=has_time_fe(fe_spec),
+                                   max_exact_n=max_exact_n,
+                                   n_probes=n_probes, rng=rng)
 
     I_ββ = (X_filt' * X_filt) ./ σ2
     I_λλ = T_eff * (tr_G2 + tr_GtG)
