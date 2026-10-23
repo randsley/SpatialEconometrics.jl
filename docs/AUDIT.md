@@ -80,6 +80,9 @@ Each row was checked against an independent reference, not merely reviewed.
 | `spatial_chow_test` | a 1500-replication Monte Carlo under the null | **the degrees of freedom were off by one** — finding 15 |
 | `spatial_hausman_test` | chosen covariance matrices, plus 250 replications on both fixed-effects pairings | **fabricated a statistic out of a noise direction** — finding 16 |
 | `panel_moran` | 2000 replications on independent draws and 400 on fitted residuals | statistic correct; **the pooled variance field was inconsistent with the statistic beside it** — finding 17 |
+| `spatial_eigenvectors` | the spectrum of `M W_sym M`, and the trace identity `Σλ = −S₀/N` | correct to 1e-14. No change needed |
+| `fit_esf` | the unbiased OLS covariance on the same design, plus 400-replication coverage | **every standard error was short by `√((N−P)/N)`** — finding 18 |
+| `fit_re_esf` | dense GLS, Woodbury, a REML grid, and 120-replication recovery of both variance components | correct to 1e-12 throughout. No change needed |
 
 ## Open findings
 
@@ -534,6 +537,81 @@ a reported field was wrong. It only matters because the struct invites the
 arithmetic — and the pooled `z_stat` does not use `Var_I` at all, which is
 now stated rather than left to be discovered.
 
+### 18. ESF understated every standard error — FIXED
+
+Finding 4 again, and this time it is not a rounding matter. The Gaussian
+branch of `fit_esf` built its covariance as
+
+```julia
+σ2 = dot(res, res) / N
+V = family === :gaussian ? σ2 .* inv(XtWX) : inv(XtWX)
+```
+
+while `dof_residual` is `N − length(coef)`. A Gaussian ESF fit is just OLS
+on `[1 X E_selected]`, so the covariance wants `s²(X′X)⁻¹` with the
+unbiased `s²`; dividing by `N` makes every standard error short by exactly
+`√((N − P)/N)`. What makes it serious here, rather than the 1.75% it cost
+SLX, is that `P` grows with the number of eigenvectors selected and
+`max_eigenvectors` defaults to 20:
+
+| N | eigenvectors selected | P | standard errors short by |
+|---|---|---|---|
+| 36 | 20 | 23 | **39.9%** |
+| 64 | 20 | 23 | 20.0% |
+| 64 | 30 | 33 | 30.4% |
+| 144 | 20 | 23 | 8.3% |
+
+`fit_re_esf`, in the same file, already divided by `N − P`, which is what
+makes this an oversight rather than a deliberate convention.
+
+After the fix the covariance equals the unbiased OLS one to 1e-10 on the
+same design. Coverage of a nominal 95% interval for the covariate slopes,
+over 400 replications at `N = 64`:
+
+| | β₁ | β₂ |
+|---|---|---|
+| as shipped, SAR(0.6) errors | 88.2% | 87.2% |
+| fixed, SAR(0.6) errors | 91.5% | 90.5% |
+| fixed, no autocorrelation | 94.8% | 94.5% |
+
+**What the fix does not buy.** With autocorrelation present, coverage is
+still 91.5% and 90.5%, not 95%. That residual gap is post-selection: the
+eigenvectors are chosen by a greedy search over the whole candidate pool on
+the same `y`, and the standard errors then treat the basis as if it had
+been fixed in advance. With no autocorrelation almost nothing is selected
+and coverage comes out right, which is what identifies selection as the
+cause. This is a property of the method, not a coding error, so it is now
+documented with the measured numbers rather than changed.
+
+### Verified with no change: the rest of the filtering module
+
+`spatial_eigenvectors` is exact. The basis is the complete `N − 1`
+eigenvectors of `Ω = M W_sym M` excluding the constant, orthonormal and
+zero-sum to 1e-14, with `Ω e_i = λ_i e_i` to 1e-15 and a spectrum matching
+a dense `eigvals(Ω)` including the zero. `MC_i = (N/S₀)λ_i` agrees with the
+module's own `moran_coefficient` to 1e-15, and the reported Moran range
+matches the theoretical extremes for the weights, `[−1.0044, 0.9443]` on a
+row-standardised 7×7 rook lattice.
+
+A pleasant identity falls out and is now pinned as a test: since `W` has a
+zero diagonal and `1′W1 = S₀`, `tr(M W_sym M) = −S₀/N`, so the Moran
+coefficients over the complete basis sum to exactly `−1` and average to
+`−1/(N−1)` — which is `E[I]`. `fit_re_esf`'s reference Moran coefficient is
+built on that identity and reproduces a direct average over the
+non-retained directions exactly.
+
+`fit_re_esf` is the best-built estimator the audit has examined. Checked
+against dense algebra at `N = 64`: the Woodbury inverse
+`(I + θEΛE′)⁻¹ = I − E diag(θλ/(1+θλ)) E′` to 3e-15, `log|V₀|` to machine
+precision, `β̂` against an explicit GLS solve to 1e-15, `vcov` against
+`σ²(X′V₀⁻¹X)⁻¹` to 1e-14, the BLUP `γ̂ = θΛE′V₀⁻¹r` to 3e-14, and the
+profile log-likelihood to 1e-10. Its REML optimum is not merely close to a
+4001-point grid over the same bracket — it is *better* than the grid's best
+point, so Brent is converging properly rather than stopping early. Under
+its own generating model over 120 replications it recovers both variance
+components, `τ̂²` averaging 0.5017 against a true 0.5 and `σ̂²` 0.2526
+against 0.25, with coverage 94.3% and 95.3%. Nothing changed.
+
 ## Queue
 
 In priority order — unchecked variance first, since that is where the
@@ -542,20 +620,22 @@ suite is blindest and where three of the four bugs this week lived.
 The variance matrices are closed, and so are the panel diagnostics — all
 five functions in testset 14. What is left:
 
-1. Spatial filtering, ESF and RE-ESF — 48 assertions; the pins are largely
-   self-referential. The ESF diagnostics are test statistics whose null
-   distribution has not been checked, which findings 13–16 say is the
-   highest-yield place left to look.
-2. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
+Spatial filtering is closed. What is left:
+
+1. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
    estimator in that queue item not yet reached.
-3. The Bayesian and ordered probit samplers — testset 19's remaining
+2. The Bayesian and ordered probit samplers — testset 19's remaining
    estimators. `fit_spatial_probit` is verified; these two report posterior
    covariances from draws and have not been checked.
+3. The GLM families of `fit_esf` — `:poisson`, `:logit` and `:negbin` go
+   through `_fit_glm` and `_pearson_resid`, neither of which has been
+   checked against an independent GLM. Only the Gaussian branch is
+   verified.
 4. Simulation (17), regimes (16) beyond the variance, tables (18),
    extension entry points (24).
 5. The GS2SLS first-stage correction left open in finding 10.
 
-Done: findings 1–17. Suite: 576 → 819 passing, none failing.
+Done: findings 1–18. Suite: 576 → 854 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
@@ -582,7 +662,12 @@ null-distribution Monte Carlo before it is believed, and the two remaining
 unchecked test statistics should be assumed mis-scaled until one is run.
 `panel_moran` was the first to be put through that and came out correct
 (finding 17), which is worth recording as evidence the rule is a prior and
-not a certainty; the ESF diagnostics are next.
+not a certainty. The filtering module then came out almost entirely clean
+too — `spatial_eigenvectors` and `fit_re_esf` needed no change at all. The
+prior is holding at roughly one real defect per module, not one per
+function, and the defects cluster in the *newest-looking* code rather than
+the most intricate: `fit_re_esf` is by far the hardest thing in its file
+and is the most correct.
 
 Finding 16 is also the first case where the defect was deliberate. The
 eigenvalue shift was written to stop an inversion from failing, and it

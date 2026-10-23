@@ -386,6 +386,27 @@ across several fits.
 
 Cost is `O(max_eigenvectors × n_candidates)` model fits, so keep the pool bounded
 for GLM families.
+
+# Inference after selection
+
+The standard errors treat the selected basis as if it had been fixed in
+advance. It was not: the eigenvectors were chosen on the same `y`, by a
+greedy search over the whole candidate pool. Coverage of a nominal 95%
+interval for the covariate slopes is therefore below 95% whenever
+eigenvectors are actually selected. Over 400 replications at `N = 64` with
+SAR(0.6) errors, about 5 eigenvectors selected per fit:
+
+| | β₁ | β₂ |
+|---|---|---|
+| nominal | 95% | 95% |
+| measured | 91.5% | 90.5% |
+
+With no spatial autocorrelation almost nothing is selected and coverage is
+right (94.8%, 94.5%). So read the slopes as point estimates whose
+intervals are mildly optimistic, and treat the gap as the cost of letting
+the data pick the basis. [`fit_re_esf`](@ref) avoids the problem by
+shrinking a fixed basis instead of selecting from it, and its intervals
+are not subject to this caveat.
 """
 function fit_esf(
     X::AbstractMatrix{T},
@@ -485,8 +506,16 @@ function fit_esf(
     ll = _glm_loglik(family, yv, μ, α, σ2)
 
     XtWX = Symmetric(Xf' * (w .* Xf))
+    # The Gaussian covariance needs the unbiased residual variance. A
+    # Gaussian ESF fit is OLS on [1 X E_selected], and dof_residual is
+    # N - length(coef), so dividing by N instead understates every standard
+    # error by exactly sqrt((N - P)/N) -- 20% at N = 64 once 20 eigenvectors
+    # are selected, 40% at N = 36. The stored sigma2 stays ML, because the
+    # log-likelihood above is computed from it. fit_re_esf already does this.
+    P_total = size(Xf, 2)
+    s2_unbiased = dot(res, res) / max(N - P_total, 1)
     V = try
-        family === :gaussian ? σ2 .* inv(XtWX) : inv(XtWX)
+        family === :gaussian ? s2_unbiased .* inv(XtWX) : inv(XtWX)
     catch
         conv = false
         Matrix{T}(I, size(Xf, 2), size(Xf, 2))
