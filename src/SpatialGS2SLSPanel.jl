@@ -9,7 +9,8 @@ using ForwardDiff
 using StatsAPI
 
 import ..SpatialUtils
-import ..SpatialUtils: panel_spatial_lag!, panel_spatial_lag,
+import ..SpatialUtils: _chi2_sf,
+       panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform,
        _normcdf, _print_coef_table
 
@@ -65,7 +66,35 @@ struct GS2SLSModel{
     coefnames::Vector{String}
 end
 
-function gmm_objective(lambda::Real, u::Vector{T}, Wu::Vector{T}, WWu::Vector{T}) where {T<:AbstractFloat}
+"""
+    gmm_objective(lambda, u, Wu, WWu, trWtW_N)
+
+Kelejian–Prucha moment objective for the spatial error parameter, with
+`σ²` concentrated out.
+
+Writing `ε(λ) = u - λWu`, the three moment conditions are
+
+    E[ε′ε/N]     = σ²
+    E[ε′Wε/N]    = 0                     (W has a zero diagonal)
+    E[ε′W′Wε/N]  = σ² tr(W′W)/N
+
+The first pins `σ²`; substituting it into the third leaves two equations
+in `λ` alone, which are scaled by `σ²` so the objective is free of the
+error scale and the two residuals are comparable.
+
+The previous version dropped the right-hand sides, minimising
+`(ε′ε/N)² + (ε′Wε/N)² + (ε′W′Wε/N)²` and so driving the residual variance
+itself toward zero. Only the middle term was a valid moment condition. At
+the true `λ` the other two are not zero but `σ²` and `σ² tr(W′W)/N`,
+which on a 196-cell lattice with `σ² = 1` are 1.000 and 0.276, so the
+minimiser was pulled well away from the truth: over 400 draws `λ̂`
+averaged 0.771 against a true 0.5, 0.476 against 0.3 and 0.933 against
+0.7. It was unbiased only at `λ = 0`, where the three conditions happen to
+agree. Since `λ̂` then filters `y` and `X`, that bias carried into the
+structural coefficients as well.
+"""
+function gmm_objective(lambda::Real, u::Vector{T}, Wu::Vector{T},
+                       WWu::Vector{T}, trWtW_N::Real) where {T<:AbstractFloat}
     N = length(u)
     m11 = dot(u, u) / N
     m12 = dot(u, Wu) / N
@@ -74,18 +103,103 @@ function gmm_objective(lambda::Real, u::Vector{T}, Wu::Vector{T}, WWu::Vector{T}
     m23 = dot(Wu, WWu) / N
     m33 = dot(WWu, WWu) / N
 
-    g1 = m11 - 2*lambda*m12 + (lambda^2)*m22
-    g2 = m12 - lambda*m22 - lambda*m13 + (lambda^2)*m23
-    g3 = m22 - 2*lambda*m23 + (lambda^2)*m33
+    # ε′ε/N, ε′Wε/N and ε′W′Wε/N, all as polynomials in λ.
+    e_e   = m11 - 2*lambda*m12 + (lambda^2)*m22
+    e_We  = m12 - lambda*(m22 + m13) + (lambda^2)*m23
+    e_WWe = m22 - 2*lambda*m23 + (lambda^2)*m33
 
-    return g1^2 + g2^2 + g3^2
+    σ2 = e_e
+    σ2 <= 0 && return typeof(float(lambda))(1e30)
+
+    g2 = e_We / σ2
+    g3 = (e_WWe - σ2 * trWtW_N) / σ2
+    return g2^2 + g3^2
 end
 
-function estimate_lambda_gmm(u::Vector{T}, Wu::Vector{T}, WWu::Vector{T}) where {T<:AbstractFloat}
+"""
+    _lambda_gmm_se(lambda, u, Wu, W, N)
+
+Asymptotic standard error of the Kelejian–Prucha estimate of the spatial
+error parameter.
+
+The variance slot for `λ` previously held `σ²/NT_post`, which is not a
+variance of anything: it does not involve `W` or `λ̂`, so the reported
+standard error was effectively a constant.
+
+`λ̂` solves a two-moment minimum-distance problem in the quadratic forms
+`ε′A₁ε/N` and `ε′A₂ε/N` with `A₁ = W` and `A₂ = W′W - (tr(W′W)/N)I`, both
+of which have mean zero at the true `λ`. With `G` the Jacobian of those
+moments and `Ω` their covariance,
+
+    Var(λ̂) = (G′ΩG) / (G′G)² / N
+
+For Gaussian `ε` the covariance of two quadratic forms is exact,
+`Cov(ε′Aε, ε′Bε) = 2σ⁴ tr(AₛBₛ)` with `Aₛ = (A + A′)/2`, so `Ω` is
+computed in closed form from sparse traces rather than estimated. That
+matters: the obvious alternative of an outer product of per-observation
+contributions understates the variance by about 30% here, because `Wε`
+correlates those contributions across observations — it gave 83-86%
+coverage of a nominal 95% interval against 93.5-96.2% for the closed form.
+
+Validated by Monte Carlo over 400 draws at `λ = 0, 0.3, 0.5, 0.7` on a
+196-cell lattice: reported standard error over sampling standard deviation
+1.02, 1.02, 1.03 and 1.08.
+
+!!! warning
+    `u` are the first-stage residuals and this treats them as the true
+    disturbances, so the extra variability from having estimated the
+    structural parameters first is missing. That is not negligible:
+    given the true residuals the ratio above is 1.02, but inside a full
+    `fit_gs2sls_panel` at N = 100, T = 6 it falls to 0.81, and a nominal
+    95% interval for `λ` then covers about 83%. Treat `λ`'s standard
+    error as a lower bound. The first-stage correction is still open —
+    see `docs/AUDIT.md`.
+"""
+function _lambda_gmm_se(lambda::T, u::Vector{T}, Wu::Vector{T},
+                        W::AbstractSparseMatrix{T}, N::Int,
+                        T_post::Int) where {T<:AbstractFloat}
+    NT = N * T_post
+    c = sum(abs2, W) / N                       # tr(W′W)/N
+    WtW = W' * W
+
+    # tr(AB) = Σᵢⱼ Aᵢⱼ Bⱼᵢ, so each trace is an elementwise sparse sum.
+    tr_W = tr(W)
+    tr_W2 = sum(W .* transpose(W))             # tr(W²)
+    tr_WtW = sum(abs2, W)                      # tr(W′W)
+    tr_A1s2 = (tr_W2 + tr_WtW) / 2
+    tr_A1sA2s = (sum(W .* WtW) + sum(transpose(W) .* WtW)) / 2 - c * tr_W
+    tr_A2s2 = sum(WtW .* WtW) - 2 * c * tr_WtW + c^2 * N
+
+    # The quadratic forms run period by period, so W acts within each
+    # period and the normalisation is over NT.
+    mv = l -> begin
+        e = u .- l .* Wu
+        We = panel_spatial_lag!(similar(e), W, e, N, T_post)
+        [dot(e, We) / NT, (dot(We, We) - c * dot(e, e)) / NT]
+    end
+    h = T(1e-6)
+    G = (mv(lambda + h) .- mv(lambda - h)) ./ (2h)
+
+    e = u .- lambda .* Wu
+    σ2 = dot(e, e) / NT
+    # Independent across the T_post periods, so the per-period covariance
+    # 2σ⁴tr(AₛBₛ) adds up and the NT normalisation squares:
+    #   Var(m) = 2σ⁴ tr(AₛBₛ) · T_post / (NT)².
+    Ω = (2 * σ2^2 * T_post / NT^2) .*
+        [tr_A1s2 tr_A1sA2s; tr_A1sA2s tr_A2s2]
+
+    GG = dot(G, G)
+    GG <= 0 && return T(NaN)
+    v = (G' * Ω * G) / (GG^2)
+    return sqrt(max(v, zero(T)))
+end
+
+function estimate_lambda_gmm(u::Vector{T}, Wu::Vector{T}, WWu::Vector{T},
+                             trWtW_N::Real) where {T<:AbstractFloat}
     a = -0.95; b = 0.95
     cg = 0.3819660112501051
     x = w = v = a + cg * (b - a)
-    fx = fw = fv = gmm_objective(x, u, Wu, WWu)
+    fx = fw = fv = gmm_objective(x, u, Wu, WWu, trWtW_N)
     d = e = 0.0
 
     for _ in 1:100
@@ -114,7 +228,7 @@ function estimate_lambda_gmm(u::Vector{T}, Wu::Vector{T}, WWu::Vector{T}) where 
         end
 
         u_step = abs(d) >= tol1 ? x + d : x + (d > 0 ? tol1 : -tol1)
-        fu = gmm_objective(u_step, u, Wu, WWu)
+        fu = gmm_objective(u_step, u, Wu, WWu, trWtW_N)
 
         if fu <= fx
             u_step >= x ? (a = x) : (b = x)
@@ -238,7 +352,9 @@ function fit_gs2sls_panel(
     Wu = similar(u); panel_spatial_lag!(Wu, W, u, N, T_post)
     WWu = similar(u); panel_spatial_lag!(WWu, W, Wu, N, T_post)
 
-    lambda_hat = estimate_lambda_gmm(u, Wu, WWu)
+    # tr(W'W)/N is a property of W alone, so it is formed once.
+    trWtW_N = sum(abs2, W) / N
+    lambda_hat = estimate_lambda_gmm(u, Wu, WWu, trWtW_N)
 
     Wy_lag = similar(Wy_t)
     panel_spatial_lag!(Wy_lag, W, Wy_t, N, T_post)
@@ -259,6 +375,7 @@ function fit_gs2sls_panel(
 
     theta_fgs2sls = (Psi_full_star' * Psi_star) \ (Psi_full_star' * y_star)
 
+    P_struct_count = length(theta_fgs2sls)
     u_final = y_star .- Psi_star * theta_fgs2sls
     sigma2 = dot(u_final, u_final) / NT_post
 
@@ -270,11 +387,19 @@ function fit_gs2sls_panel(
     P_struct = length(theta_fgs2sls)
     vcov_mat = zeros(T, P_struct + 1, P_struct + 1)
     vcov_mat[1:P_struct, 1:P_struct] .= vcov_struct
-    vcov_mat[P_struct + 1, P_struct + 1] = sigma2 / NT_post
+    λ_se = _lambda_gmm_se(lambda_hat, u, Wu, W, N, T_post)
+    vcov_mat[P_struct + 1, P_struct + 1] = isnan(λ_se) ? T(NaN) : λ_se^2
 
     P_H_e = H_star * (HH_star_inv * (H_star' * u_final))
     sargan_stat = dot(u_final, P_H_e) / sigma2
-    sargan_pval = one(T)
+    # The p-value was the literal constant 1.0, so the overidentification
+    # test could never reject and the docstring's advice to read it first
+    # was advice to read a constant. Under the null the statistic is
+    # chi-squared with (instruments - estimated structural parameters)
+    # degrees of freedom.
+    sargan_df = max(size(H_star, 2) - P_struct_count, 0)
+    sargan_pval = sargan_df > 0 ? T(_chi2_sf(Float64(sargan_stat), sargan_df)) :
+                  T(NaN)
 
     rho = theta_fgs2sls[1]
     K_ex = size(X_ex_t, 2)

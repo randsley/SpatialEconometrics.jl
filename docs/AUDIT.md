@@ -69,6 +69,13 @@ Each row was checked against an independent reference, not merely reviewed.
 | SEM `vcov` | expected information matrix, written out densely | **structure was right, traces were not** — finding 5 |
 | SDEM `vcov` | the error model's expected information in augmented regressors | **λ was fabricated, now fixed** — finding 6 |
 | SAC `vcov` | numerical Hessian of the full log-likelihood, plus a 400-replication Monte Carlo | **ρ and λ were fabricated, now derived** — finding 7 |
+| `estimate_lambda_gmm` (GS2SLS) | the Kelejian–Prucha moment conditions, and a 400-draw Monte Carlo | **two of three moments were misspecified** — finding 8 |
+| GS2SLS `sargan_pval` | χ² survival function | **was the constant 1.0** — finding 9 |
+| GS2SLS λ `vcov` | closed-form covariance of Gaussian quadratic forms, Monte-Carlo validated | **was a placeholder; now derived, with a documented gap** — finding 10 |
+| `fit_spatial_regime` `vcov` | the SAR expected information | **ρ was fabricated, now derived** — finding 11 |
+| `fit_dynamic_spatial_panel` | Monte Carlo at T = 8, 16, 32, 64 | **ρ̂ was inconsistent** — finding 12 |
+| spatial panel `vcov` | numerical Hessian of the within-transformed likelihood, `IndivFE` and `TwoWayFE` | correct: ratios 0.993–1.024 |
+| `fit_spatial_probit` | 250-replication Monte Carlo | correct: bias ≤ 0.013, coverage 90–97%. No change needed |
 
 ## Open findings
 
@@ -274,32 +281,139 @@ actual coverage near 78%.
 `fit_sac`, `fit_sdem`, `fit_spatial_error` (both variants) gained
 `max_exact_n`, `vcov_probes` and `rng`. Covered by testset 15b.
 
+### 8. The GS2SLS spatial error parameter was badly biased — FIXED
+
+**The first finding that is not second-order.** `gmm_objective` minimised
+
+    (ε′ε/N)² + (ε′Wε/N)² + (ε′W′Wε/N)²,   ε(λ) = u - λWu
+
+but only the middle term is a valid moment condition. The Kelejian–Prucha
+conditions are `E[ε′ε/N] = σ²`, `E[ε′Wε/N] = 0` and
+`E[ε′W′Wε/N] = σ² tr(W′W)/N`; the first and third had their right-hand
+sides dropped, so the objective drove the residual variance itself toward
+zero. Measured at the true λ on a 196-cell lattice with σ² = 1, the two
+mis-stated moments equal 1.000 and 0.276, not 0.
+
+Consequences, over 400 draws:
+
+| true λ | λ̂ mean | bias | correctly specified |
+|---|---|---|---|
+| 0.0 | −0.002 | −0.002 | −0.002 |
+| 0.3 | 0.476 | **+0.176** | −0.009 |
+| 0.5 | 0.771 | **+0.271** | +0.001 |
+| 0.7 | 0.933 | **+0.233** | −0.007 |
+
+Unbiased only at λ = 0, where the three conditions happen to agree. And
+because λ̂ then filters `y` and `X` for the second stage, the bias carried
+into ρ and β as well.
+
+Fixed by concentrating `σ²` out of the first moment and scaling the other
+two by it, leaving two scale-free equations in λ. After the fix, a
+120-replication Monte Carlo of the full `fit_gs2sls_panel` at N = 100,
+T = 6 gives biases of +0.0007 (ρ), +0.0008 and −0.0051 (β), −0.0010 (δ)
+and −0.0073 (λ).
+
+### 9. The Sargan p-value was the constant 1.0 — FIXED
+
+`sargan_pval = one(T)`. The overidentification test could never reject, and
+the docstring's instruction to "check `sargan_pval` before reading anything
+else" was an instruction to read a constant. Now the χ² survival function
+with `instruments − structural parameters` degrees of freedom; on a
+correctly specified Monte Carlo it rejects 8.3% of the time at the 5% level
+(120 replications, so about 1.6 standard errors from nominal).
+
+### 10. GS2SLS λ had no variance — FIXED, with a known gap
+
+The slot held `σ²/NT_post`, which involves neither `W` nor `λ̂`.
+
+`λ̂` solves a two-moment problem in quadratic forms with fixed matrices
+`A₁ = W` and `A₂ = W′W − (tr(W′W)/N)I`, so `Var(λ̂) = (G′ΩG)/(G′G)²` with
+`G` the moment Jacobian. For Gaussian `ε` the moment covariance is exact,
+`Cov(ε′Aε, ε′Bε) = 2σ⁴tr(AₛBₛ)`, and is computed in closed form from sparse
+traces. That choice mattered: the obvious alternative, an outer product of
+per-observation contributions, understates the variance by 30% because `Wε`
+correlates those contributions — 83–86% coverage against 93.5–96.2% for the
+closed form.
+
+**Remaining gap.** The formula treats the first-stage residuals as the true
+disturbances. Given true residuals the reported/sampling ratio is 1.02, but
+inside a full fit it falls to 0.81 and coverage of a nominal 95% interval to
+83%. That is documented at the call site as a lower bound. The first-stage
+correction is still open.
+
+### 11. The regime model's ρ had no variance — FIXED
+
+`V_full[n_total, n_total] = T(1) / N`, the same placeholder as SAC and SDEM,
+so `se(ρ)` was again exactly `1/sqrt(N)`. With regime dummies this is still
+an ordinary spatial lag model, so it now uses the SAR expected information.
+Its non-spatial branch also used the ML `σ²` in an OLS covariance, the same
+defect as finding 4, and now uses the unbiased `s²`.
+
+### 12. The dynamic spatial panel's ρ̂ was inconsistent — FIXED
+
+The concentrated likelihood added `log|I − ρW|` **once**:
+
+```julia
+return const_term + logdet_fn(ρ) - T(0.5) * NT_post * log(σ2)
+```
+
+Each of the `T_post` periods contributes its own Jacobian, as the static
+panel correctly has it (`const_term + T_opt * ld - …`). Counting it once
+under-penalised large `|ρ|` by a factor of `T_post`.
+
+This was not a finite-sample bias but an inconsistency, and the Monte Carlo
+shows the difference plainly — the error does not shrink with `T`, so the
+confidence interval tightens around the wrong value:
+
+| T | ρ̂ (true 0.35) | bias | bias × T | coverage of nominal 95% |
+|---|---|---|---|---|
+| 8 | 0.397 | +0.047 | 0.38 | 73.8% |
+| 16 | 0.409 | +0.059 | 0.95 | 43.8% |
+| 32 | 0.408 | +0.058 | 1.85 | 21.2% |
+| 64 | 0.409 | +0.059 | 3.76 | **1.2%** |
+
+A residual bias of order 1/T would have shown `bias × T` flat; it grows
+linearly instead. The Yu–de Jong–Lee correction was not the cause — the
+uncorrected estimate showed the same thing. After the fix, biases of
+−0.0038, +0.0020, +0.0011 and +0.0017 at T = 8, 16, 32, 64 with coverage
+92.5–97.5%, and in the four-parameter Monte Carlo every estimate is within
+0.008 of the truth with coverage 94.2–98.3%.
+
 ## Queue
 
 In priority order — unchecked variance first, since that is where the
 suite is blindest and where three of the four bugs this week lived.
 
-1. The variance matrices still unchecked: spatial panel and dynamic panel
-   (their trace inputs are now exact, but the assembled information matrix
-   has not been checked against anything), GS2SLS panel, dynamic system GMM,
-   and the three discrete-choice estimators.
-2. Panel diagnostics — testset 14, zero value pins: `panel_lm_tests`,
+Queue item 1 — the variance matrices — is now closed. What is left:
+
+1. Panel diagnostics — testset 14, zero value pins: `panel_lm_tests`,
    `spatial_chow_test`, `spatial_hausman_test`.
-3. Spatial discrete choice — 52 assertions, 5 pins.
-4. Spatial filtering, ESF and RE-ESF — 48 assertions; the pins are largely
+2. Spatial filtering, ESF and RE-ESF — 48 assertions; the pins are largely
    self-referential.
-5. Dynamic panel and system GMM — testsets 3 and 5, zero to one pin.
-6. Simulation (17), regimes (16), tables (18), extension entry points (24).
+3. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
+   estimator in that queue item not yet reached.
+4. The Bayesian and ordered probit samplers — testset 19's remaining
+   estimators. `fit_spatial_probit` is verified; these two report posterior
+   covariances from draws and have not been checked.
+5. Simulation (17), regimes (16) beyond the variance, tables (18),
+   extension entry points (24).
+6. The GS2SLS first-stage correction left open in finding 10.
 
-Done: `vuong_test` (1), the trace-based variances and impacts (2), and the
-SLX, SEM, SDEM and SAC variances (4–7). Suite: 576 → 755 passing, none
-failing.
+Done: findings 1–12. Suite: 576 → 783 passing, none failing.
 
-A pattern worth naming, now that seven findings are in: every one of them
-lived in a *second-order* quantity — a variance, a trace, a test statistic's
-scale factor. The point estimates have been right throughout. Parameter
-recovery is exactly what the old tests checked, and exactly what would never
-have caught any of this.
+A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
+— a variance, a trace, a test statistic's scale factor — and the point
+estimates were right throughout. Findings 8 and 12 broke that: a
+misspecified moment condition biased GS2SLS's λ̂ by +0.27, and a Jacobian
+counted once instead of `T_post` times left the dynamic panel's ρ̂
+inconsistent. Both are the kind of error a recovery test is supposed to
+catch — and testsets 3 and 4 had `atol = 0.15` on ρ and nothing at all on λ,
+so neither did.
+
+Four of the twelve findings were the same shape: a variance slot filled with
+a constant (`1/N` three times, `σ²/NT` once) so that the reported standard
+error did not depend on the data. Worth grepping for that pattern in any
+estimator added later.
 
 Closing an item means: an independent reference exists, it is committed as a
 test in `test/runtests.jl`, and the row above moves to "Verified correct".

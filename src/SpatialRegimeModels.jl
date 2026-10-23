@@ -11,6 +11,7 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
+       g_traces,
        brent_maximize, _normcdf, _print_coef_table, _chi2_sf
 
 const LogDetMethod = SpatialUtils.LogDetMethod
@@ -256,7 +257,10 @@ function fit_spatial_regime(
     regimes::ExogenousRegimes;
     spatial_lag::Bool=true,
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
-    varnames::Union{Nothing, Vector{String}}=nothing
+    varnames::Union{Nothing, Vector{String}}=nothing,
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
     N, K = size(X)
@@ -284,7 +288,10 @@ function fit_spatial_regime(
         res = y .- X_regime * β
         σ2 = dot(res, res) / N
         ll = -T(0.5) * N * (log(T(2π)) + log(σ2) + one(T))
-        V = σ2 .* inv(Symmetric(X_regime' * X_regime))
+        # OLS without a spatial lag, so use the unbiased s², not the ML σ²
+        # the likelihood needs -- dof_residual already reports N - P.
+        s2_unb = dot(res, res) / max(N - size(X_regime, 2), 1)
+        V = s2_unb .* inv(Symmetric(X_regime' * X_regime))
         return SpatialRegimeModel{T, M}(β, V, zero(T), σ2, ll, W, X_regime,
             Vector{T}(y), res, cnames, labels, n_reg, false)
     end
@@ -315,11 +322,30 @@ function fit_spatial_regime(
     res = y_f .- X_regime * β_hat
     σ2_hat = dot(res, res) / N
 
-    V_β = σ2_hat .* inv(Symmetric(X_regime' * X_regime))
+    # ρ's variance slot held the literal constant 1/N, so every reported
+    # standard error for ρ was exactly 1/sqrt(N) whatever the data said,
+    # and β's ignored that ρ had been estimated at all. With regime dummies
+    # this is still an ordinary spatial lag model, so the expected
+    # information is the usual one for G = W(I - ρW)⁻¹:
+    #   I_ββ = X'X/σ²,  I_βρ = X'(GXβ)/σ²,
+    #   I_ρρ = (GXβ)'(GXβ)/σ² + tr(G²) + tr(G'G),
+    #   I_ρσ² = tr(G)/σ²,  I_σ²σ² = N/(2σ⁴).
+    A_lu = lu(sparse(one(T) * I, N, N) - ρ_hat * W)
+    GXb = W * (A_lu \ (X_regime * β_hat))
+    tr_G, tr_G2, tr_GtG = g_traces(W, ρ_hat; max_exact_n=max_exact_n,
+                                   n_probes=vcov_probes, rng=rng)
+
     n_total = P_total + 1
-    V_full = zeros(T, n_total, n_total)
-    V_full[1:P_total, 1:P_total] .= V_β
-    V_full[n_total, n_total] = T(1) / N
+    Info = zeros(T, P_total + 2, P_total + 2)
+    iρ = P_total + 1; iσ = P_total + 2
+    Info[1:P_total, 1:P_total] .= (X_regime' * X_regime) ./ σ2_hat
+    Info[1:P_total, iρ] .= (X_regime' * GXb) ./ σ2_hat
+    Info[iρ, 1:P_total] .= Info[1:P_total, iρ]
+    Info[iρ, iρ] = dot(GXb, GXb) / σ2_hat + tr_G2 + tr_GtG
+    Info[iρ, iσ] = tr_G / σ2_hat
+    Info[iσ, iρ] = Info[iρ, iσ]
+    Info[iσ, iσ] = N / (2 * σ2_hat^2)
+    V_full = Matrix{T}(inv(Symmetric(Info))[1:n_total, 1:n_total])
     full_coef = vcat(β_hat, ρ_hat)
 
     return SpatialRegimeModel{T, M}(full_coef, V_full, ρ_hat, σ2_hat, max_ll, W,
