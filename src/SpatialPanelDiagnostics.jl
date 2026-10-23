@@ -66,6 +66,44 @@ fit does not, so the first position is the intercept in one model and the
 first slope in the other. Comparing those positionally builds a statistic
 out of unrelated parameters: it looks like a decisive rejection and means
 nothing.
+
+# When the statistic is not computable
+
+The test inverts `V(m_fe) - V(m_re)`, which the Hausman algebra requires
+to be positive definite — `m_re` must be the *efficient* estimator under
+the null. Passing the arguments the other way round inverts the ordering,
+and where there is a genuine efficiency ordering it leaves nothing to
+invert.
+
+Directions whose eigenvalue is not clearly positive are dropped and `df`
+reports how many were kept, so `df` may be smaller than the number of
+names compared. If no direction survives, `stat` and `p_value` are `NaN`
+and `df` is `0`: the two fits are not ordered by precision in any
+direction and there is nothing to compare. **Check `df` before reading
+the p-value.** The one exception is two fits with identical coefficients,
+where there is no difference to weigh and the result is `stat = 0`,
+`p_value = 1`, `df = 0`.
+
+!!! warning "Both common fixed-effects pairings fail the null"
+    Two `fit_spatial_panel` fits that differ only in their fixed-effects
+    specification generally do not satisfy the efficiency condition, and
+    this test is badly sized on them. Measured over 250 replications at
+    `N = 49`, `T = 5`, `ρ = 0.4`, with the null true:
+
+    | pairing | result |
+    |---|---|
+    | `IndivFE` vs `TwoWayFE`, no time effects | degenerate: `NaN` in 160 of 250 draws, and 6 of the remaining 90 reject at the 5% level |
+    | `NoFE` vs `IndivFE`, effects uncorrelated with `X` | computable every time but oversized: 25.6% rejection at the 5% level |
+
+    The first pairing is a near-cancellation — the two estimates differ by
+    a standard deviation of 0.005 while each standard error is 0.037 — so
+    `V_fe - V_re` is noise. The second is computable because an unmodelled
+    individual effect inflates `σ̂²` and so every standard error in the
+    `NoFE` fit, but that inflation comes from the misspecification itself
+    rather than from an efficiency ordering, so the null distribution is
+    not `χ²`. It does have power — 100% rejection when the effects are
+    correlated with `X` — but treat a borderline p-value from either
+    pairing as uninformative.
 """
 function spatial_hausman_test(
     m_fe::StatsAPI.RegressionModel,
@@ -102,23 +140,37 @@ function spatial_hausman_test(
     V_re = vcov(m_re)[i_re, i_re]
 
     V_diff = V_fe .- V_re
-    V_diff_sym = Symmetric(V_diff)
-
-    eig_vals = eigvals(V_diff_sym)
-    if any(eig_vals .< -1e-8)
-        V_diff_sym = Symmetric(V_diff + max(0.0, -minimum(eig_vals) + 1e-6) * I)
-    end
-
     diff = β_fe_c .- β_re_c
-    V_inv = try
-        inv(V_diff_sym)
-    catch
-        pinv(V_diff_sym)
+
+    # The statistic needs V_fe - V_re to be positive definite, and often it
+    # is not: the two variance matrices are close, so their difference is a
+    # cancellation whose sign is decided by sampling noise. Shifting the
+    # eigenvalues to force definiteness is not a repair -- it leaves the
+    # smallest one at the shift itself, so the inverse carries an eigenvalue
+    # of 1/shift and the statistic is whatever that noise direction happens
+    # to be. Instead invert only the directions that are clearly positive,
+    # and report how many were used as the degrees of freedom.
+    E = eigen(Symmetric(V_diff))
+    tol = 1e-8 * max(maximum(abs, E.values), eps(eltype(E.values)))
+    keep = E.values .> tol
+    k = count(keep)
+
+    if k == 0
+        if norm(diff) <= 1e-10 * max(one(eltype(diff)), norm(β_fe_c))
+            # The two fits give the same coefficients, so there is no
+            # difference to weigh and the statistic is zero however their
+            # variances compare. This is the self-comparison case.
+            return HausmanTestResult(0.0, 0, 1.0, shared)
+        end
+        # Otherwise the fits are not ordered by precision in any direction,
+        # so the difference between them cannot be weighed at all.
+        return HausmanTestResult(NaN, 0, NaN, shared)
     end
 
-    stat = dot(diff, V_inv * diff)
+    z = transpose(E.vectors[:, keep]) * diff
+    stat = sum(z .^ 2 ./ E.values[keep])
     stat = max(stat, 0.0)
-    df = length(shared)
+    df = k
     p_value = _chi2_sf(stat, df)
 
     return HausmanTestResult(stat, df, p_value, shared)
@@ -156,9 +208,24 @@ end
 """
     spatial_chow_test(y, X, W, N, T, break_period)
 
-Spatial Chow test for structural break at `break_period`.
-Tests whether parameters are stable across two sub-periods.
-Uses the LR-based approach adapted for spatial models.
+Spatial Chow test for a structural break at `break_period`: an F test of
+whether the parameters are stable across the two sub-periods.
+
+Each model is fitted by OLS on `[X Wy]`, so the break restricts the `K`
+slopes **and** the spatial lag coefficient — `K + 1` restrictions against
+`2(K + 1)` unrestricted parameters, hence `df = (K + 1, NT - 2(K + 1))`.
+Counting only the `K` slopes roughly doubles the size of the test: over
+1500 replications with no break at `N = 64`, `T = 6`, `K = 3`, the
+`K`-restriction version rejects 8.5-10.5% of the time at the 5% level and
+1.8-2.7% at the 1% level, against 4.1-5.8% and 0.5-1.2% here (Monte-Carlo
+standard error 0.56%).
+
+!!! note
+    `Wy` is endogenous, so the sub-period fits are not consistent estimates
+    of a SAR and the F distribution is an approximation. The calibration
+    above is the evidence that it is an adequate one at these sample sizes;
+    it has not been checked for small `N` or for a weights matrix far from
+    a lattice.
 """
 function spatial_chow_test(
     y::AbstractVector{<:Real},
@@ -182,8 +249,10 @@ function spatial_chow_test(
     ssr2 = _spatial_ols_ssr(y[idx2], X[idx2, :], W, N, T2)
 
     ssr_sum = ssr1 + ssr2
-    df_num = K
-    df_den = NT - 2 * K
+    # K slopes plus the spatial lag coefficient break together.
+    n_par = K + 1
+    df_num = n_par
+    df_den = NT - 2 * n_par
 
     stat = ((ssr_pooled - ssr_sum) / df_num) / (ssr_sum / df_den)
     stat = max(stat, 0.0)
@@ -254,10 +323,49 @@ end
 """
     panel_lm_tests(y, X, W, N, T)
 
-Joint LM tests for spatial panels (Baltagi, Song & Koh 2003).
-Tests simultaneously for spatial lag, spatial error, and random effects
-from a pooled OLS baseline.
-Returns individual and joint test statistics.
+LM tests for a spatial panel against a pooled OLS baseline: a spatial lag
+test, a spatial error test, a Breusch-Pagan test for random effects, and a
+joint test of all three.
+
+The three component tests are each `χ²(1)`. With `A = I_T ⊗ W` and
+`τ = tr(A²) + tr(A′A) = T · (tr(W′W) + tr(W²))`, the scores at the null are
+`d_ρ = e′Ay/σ̂²` and `d_λ = e′Ae/σ̂²`, with
+
+    Var(d_λ) = τ,   Var(d_ρ) = Cov(d_ρ, d_λ) + τ = D,
+    D = (AXβ̂)′M(AXβ̂)/σ̂² + τ
+
+so the lag test must be scaled by `D`, not by `τ` and not by the spread of
+the lagged *observed* `y` (Anselin 1988). The joint test is **not** the sum
+of the three components: `d_ρ` and `d_λ` are correlated, with
+`Cov(d_ρ, d_λ) = τ`, so their sum has variance above `χ²(2)`. The spatial
+block uses the quadratic form in the inverse information instead (Anselin,
+Bera, Florax & Yoon 1996),
+
+    LM_spatial = [τ d_ρ² - 2τ d_ρ d_λ + D d_λ²] / [τ (D - τ)]
+
+which is `χ²(2)`. The random-effects score is a quadratic form in `e` whose
+cross-trace with `A` is `tr(J_T ⊗ W) = T · tr(W) = 0`, so it is
+asymptotically uncorrelated with both spatial scores and simply adds, giving
+a `χ²(3)` joint test.
+
+# Calibration
+
+Under the null, 4000 replications at `N = 64`, `T = 5` (Monte-Carlo standard
+error 0.34% on a rejection rate):
+
+| test | mean | variance | rejects at 5% |
+|---|---|---|---|
+| lag | 1.022 | 2.07 | 5.17% |
+| error | 0.998 | 2.33 | 5.40% |
+| random effects | 1.041 | 2.04 | 5.08% |
+| joint | 3.046 | 6.30 | 5.47% |
+
+Power at `ρ = 0.15`: 97.0% for the lag test, 89.9% for the joint test.
+
+!!! note
+    Every statistic is clamped at zero, so a value of exactly `0.0` means
+    the formula returned something negative and the test is uninformative,
+    not that the null holds exactly.
 """
 function panel_lm_tests(
     y::AbstractVector{<:Real},
@@ -280,17 +388,26 @@ function panel_lm_tests(
         @views panel_spatial_lag!(We[idx], W, e[idx], N, 1)
     end
 
-    T_W = _trace_WpW(W)
+    # τ = tr(A²) + tr(A′A) for A = I_T ⊗ W; _trace_WpW divides by N.
+    τ = N * T_per * _trace_WpW(W)
 
-    eWe = dot(e, We)
-    LM_error = (eWe / σ²)^2 / (N * T_per * T_W)
-    LM_error = max(LM_error, 0.0)
+    d_λ = dot(e, We) / σ²
+    LM_error = max(d_λ^2 / τ, 0.0)
 
-    eWy = dot(e, Wy)
-    J = (Wy' * (I - X * ((X' * X) \ X')) * Wy) / σ²
-    J = max(J, eps())
-    LM_lag = (eWy / σ²)^2 / J
-    LM_lag = max(LM_lag, 0.0)
+    # The lag score is scaled by the signal in the lagged *fitted* values
+    # plus the same trace term. Using the lagged observed y instead, and
+    # dropping the trace term, inflates the statistic by about 17%.
+    ŷ = X * β_ols
+    Wŷ = zeros(NT)
+    for t in 1:T_per
+        idx = ((t-1)*N+1):(t*N)
+        @views panel_spatial_lag!(Wŷ[idx], W, ŷ[idx], N, 1)
+    end
+    MWŷ = Wŷ .- X * ((X' * X) \ (X' * Wŷ))
+    D = dot(Wŷ, MWŷ) / σ² + τ
+
+    d_ρ = dot(e, Wy) / σ²
+    LM_lag = max(d_ρ^2 / D, 0.0)
 
     E_mat = reshape(e, N, T_per)
     e_bar_i = vec(mean(E_mat, dims=2))
@@ -298,7 +415,13 @@ function panel_lm_tests(
     LM_re = (sum_sq_bar / (dot(e, e)) - 1.0)^2 * NT / (2.0 * (T_per - 1))
     LM_re = max(LM_re, 0.0)
 
-    LM_joint = LM_lag + LM_error + LM_re
+    # d_ρ and d_λ are correlated, so the joint spatial test is the quadratic
+    # form in the inverse information, not LM_lag + LM_error.
+    den = τ * (D - τ)
+    LM_spatial = den > 0 ?
+        max((τ * d_ρ^2 - 2 * τ * d_ρ * d_λ + D * d_λ^2) / den, 0.0) :
+        LM_lag + LM_error
+    LM_joint = LM_spatial + LM_re
     joint_df = 3
 
     return PanelLMTestResult(

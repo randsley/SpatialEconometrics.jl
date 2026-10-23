@@ -76,6 +76,9 @@ Each row was checked against an independent reference, not merely reviewed.
 | `fit_dynamic_spatial_panel` | Monte Carlo at T = 8, 16, 32, 64 | **ρ̂ was inconsistent** — finding 12 |
 | spatial panel `vcov` | numerical Hessian of the within-transformed likelihood, `IndivFE` and `TwoWayFE` | correct: ratios 0.993–1.024 |
 | `fit_spatial_probit` | 250-replication Monte Carlo | correct: bias ≤ 0.013, coverage 90–97%. No change needed |
+| `panel_lm_tests` | the closed-form score variances, and a 4000-replication Monte Carlo under the null | **the lag test was mis-scaled and the joint test added correlated scores** — findings 13, 14 |
+| `spatial_chow_test` | a 1500-replication Monte Carlo under the null | **the degrees of freedom were off by one** — finding 15 |
+| `spatial_hausman_test` | chosen covariance matrices, plus 250 replications on both fixed-effects pairings | **fabricated a statistic out of a noise direction** — finding 16 |
 
 ## Open findings
 
@@ -379,15 +382,138 @@ uncorrected estimate showed the same thing. After the fix, biases of
 92.5–97.5%, and in the four-parameter Monte Carlo every estimate is within
 0.008 of the truth with coverage 94.2–98.3%.
 
+### 13. The panel lag LM test was mis-scaled — FIXED
+
+`LM_lag` divided the squared lag score by
+
+```julia
+J = (Wy' * (I - X * ((X' * X) \ X')) * Wy) / σ²
+```
+
+which is wrong twice over. With `A = I_T ⊗ W` and
+`τ = tr(A²) + tr(A′A)`, the score `d_ρ = e′Ay/σ̂²` has variance
+
+    D = (AXβ̂)′M(AXβ̂)/σ̂² + τ
+
+so the denominator should use the lag of the **fitted** values, and must
+add `τ`. The code used the lag of the observed `y` — which carries the
+disturbance as well as the signal, inflating the first term — and dropped
+`τ` entirely. The two errors do not cancel: over 4000 replications under
+the null at `N = 64`, `T = 5` (Monte-Carlo standard error 0.34% on a
+rejection rate),
+
+| | mean | variance | rejects at 5% |
+|---|---|---|---|
+| as shipped | 1.193 | 2.82 | **7.25%** |
+| corrected | 1.022 | 2.07 | 5.17% |
+| `χ²(1)` | 1.0 | 2.0 | 5% |
+
+The over-rejection is 6.6 Monte-Carlo standard errors from nominal, and it
+does not shrink: across `N` from 64 to 576 and `T` from 5 to 20 the shipped
+statistic rejected at 5.8–9.5% and the corrected one at 3.5–7.5%. Power is
+unaffected in any way that matters — 97.0% against `ρ = 0.15`, against
+98.0% for the oversized version.
+
+`LM_error` and `LM_re` were already right (5.40% and 5.08%), so this is the
+one component of the battery that was wrong.
+
+### 14. The joint panel LM test added correlated scores — FIXED
+
+`LM_joint = LM_lag + LM_error + LM_re` with `df = 3`. Summing marginal
+statistics is only a `χ²` if their scores are orthogonal, and the two
+spatial scores are not: `Cov(d_ρ, d_λ) = τ`, the whole of `Var(d_λ)`. The
+sum is therefore overdispersed — variance 7.84 against 6.0 for a `χ²(3)`,
+and 6.38% rejection — even once finding 13 is fixed.
+
+The spatial block now uses the quadratic form in the inverse information
+(Anselin, Bera, Florax & Yoon 1996),
+
+    LM_spatial = [τ d_ρ² − 2τ d_ρ d_λ + D d_λ²] / [τ (D − τ)]
+
+which is `χ²(2)`. The random-effects score survives as a separate addend
+because its cross-trace with the spatial scores vanishes:
+`tr(J_T ⊗ W) = T · tr(W) = 0`, since `W` has a zero diagonal. The result is
+mean 3.046, variance 6.30 and 5.47% rejection against `χ²(3)`.
+
+### 15. The spatial Chow test's degrees of freedom were off by one — FIXED
+
+`df_num = K`, `df_den = NT - 2K` for `K = size(X, 2)`. But each sub-period
+fit is an OLS regression of `y` on `[X Wy]`, so it estimates `K` slopes
+**and** a spatial lag coefficient: the break imposes `K + 1` restrictions
+against `2(K + 1)` unrestricted parameters. One missing restriction is
+enough to roughly double the size of the test. Over 1500 replications with
+no break at `N = 64`, `T = 6` (Monte-Carlo standard error 0.56%):
+
+| | rejects at 5% | rejects at 1% |
+|---|---|---|
+| as shipped, `K` restrictions | 8.5–10.5% | 1.8–2.7% |
+| corrected, `K + 1` | 4.1–5.8% | 0.5–1.2% |
+
+measured at `ρ = 0`, `0.4` and `0.7` and at `K = 2` and `3`. Power against
+a break of 0.5 in one slope is 97.2% after the fix.
+
+`Wy` is endogenous, so these sub-period fits are not consistent estimates
+of a SAR and the `F` distribution is an approximation. The Monte Carlo is
+the evidence that it is an adequate one at these sizes; that caveat is now
+in the docstring, where it was not before.
+
+### 16. The Hausman test fabricated a statistic out of a noise direction — FIXED
+
+The worst-behaved thing found so far, and the only finding that was
+*designed* rather than mistyped. The test inverts `V_fe − V_re`, which the
+Hausman algebra needs to be positive definite. When it was not, the code
+shifted every eigenvalue up to make it so:
+
+```julia
+if any(eig_vals .< -1e-8)
+    V_diff_sym = Symmetric(V_diff + max(0.0, -minimum(eig_vals) + 1e-6) * I)
+end
+```
+
+That is not a repair. It leaves the smallest eigenvalue sitting at the
+shift, `1e-6`, so the inverse carries an eigenvalue of `1e6` and the
+statistic becomes whatever the data happen to project onto a direction that
+was pure noise.
+
+It fires constantly, because two panel fits differing only in their fixed
+effects have nearly equal variance matrices. At `N = 49`, `T = 5`,
+`ρ = 0.4`, `IndivFE` against `TwoWayFE` — the pairing the package's own
+test suite used — the two estimates differ by a standard deviation of 0.005
+while each standard error is 0.037, so `V_fe − V_re` has entries of order
+`−7e-5` whose sign is set by sampling noise. Over 250 draws with the null
+true it was indefinite in **249**, and the test rejected at the 5% level in
+**86.0%** of them, median statistic 71.6 against a critical value of 7.81.
+
+Fixed by inverting only the directions whose eigenvalue is clearly
+positive and reporting the count as `df` — the Moore–Penrose form of the
+statistic — and returning `NaN` with `df = 0` when no direction survives.
+The same 250 draws now give `NaN` in 160 cases and 6 rejections among the
+remaining 90, with 68% power when time effects are genuinely present.
+
+**What is not fixed, because it is not a coding error.** Two
+`fit_spatial_panel` fits that differ only in their fixed-effects
+specification do not generally satisfy the Hausman efficiency condition, so
+the statistic has no `χ²` null distribution whichever way the arguments go.
+`NoFE` against `IndivFE` is computable every time — an unmodelled
+individual effect inflates `σ̂²` and so every standard error in the `NoFE`
+fit, which makes the difference positive — but that inflation comes from
+the misspecification rather than from an efficiency ordering, and it
+rejects 25.6% of the time under the null. It does have power (100% when the
+effects are correlated with `X`). Both pairings and both measured sizes are
+now in the docstring under a warning, so a borderline p-value cannot be
+read as if it were calibrated.
+
 ## Queue
 
 In priority order — unchecked variance first, since that is where the
 suite is blindest and where three of the four bugs this week lived.
 
-Queue item 1 — the variance matrices — is now closed. What is left:
+The variance matrices are closed, and so are the panel diagnostics apart
+from `panel_moran`. What is left:
 
-1. Panel diagnostics — testset 14, zero value pins: `panel_lm_tests`,
-   `spatial_chow_test`, `spatial_hausman_test`.
+1. `panel_moran` — the one function in testset 14 not yet checked against
+   anything. Its per-period `MoranResult`s and the pooled statistic have no
+   value pins.
 2. Spatial filtering, ESF and RE-ESF — 48 assertions; the pins are largely
    self-referential.
 3. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
@@ -399,7 +525,7 @@ Queue item 1 — the variance matrices — is now closed. What is left:
    extension entry points (24).
 6. The GS2SLS first-stage correction left open in finding 10.
 
-Done: findings 1–12. Suite: 576 → 783 passing, none failing.
+Done: findings 1–16. Suite: 576 → 810 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
@@ -410,10 +536,27 @@ inconsistent. Both are the kind of error a recovery test is supposed to
 catch — and testsets 3 and 4 had `atol = 0.15` on ρ and nothing at all on λ,
 so neither did.
 
-Four of the twelve findings were the same shape: a variance slot filled with
-a constant (`1/N` three times, `σ²/NT` once) so that the reported standard
-error did not depend on the data. Worth grepping for that pattern in any
-estimator added later.
+Four of the first twelve findings were the same shape: a variance slot
+filled with a constant (`1/N` three times, `σ²/NT` once) so that the
+reported standard error did not depend on the data. Worth grepping for that
+pattern in any estimator added later.
+
+Findings 13–16 are a second shape, and it is the one to watch for in the
+remaining queue: a **test statistic whose null distribution was never
+checked**. All four were off by a factor — 1.45× on the lag LM, 1.3× on the
+joint, 2× on the Chow, 17× on the Hausman — and every one of them still
+satisfied the entirety of testset 14, because the assertions were
+`stat >= 0`, `0 <= p <= 1` and `df == 3`. A statistic that is twice its
+nominal size passes all three. Any diagnostic added from here on needs a
+null-distribution Monte Carlo before it is believed, and the two remaining
+unchecked test statistics — `panel_moran` and the ESF diagnostics — should
+be assumed mis-scaled until one is run.
+
+Finding 16 is also the first case where the defect was deliberate. The
+eigenvalue shift was written to stop an inversion from failing, and it
+succeeded at that: it turned a visible error into a plausible-looking
+number. Silencing a numerical failure is worse than propagating it, and the
+three statistics clamped at zero noted in finding 3 are the same instinct.
 
 Closing an item means: an independent reference exists, it is committed as a
 test in `test/runtests.jl`, and the row above moves to "Verified correct".
