@@ -73,7 +73,7 @@ import .GWREstimation: GWRModel, MGWRModel, fit_gwr, fit_mgwr, BandwidthType, Fi
 import .SpatialGravityModels: GravityModel, GravityVariant, PoissonGravity, NegBinGravity, GravityFE, OriginFE, DestinationFE, BilateralFE, fit_gravity, multilateral_resistance
 import .FormulaDSL: @formula, slag, fe, endo, ParsedSpatialFormula, extract_panel_permutation
 import .SpatialWeights: knn_weights, distance_weights, band_weights, block_diagonal_weights, row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!, SpatialConnectivity, spatial_connectivity, read_gal, write_gal, read_gwt, write_gwt
-import .SpatialModelSelection: spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test, CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, model_comparison_table
+import .SpatialModelSelection: spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test, CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, KnnSelectionResult, select_knn_w, model_comparison_table
 import .SpatialPanelDiagnostics: HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test, PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran
 import .HigherOrderSpatial: SLXModel, fit_slx, SACModel, fit_sac, SDEMModel, fit_sdem
 import .SpatialRegimeModels: SpatialRegimeModel, fit_spatial_regime, ExogenousRegimes, skater_regimes, ChowRegimeTest, regime_chow_test
@@ -480,7 +480,8 @@ export
     read_gal, write_gal, read_gwt, write_gwt,
     # SpatialModelSelection
     spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test,
-    CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, model_comparison_table,
+    CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test,
+    KnnSelectionResult, select_knn_w, model_comparison_table,
     # SpatialPanelDiagnostics
     HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test,
     PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran,

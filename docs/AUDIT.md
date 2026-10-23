@@ -91,8 +91,8 @@ Each row was checked against an independent reference, not merely reviewed.
 | `_rho_logpost` | the dense `logabsdet(A) - 0.5*dot(r,r)` form, at six values of ρ | exact to 7e−15. No change needed |
 | `_sweep_latent!` | its untruncated stationary distribution against `N(μ, H⁻¹)` | correct: mean and covariance recovered to 1.4% and 1.5% over 40000 sweeps. No change needed |
 | `_rand_truncnorm` | `Distributions.truncated(Normal(…))` in four configurations | exact, including μ two SD outside the kept region. No change needed |
-| Turing extension SAR and SEM likelihoods | the model densities, read against `log|A| + log N(filtered residual)` | both correctly specified, and `@addlogprob!` is the right vehicle. No change needed |
-| `chebyshev_logdet` under the Bayesian prior | the exact log-determinant across the whole `Uniform(-0.99, 0.99)` support | accurate: error below 1e-3 for `|rho| <= 0.9`, worst case 0.17 at `N = 64` and falling to 0.026 at `N = 400`. No change needed |
+| Turing extension SAR and SEM likelihoods | the model densities, read against `log\|A\| + log N(filtered residual)` | both correctly specified, and `@addlogprob!` is the right vehicle. No change needed |
+| `chebyshev_logdet` under the Bayesian prior | the exact log-determinant across the whole `Uniform(-0.99, 0.99)` support | accurate: error below 1e-3 for `\|rho\| <= 0.9`, worst case 0.17 at `N = 64` and falling to 0.026 at `N = 400`. No change needed |
 | `fit_spatial_regime` design and recovery | the block structure entry by entry, and 250-replication recovery | correct: blocks exact and full rank, biases under 0.015, coverage 92.0-94.8% across all seven parameters. No change needed |
 | `regime_chow_test` | the LR statistic by hand, and its size as `N` grows | statistic and df correct; both chi-squared(3) moments converge. Finite-sample over-rejection only, documented |
 | `coeftable` p-values and intervals | the exact normal CDF and quantile | correct: relative error 3.6e-3 at `z = 6` and 1e-2 at `z = 8`, monotone, never negative; `_qnorm` round-trips to 1e-10. No change needed |
@@ -1203,7 +1203,7 @@ outstanding.
 
 Done: findings 1–25. Suite: 576 → 1156 passing, none failing.
 
-Post-audit, under the standing rule in the last section: 1229 passing.
+Post-audit, under the standing rule in the last section: 1274 passing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
@@ -1256,8 +1256,9 @@ so the rule has somewhere to be satisfied.
 | Added | Diagnostic | Null distribution measured | Verdict |
 |---|---|---|---|
 | 2026-10-23 | `sdm_tests` — the five Koley & Bera Durbin score statistics | 20000 replications, `N = 81`: mean = df to within 2.6%, variance = 2df to within 1.9%, size 0.047–0.054 at the 5% level and 0.009–0.010 at the 1% | Verified correct |
+| 2026-10-24 | `select_knn_w` — choosing `k` for a knn `W` by AIC | not a test statistic, so the gate is the selection error rate: 300 draws generated at `k = 6`, `k` searched over `2:20`, exact recovery 42.3% / 57.3% / 77.0% at `N = 100 / 200 / 400` against 5.3% by chance, median `k̂ = 6` throughout | Verified correct |
 
-Four checks, in testset 27:
+### `sdm_tests` — four checks, in testset 27
 
 1. **Reduction.** `RS_rho` is algebraically the existing `lm_test_lag`, and
    agrees with it to 0.00e+00. The per-term formula applied at the `rho`
@@ -1289,3 +1290,28 @@ property that matters, and the one the committed test makes, is that the
 statistic is chi-squared: mean = df, variance = 2df, correct size in the
 tail. Findings 13–16 were all scale errors, and the mean of the statistic
 is what catches a scale error.
+
+### `select_knn_w` — four checks, in testset 28
+
+`select_knn_w` is a selection procedure rather than a test, so the rule was
+read across to the quantity that plays the same role: its error rate. The
+numbers above are the headline, and the one that matters for interpretation
+is what a wrong `k` does to `rho-hat` — over 300 draws at `N = 200`, mean
+`rho-hat` runs 0.325 at `k = 2` (−35.1% bias) through 0.493 at the true
+`k = 6` (−1.4%) to 0.646 at `k = 20` (+29.1%), while selecting leaves it at
+0.502 (+0.5%). Paired against a fixed choice, selection gives the smaller
+`|rho-hat − rho|` in 98.3% of draws at `k = 2`, 69.0% at `k = 10` and 93.0%
+at `k = 20`. The figure usually quoted for this effect is "up to 20%"; the
+wider range here is a property of searching out to `k = 20`, not a
+disagreement with the source, and the docstring says so rather than quoting
+the tidier number.
+
+A second note. The non-monotonicity of the criterion in `k` is the premise
+of the whole exercise, so it is asserted rather than assumed: the committed
+test checks that the AIC curve is neither increasing nor decreasing
+throughout and that its minimiser is interior to the searched range. With
+the variant and `X` held fixed the parameter count does not vary with `k`,
+so AIC, BIC and the raw log-likelihood rank the candidates identically here
+— the test pins that too, so the `criterion` keyword is not mistaken for
+doing work it does not do in this search.
+

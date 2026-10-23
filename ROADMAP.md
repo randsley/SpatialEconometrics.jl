@@ -2,7 +2,7 @@
 
 > **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,229 test assertions in 48 testsets with both package
+> 22 submodules, 1,274 test assertions in 53 testsets with both package
 > extensions installed, 20 examples, 9 notebooks, 2 package extensions,
 > CI/CD and 21 Documenter.jl pages. **Phases 4, 5 and 6
 > are complete except item #10 (Performance)**, which is the next piece of work.
@@ -334,14 +334,17 @@ literature are to select `W` by a criterion or to estimate it.
 
 | Feature | Description | Reference |
 |---|---|---|
-| knn `W` selection by AIC | Refit the same model for `k = 2…50` and plot AIC against `k`; the curve is non-linear with a clear minimum, and a wrong `k` biases `ρ̂` by up to 20% | Kubara & Kopczewska (2023) |
+| ~~knn `W` selection by AIC~~ — **delivered**, see `select_knn_w` | Refit the same model for `k = 2…50` and read AIC against `k`; the curve is non-monotone with an interior minimum, and a wrong `k` biases `ρ̂` badly — measured at −35.1% at `k = 2` and +29.1% at `k = 20` against a true `k = 6`, wider than the source's "up to 20%" because the range searched is wider | Kubara & Kopczewska (2023) |
 | Endogenous / gravity-formed `W` | Parameterised `w_ij = f(d_ij, Z_ij; γ)` estimated jointly with the model by concentrated ML or GMM | Kelejian & Piras (2014); Qu & Lee (2015) |
 | Time-varying `W` | `W_t` from bilateral flows, with the panel estimators taking a vector of weight matrices | Lee & Yu (2012) |
 
-The AIC-over-`k` search is nearly free here: `knn_weights` and `spatial_aic`
-both exist, and the loop between them is the deliverable. Note the caveat
-from the source — comparing AICs across different `W` is valid only when the
-dependent variable and the sample do not change between fits.
+The AIC-over-`k` search was nearly free, and is now delivered as
+`select_knn_w`: `knn_weights` and `spatial_aic` both existed, and the loop
+between them plus its guards was the deliverable. The caveat from the source
+— comparing AICs across different `W` is valid only when the dependent
+variable and the sample do not change between fits — is checked rather than
+documented, and a candidate whose fit fails or whose `ρ̂` pins to the bound
+is excluded from the argmin instead of winning it by having no number.
 
 **Dependencies:** NearestNeighbors.jl (already available); optional GeoInterface.jl for geometry-based weights
 
@@ -675,7 +678,7 @@ Tier 3 builds rather than inside them.
 | Priority | Item | Est. Lines | Rationale |
 |---|---|---|---|
 | ~~12~~ | ✅ Durbin score tests (#5) | 350 | Delivered: `sdm_tests`, testset 27, null distribution in `docs/AUDIT.md` |
-| 13 | knn `W` selection by AIC (#6) | ~150 | `knn_weights` + `spatial_aic` already exist |
+| ~~13~~ | ✅ knn `W` selection by AIC (#6) | 210 | Delivered: `select_knn_w`, testset 28, recovery rates in `docs/AUDIT.md` |
 | 14 | SDEM roadmap + Bayesian SD/SDE (#5) | ~400 | Local vs global spillovers |
 | 15 | Spatio-temporal Moran PCA (#7) | ~300 | Reuses the eigenvector basis |
 | | **Phase 6B total** | **~1,200** | |
@@ -714,21 +717,22 @@ Rows above the rule are measured; rows below are estimates.
 |---|---|---|---|
 | **v0.3.0** (registered) | 13 | 54 | ~6,500 |
 | **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
-| **master** (+ Phase 6B item 1) | 22 | 1,229 | 13,716 |
+| **master** (+ Phase 6B items 1–2) | 22 | 1,274 | 13,970 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 13,716 lines of
-`src/`, 3,894 lines of tests (1,229 assertions in 48 testsets with both
-package extensions installed), 2,450 lines of examples across 20 scripts,
+Measured on master: 22 submodules plus the umbrella across 13,970 lines of
+`src/`, 4,047 lines of tests (1,274 assertions in 53 testsets with both
+package extensions installed), 2,492 lines of examples across 20 scripts,
 398 lines of package extensions, 21 documentation pages and 9 notebooks
 (3 Jupyter, 6 Pluto).
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed
-form, a published number or an independently written reference. The 73 on top
-of that are Phase 6B's first item, which came in under the same rule.
+form, a published number or an independently written reference. The 118 on
+top of that are Phase 6B's first two items, which came in under the same
+rule.
 
 The earlier per-release projections (v0.4.0 at 16 modules, v0.5.0 at 20,
 v0.6.0 at 23) were overtaken: Phases 4, 5 and 6 all landed on the 0.4.0
