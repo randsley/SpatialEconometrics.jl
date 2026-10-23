@@ -84,6 +84,10 @@ Each row was checked against an independent reference, not merely reviewed.
 | `fit_esf` | the unbiased OLS covariance on the same design, plus 400-replication coverage | **every standard error was short by `√((N−P)/N)`** — finding 18 |
 | `fit_re_esf` | dense GLS, Woodbury, a REML grid, and 120-replication recovery of both variance components | correct to 1e-12 throughout. No change needed |
 | ESF GLM families | `Distributions.logpdf`, and a ForwardDiff score and Hessian at the IRLS optimum | likelihoods and IRLS exact; **the negative binomial's dispersion was biased low** — finding 19 |
+| `build_gmm_system` | the instrument structure in Roodman (2009), checked entry by entry | correct: lag layout, collapsing, level block and `H` all as specified. No change needed |
+| `fit_dynamic_gmm` `vcov` | Windmeijer (2005) eq. 4.4, and coverage over `N` from 50 to 800 | **the correction's two dominant terms were mis-assembled** — finding 20 |
+| `compute_ab_serial_correlation` | 300-replication Monte Carlo under a correctly specified model | correct: AR(2) standard deviation 0.97–1.06, rejecting 5.3–6.0%. No change needed |
+| `hansen_j` | the quadratic form `g′W₂g`, and its rejection rate | correct: rejects 3.3–5.3% at the 5% level. No change needed |
 
 ## Open findings
 
@@ -663,6 +667,79 @@ Coverage for the two canonical families needs no caveat: 93.2% and 95.2%
 for the Poisson, 93.6% and 95.2% for the logit, over 250 replications at
 `N = 81`.
 
+### 20. The Windmeijer correction was mis-assembled — FIXED
+
+Two-step GMM standard errors are badly biased downwards in small samples,
+and the Windmeijer (2005) correction exists to repair that. The code
+computed every ingredient correctly and then assembled them wrongly.
+
+The formula, as Windmeijer states it in eq. 4.4 and Roodman (2009) in eq.
+23, is
+
+    V_c = V₂ + D V₂ + (D V₂)′ + D V₁ D′
+
+with `V₂` the uncorrected two-step variance, `V₁` the robust one-step
+variance, and `D` the derivative of the two-step estimate with respect to
+the one-step estimate that enters the weight matrix. The code had
+
+```julia
+V_wind = V_naive .+ (D_mat * V_1 * V_naive) .+ (V_naive * V_1 * D_mat') .+ (D_mat * V_1 * D_mat')
+```
+
+— a spurious `V_1` inside both middle terms. All four matrices are `P × P`,
+so it runs silently. But `V_1` is a variance, with entries of order `1e-3`
+here, so multiplying by it shrinks the two terms that carry the whole
+correction by about two orders of magnitude: `‖D V₂‖ = 1.1e-3` against
+`‖D V₁ V₂‖ = 5.7e-6`. What is left is `V₂ + D V₁ D′`, barely above the
+uncorrected variance the correction was supposed to repair.
+
+`D` itself is right. It is obtained by differentiating
+`−V₂ S_ZX′ W₂ Ω(θ) W₂ g₂` with ForwardDiff at `θ̂₁`, which is exactly
+Windmeijer's `D` — a neat way to get it without hand-coding `∂Ω/∂θ`.
+
+Standard errors came out 15–19% short. Coverage of a nominal 95% interval
+for `ρ`, over 250 replications at `T = 6`:
+
+| N | uncorrected | as shipped | correct |
+|---|---|---|---|
+| 50 | 77.2% | — | **92.0%** |
+| 100 | 83.6% | 87.7% | 90.4% |
+| 200 | 89.2% | — | 94.0% |
+| 800 | 94.0% | — | 94.0% |
+
+At `N = 100` the shipped version recovered 4 points of the 11 available;
+the correct formula recovers 7. The gain is largest at small `N`, which is
+the whole point — at `N = 800` corrected and uncorrected agree, as they
+should.
+
+Note what this does **not** fix: `ρ̂` is itself biased in short panels, by
+−0.041 for `DifferenceGMM` and +0.023 for `SystemGMM` at `N = 50`, in
+opposite directions, both falling to about ±0.002 by `N = 800`. No variance
+matrix rescues that, and it is now in the docstring beside the coverage
+table.
+
+### Verified with no change: the rest of the dynamic GMM module
+
+`build_gmm_system` matches Roodman entry by entry, checked on an explicit
+`N = 8`, `T = 6` panel rather than by reading. The differenced equations
+carry `Δy_it` on `Δy_{i,t−1}` and `Δx_it`; equation `t` is instrumented by
+the levels `y_{t−2}` down to `y_1`; `H` is the tridiagonal `2`/`−1`
+covariance of `Δε`; collapsing reduces the count from one column per
+(period, lag) pair to one per lag, with column `s` holding lag `s` in every
+equation; and the System GMM level block stacks `y_it` on `y_{i,t−1}`,
+instrumented by `Δy_{i,t−1}`, with an identity `H` block and zero
+cross-blocks. All of that is now pinned.
+
+The three diagnostics are calibrated, which matters after findings 13–16.
+Over 300 replications at `N = 100` with a correctly specified model:
+Hansen J rejects 5.3% (`DifferenceGMM`) and 3.3% (`SystemGMM`) at the 5%
+level; AR(2) has mean `−0.11`/`−0.03` and standard deviation 1.023/1.024,
+rejecting 5.7%/5.3%; and AR(1) sits at `−5.4`/`−5.8`, rejecting hard, which
+is correct rather than alarming — `Δε` is MA(1) by construction, so a
+first-order test on differenced residuals *must* reject. The AR(2) standard
+deviation stayed at 1.03 after finding 20 changed the variance matrix that
+feeds it, so that coupling is sound too.
+
 ## Queue
 
 In priority order — unchecked variance first, since that is where the
@@ -674,20 +751,20 @@ five functions in testset 14. What is left:
 Spatial filtering is closed, all five functions and all four families.
 What is left:
 
-1. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
-   estimator in that queue item not yet reached.
-2. The Bayesian and ordered probit samplers — testset 19's remaining
+Dynamic GMM is closed. What is left:
+
+1. The Bayesian and ordered probit samplers — testset 19's remaining
    estimators. `fit_spatial_probit` is verified; these two report posterior
    covariances from draws and have not been checked.
-3. Simulation (17), regimes (16) beyond the variance, tables (18),
+2. Simulation (17), regimes (16) beyond the variance, tables (18),
    extension entry points (24).
-4. The GS2SLS first-stage correction left open in finding 10.
-5. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
+3. The GS2SLS first-stage correction left open in finding 10.
+4. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
    could use its own maximum likelihood estimate instead of method of
    moments, which would lift its small-sample coverage from 91.6% toward
    the 95.2% the Poisson achieves. See finding 19.
 
-Done: findings 1–19. Suite: 576 → 887 passing, none failing.
+Done: findings 1–20. Suite: 576 → 963 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
