@@ -564,28 +564,6 @@ function _trace_W2_WtW_fast(W::AbstractSparseMatrix{T}) where {T}
     return w2 + wtw
 end
 
-"""
-    lm_test_lag(y, X, W)
-
-Anselin's LM test for an omitted spatial lag of the dependent variable.
-
-Fitted by OLS under the null of no spatial dependence, this tests
-`H0: rho = 0` in `y = rho*W*y + X*beta + e` against the alternative that a
-lag belongs in the model. The statistic is chi-squared with 1 degree of
-freedom.
-
-It is **not robust**: a spatial error process also inflates it, so a
-rejection on its own does not distinguish lag from error dependence. Use
-[`lm_test_robust_lag`](@ref), or [`lm_tests`](@ref) for the whole battery.
-`X` must include an intercept column; none is added for you.
-
-
-# Returns
-An [`LMTestResult`](@ref).
-
-# References
-Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
-"""
 # Shared pieces of the Anselin LM battery: the OLS residuals, tr(W'W + W^2),
 # the information term J_rho_rho built from the LAGGED FITTED VALUES W*X*b,
 # and the two scores d_rho = e'Wy/s2 and d_lam = e'We/s2.
@@ -608,6 +586,28 @@ function _lm_components(y::AbstractVector{T}, X::AbstractMatrix{T},
     return (; e, σ2, Tr, J, d_rho, d_lam)
 end
 
+"""
+    lm_test_lag(y, X, W)
+
+Anselin's LM test for an omitted spatial lag of the dependent variable.
+
+Fitted by OLS under the null of no spatial dependence, this tests
+`H0: rho = 0` in `y = rho*W*y + X*beta + e` against the alternative that a
+lag belongs in the model. The statistic is chi-squared with 1 degree of
+freedom.
+
+It is **not robust**: a spatial error process also inflates it, so a
+rejection on its own does not distinguish lag from error dependence. Use
+[`lm_test_robust_lag`](@ref), or [`lm_tests`](@ref) for the whole battery.
+`X` must include an intercept column; none is added for you.
+
+
+# Returns
+An [`LMTestResult`](@ref).
+
+# References
+Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
+"""
 function lm_test_lag(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
     c = _lm_components(y, X, W)
 

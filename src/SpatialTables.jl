@@ -177,11 +177,6 @@ end
 # Export Formats
 # ═══════════════════════════════════════════════════════════════════════
 
-"""
-    to_latex(ct::CoefTable; digits=4)
-
-Format coefficient table as a LaTeX tabular environment string.
-"""
 # Each exporter writes into a format with its own metacharacters, and a
 # coefficient name is safe in none of them. The names this package produces
 # routinely carry `_` (`W_x1` from SLX, `R1_(Intercept)` from regimes) and
@@ -242,6 +237,11 @@ end
 _fmt(x::Real, digits::Int) =
     Printf.format(Printf.Format("%." * string(max(digits, 0)) * "f"), x)
 
+"""
+    to_latex(ct::CoefTable; digits=4)
+
+Format coefficient table as a LaTeX tabular environment string.
+"""
 function to_latex(ct::CoefTable; digits::Int=4)
     io = IOBuffer()
     println(io, "\\begin{tabular}{lcccc}")

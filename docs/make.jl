@@ -4,6 +4,11 @@ using SpatialEconometrics
 makedocs(
     sitename = "SpatialEconometrics.jl",
     modules = [SpatialEconometrics],
+    # Internal helpers carry docstrings for the next reader of the
+    # source, not for the manual. Checking every docstring would force
+    # private algebra into the public API reference; checking the
+    # exported surface keeps the build strict where it matters.
+    checkdocs = :exports,
     authors = "Nigel Randsley",
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",

@@ -313,7 +313,7 @@ Traces of powers of `W`, normalised: entry `m + 1` is `tr(Wᵐ) / N`.
 
 Computed exactly from the eigenvalues of `W` when `N <= max_exact_n`,
 since `tr(Wᵐ) = Σᵢ λᵢᵐ` and one decomposition serves every power. Above
-that size it falls back to [`precompute_neumann_traces`](@ref), whose
+that size it falls back to `precompute_neumann_traces`, whose
 Hutchinson estimates are stochastic — so pass `rng` if the result has to
 be reproducible.
 

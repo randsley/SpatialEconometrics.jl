@@ -8,7 +8,7 @@ using StatsAPI
 import StatsAPI: loglikelihood, nobs, dof_residual, coef, vcov, residuals
 
 import ..SpatialUtils: _normcdf, _chi2_sf
-import ..SpatialWeights
+import ..SpatialWeights: knn_weights, spatial_connectivity
 import ..SpatialEconometricsPrototype
 
 export
@@ -599,12 +599,12 @@ function select_knn_w(
     Ws = Vector{Any}(undef, n)
 
     for (i, k) in enumerate(ks)
-        Wk = SpatialWeights.knn_weights(coords, k; binary = binary,
+        Wk = knn_weights(coords, k; binary = binary,
                                         row_standardize = true,
                                         symmetrize = symmetrize)
         Wk = convert(SparseMatrixCSC{T, Int}, Wk)
         Ws[i] = Wk
-        isl[i] = SpatialWeights.spatial_connectivity(Wk).n_islands
+        isl[i] = spatial_connectivity(Wk).n_islands
 
         m = try
             SpatialEconometricsPrototype.fit_spatial(variant, Wk, X, y;

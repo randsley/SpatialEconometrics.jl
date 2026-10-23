@@ -22,3 +22,22 @@ robust_coeftable
 robust_vcov
 spatial_effects
 ```
+
+## Internal numerics
+
+These two are exported by the `SpatialUtils` submodule but not re-exported
+by the package, so they are reached as
+`SpatialEconometrics.SpatialUtils.spatial_trace_powers`. They are the trace
+machinery the asymptotic covariances and the log-determinant approximations
+are built on, and they are listed here because they carry docstrings: the
+docs build checks that every documented name a module exports reaches the
+manual, so an undocumented-but-exported function cannot hide.
+
+```@meta
+CurrentModule = SpatialEconometrics.SpatialUtils
+```
+
+```@docs
+g_traces
+spatial_trace_powers
+```
