@@ -293,6 +293,58 @@ using NearestNeighbors
         @test length(m_mgwr.bandwidths) == 3  # intercept + 2 vars
         @test size(m_mgwr.coef_local) == (N, 3)
 
+        # MGWR degrees of freedom, accumulated per Yu et al. (2020). The fit
+        # is additive in its components, so S = sum_k R_k and tr(S) must be
+        # the sum of the per-covariate traces exactly, not just to tolerance.
+        @test length(m_mgwr.enp) == 3
+        @test all(isfinite, m_mgwr.enp)
+        @test sum(m_mgwr.enp) == m_mgwr.hat_trace
+        @test all(>=(1.0), m_mgwr.enp)      # each coefficient costs a parameter
+        @test 3.0 <= m_mgwr.hat_trace <= N
+
+        # sigma2 and AICc must now carry that penalty. Before the accumulator
+        # existed, sigma2 was RSS/N and AICc was N*log(RSS/N) + N -- the
+        # tr(S) = 0 case, which made MGWR beat GWR by exactly the penalty it
+        # was missing. The last assertion is the one that catches a relapse.
+        let RSS = sum(abs2, residuals(m_mgwr)), t = m_mgwr.hat_trace
+            @test isapprox(m_mgwr.sigma2, RSS / (N - t); rtol = 1e-10)
+            @test isapprox(m_mgwr.AICc,
+                           N * log(RSS / N) + N * (N + t) / (N - 2 - t);
+                           rtol = 1e-10)
+            @test m_mgwr.AICc > N * log(RSS / N) + N + 1.0
+        end
+
+        # beta1 varies with the x-coordinate and beta2 is constant, so the
+        # first should buy more effective parameters on a shorter bandwidth.
+        # This is the substantive claim MGWR makes, and it reads straight off
+        # the accumulator rather than off the coefficient spread.
+        @test m_mgwr.enp[2] > m_mgwr.enp[3]
+        @test m_mgwr.bandwidths[2] < m_mgwr.bandwidths[3]
+
+        # The standard errors come from the coefficient operator B_k, so they
+        # are finite and strictly positive everywhere once it is accumulated.
+        @test all(isfinite, m_mgwr.se_local)
+        @test all(>(0.0), m_mgwr.se_local)
+
+        # Opting out must change only what is reported, never the fit: the
+        # accumulator rides alongside the back-fitting loop and must not
+        # perturb it. Everything it identifies is NaN rather than a number
+        # that would invite comparison with a GWR AICc.
+        m_noinf = fit_mgwr(X, y, coords; inference = false)
+        @test m_noinf.coef_local == m_mgwr.coef_local
+        @test isnan(m_noinf.hat_trace)
+        @test isnan(m_noinf.AICc)
+        @test all(isnan, m_noinf.enp)
+        @test isapprox(m_noinf.sigma2, sum(abs2, residuals(m_noinf)) / N;
+                       rtol = 1e-10)
+
+        # Above max_inference_n the accumulator is skipped with a warning,
+        # not an error: K+1 dense N x N operators is a memory ceiling, not a
+        # reason to refuse to fit.
+        m_gated = @test_logs (:warn, r"degrees-of-freedom accumulator") match_mode=:any fit_mgwr(X, y, coords; max_inference_n = 10)
+        @test isnan(m_gated.hat_trace)
+        @test m_gated.R2 > 0.5
+
         # tr(S) is an effective parameter count, so it lives in [K, N].
         # It was once formed with R^{-1} in place of R^{-T}, which pushed it
         # past N on a badly scaled X and then collapsed the N - tr(S) divisor
@@ -311,6 +363,171 @@ using NearestNeighbors
             @test isapprox(vec(mean(m_wide.coef_local, dims = 1)), b_ols; rtol = 1e-6)
             @test all(isapprox.(m_wide.coef_local[1, :], b_ols; rtol = 1e-6))
         end
+    end
+
+    @testset "11b. Bandwidth selection & back-fitting convergence" begin
+        rng = MersenneTwister(2211); N = 45
+        coords = hcat(rand(rng, N) .* 10, rand(rng, N) .* 10)
+        X = randn(rng, N, 2)
+        y = 2.0 .+ (1.0 .+ 0.3 .* coords[:, 1]) .* X[:, 1] .-
+            0.5 .* X[:, 2] .+ 0.5 .* randn(rng, N)
+
+        # The adaptive bandwidth asks the KD-tree for k+1 neighbours, which
+        # throws at k = N -- and k_max = min(N, 500) put exactly that value
+        # in the search range. It survived only because the old golden-section
+        # search never happened to evaluate the endpoint.
+        @test fit_gwr(X, y, coords; bandwidth = AdaptiveBandwidth(N)) isa GWRModel
+
+        # Over a span this short the selector scans every candidate, so it
+        # must return the exact grid minimum. What it replaced was a
+        # golden-section search, valid only on a unimodal objective; the AICc
+        # curve in k is not unimodal (eleven sign changes on Columbus), and
+        # there that search returned k = 43 where the minimum is k = 23,
+        # 2.3 AICc units worse.
+        m_sel = fit_gwr(X, y, coords)
+        @test 5 <= m_sel.bandwidth <= N - 1
+        @test all(k -> fit_gwr(X, y, coords;
+                               bandwidth = AdaptiveBandwidth(k)).AICc >=
+                       m_sel.AICc - 1e-9, 5:(N - 1))
+
+        # Back-fitting runs in two phases and `converged` requires both: the
+        # bandwidths settling and the coefficients reaching tol. Cut it short
+        # and there is no fixed operator to take a trace of, so the reported
+        # degrees of freedom are NaN rather than whatever the half-built
+        # accumulator happened to hold.
+        m_short = @test_logs (:warn,) match_mode=:any fit_mgwr(X, y, coords; max_iter = 2)
+        @test !m_short.converged
+        @test isnan(m_short.hat_trace)
+
+        # Columbus is the case where back-fitting genuinely fails to
+        # converge: INC and HOVAL are spatially correlated with each other,
+        # so the additive components compete and the contraction factor is
+        # about 0.94 per sweep. It needs ~140 sweeps; max_iter used to stop
+        # at 50 and return a fit that was not a fixed point of anything.
+        # @test_logs with no expected entry is the real assertion here: it
+        # fails if any of the three convergence warnings fire.
+        csv = joinpath(@__DIR__, "..", "notebooks", "data", "columbus.csv")
+        if isfile(csv)
+            # Parsed by hand rather than with DelimitedFiles, which is no
+            # longer an unconditional stdlib and is not a test dependency.
+            lines = filter(!isempty, strip.(readlines(csv)))
+            cnames = string.(split(lines[1], ','))
+            rows = [parse.(Float64, split(l, ',')) for l in lines[2:end]]
+            getcol(c) = [r[findfirst(==(c), cnames)] for r in rows]
+            yc = getcol("CRIME")
+            Xc = hcat(getcol("INC"), getcol("HOVAL"))
+            cc = hcat(getcol("X"), getcol("Y"))
+
+            mc = @test_logs fit_mgwr(Xc, yc, cc)
+            @test mc.converged
+            @test mc.iterations > 50
+            @test all(isfinite, mc.enp)
+            @test sum(mc.enp) == mc.hat_trace
+            @test isapprox(mc.sigma2,
+                           sum(abs2, residuals(mc)) /
+                           (length(yc) - mc.hat_trace); rtol = 1e-10)
+        end
+    end
+
+    @testset "11c. MGWR degrees of freedom against a solved fixed point" begin
+        # The back-fitting fixed point is a linear system, so at small N it
+        # can be solved outright and both degrees-of-freedom paths checked
+        # against the answer instead of against each other. Every bug found
+        # in this part of the package was a formula that no test compared to
+        # a closed form, so this is the test that should have existed.
+        #
+        #   f_k = S^(k) (y - sum_{j != k} f_j)
+        #   => R_k + S^(k) sum_{j != k} R_j = S^(k)
+        #
+        # which is one (NK x NK) solve with N right-hand sides.
+        GW = SpatialEconometrics.GWREstimation
+
+        rng = MersenneTwister(3311); N = 30
+        coords = hcat(rand(rng, N) .* 10, rand(rng, N) .* 10)
+        X = randn(rng, N, 2)
+        y = 2.0 .+ (1.0 .+ 0.3 .* coords[:, 1]) .* X[:, 1] .-
+            0.5 .* X[:, 2] .+ 0.5 .* randn(rng, N)
+        X_aug = hcat(ones(N), X)
+        K = 3
+        kern = BisquareKernel()
+        tree = GW._build_tree(coords)
+
+        m_ex = fit_mgwr(X, y, coords; tol = 1e-8, max_iter = 4000)
+        @test m_ex.converged
+        @test m_ex.df_method === :exact
+
+        Sk = map(1:K) do k
+            bw = AdaptiveBandwidth(round(Int, m_ex.bandwidths[k]))
+            xk = X_aug[:, k]
+            S = zeros(N, N)
+            for i in 1:N
+                w = GW._get_weights(tree, coords, i, bw, kern)
+                den = sum(w[j] * xk[j]^2 for j in 1:N)
+                den <= 1e-12 && continue
+                for j in 1:N
+                    S[i, j] = xk[i] * w[j] * xk[j] / den
+                end
+            end
+            S
+        end
+
+        A = zeros(N * K, N * K); Bm = zeros(N * K, N)
+        for k in 1:K
+            rows = ((k - 1) * N + 1):(k * N)
+            A[rows, rows] = Matrix(I, N, N)
+            for j in 1:K
+                j == k && continue
+                A[rows, ((j - 1) * N + 1):(j * N)] = Sk[k]
+            end
+            Bm[rows, :] = Sk[k]
+        end
+        Rst = A \ Bm
+        truth = [tr(Rst[((k - 1) * N + 1):(k * N), :]) for k in 1:K]
+
+        # The solved operator must reproduce the fit it is the operator of.
+        f_hat = zeros(N)
+        for k in 1:K
+            f_hat .+= Rst[((k - 1) * N + 1):(k * N), :] * y
+        end
+        @test isapprox(f_hat, m_ex.fitted; atol = 1e-6)
+
+        # The accumulator must match it to the tolerance it was run at.
+        @test isapprox(m_ex.enp, truth; atol = 1e-4)
+        @test isapprox(m_ex.hat_trace, sum(truth); atol = 1e-4)
+        @test all(iszero, m_ex.enp_se)       # exact, so no Monte Carlo error
+
+        # The probe estimator must agree with the same truth, within its own
+        # reported error. 4 SEs rather than 2: against a solved fixed point
+        # these z-scores have standard deviation about 1.04 at 200 probes
+        # (1.28 at 50), because a quadratic form in Rademacher variables is
+        # not Gaussian and its variance is estimated from the same probes.
+        m_st = fit_mgwr(X, y, coords; inference = :stochastic,
+                        rng = MersenneTwister(606), tol = 1e-8, max_iter = 4000)
+        @test m_st.df_method === :stochastic
+        @test all(isfinite, m_st.enp_se)
+        @test all(>(0.0), m_st.enp_se)
+        @test all(abs.(m_st.enp .- truth) .<= 4 .* m_st.enp_se)
+        @test abs(m_st.hat_trace - sum(truth)) <= 4 * sqrt(sum(abs2, m_st.enp_se))
+
+        # Whatever is asked of inference, the fit must come out the same: the
+        # degrees of freedom are read off the frozen smoother afterwards and
+        # cannot feed back into the back-fitting.
+        m_no = fit_mgwr(X, y, coords; inference = false, tol = 1e-8, max_iter = 4000)
+        @test m_no.df_method === :none
+        @test m_no.coef_local == m_ex.coef_local
+        @test m_st.coef_local == m_ex.coef_local
+        @test all(isnan, m_no.enp_se)
+
+        # Memory, not principle, is what gates the exact path, so the
+        # stochastic one must still work where the exact one gives up.
+        m_gate = @test_logs (:warn,) match_mode=:any fit_mgwr(X, y, coords; max_inference_n = 5)
+        @test m_gate.df_method === :none
+        m_sg = fit_mgwr(X, y, coords; inference = :stochastic, max_inference_n = 5,
+                        rng = MersenneTwister(77))
+        @test m_sg.df_method === :stochastic
+        @test isfinite(m_sg.hat_trace)
+
+        @test_throws ArgumentError fit_mgwr(X, y, coords; inference = :exact)
     end
 
     @testset "12. Spatial Weights Construction" begin
