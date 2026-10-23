@@ -11,6 +11,7 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames, loglikelihood
 using StatsModels
 using Tables
 using NearestNeighbors
+using Distributions
 
 # A stand-in fit, so spatial_hausman_test can be handed chosen coefficient
 # vectors and covariance matrices rather than whatever two panel fits happen
@@ -2197,6 +2198,161 @@ vcov(m::HausMock) = m.V
         @test 0.38 < mt2 < 0.65        # true 0.5
         @test 0.21 < ms2 < 0.30        # true 0.25
         @test cvg > 0.88               # nominal 0.95
+    end
+
+    @testset "21c. ESF GLM Families against Independent Densities" begin
+        SF = SpatialEconometrics.SpatialFiltering
+        rng = MersenneTwister(606)
+        n = 300
+        Xg = hcat(ones(n), randn(rng, n), randn(rng, n))
+        bg = [0.4, 0.6, -0.3]
+        ηg = Xg * bg
+        μ_log = exp.(ηg)
+        μ_logit = 1 ./ (1 .+ exp.(-ηg))
+        α_t = 0.5; r_nb = 1 / α_t
+
+        y_p = Float64[rand(rng, Poisson(m)) for m in μ_log]
+        y_b = Float64[rand(rng, Bernoulli(m)) for m in μ_logit]
+        y_n = Float64[rand(rng, NegativeBinomial(r_nb, r_nb / (r_nb + m)))
+                      for m in μ_log]
+
+        # ---- the log-likelihoods are the textbook densities -----------
+        @test isapprox(SF._glm_loglik(:poisson, y_p, μ_log, 0.0, 0.0),
+                       sum(logpdf(Poisson(μ_log[i]), Int(y_p[i])) for i in 1:n);
+                       rtol = 1e-10)
+        @test isapprox(SF._glm_loglik(:logit, y_b, μ_logit, 0.0, 0.0),
+                       sum(logpdf(Bernoulli(μ_logit[i]), Bool(y_b[i])) for i in 1:n);
+                       rtol = 1e-10)
+        @test isapprox(SF._glm_loglik(:negbin, y_n, μ_log, α_t, 0.0),
+                       sum(logpdf(NegativeBinomial(r_nb, r_nb / (r_nb + μ_log[i])),
+                                  Int(y_n[i])) for i in 1:n);
+                       rtol = 1e-10)
+        # the Gaussian branch is the concentrated form, -N/2(log2π + logσ² + 1)
+        @test isapprox(SF._glm_loglik(:gaussian, y_p, μ_log, 0.0, 2.0),
+                       -0.5 * n * (log(2π) + log(2.0) + 1); rtol = 1e-12)
+
+        # ---- IRLS reaches the actual maximum --------------------------
+        # Differentiate an independently written log-likelihood at the IRLS
+        # answer: the score must vanish and a Newton step must not move.
+        nll_p(v) = -sum(logpdf(Poisson(exp(dot(view(Xg, i, :), v))), Int(y_p[i]))
+                        for i in 1:n)
+        nll_b(v) = -sum(logpdf(Bernoulli(1 / (1 + exp(-dot(view(Xg, i, :), v)))),
+                               Bool(y_b[i])) for i in 1:n)
+        nll_n(v) = -sum(logpdf(NegativeBinomial(r_nb,
+                            r_nb / (r_nb + exp(dot(view(Xg, i, :), v)))),
+                            Int(y_n[i])) for i in 1:n)
+
+        for (fam, yv, nll, al) in ((:poisson, y_p, nll_p, 0.0),
+                                   (:logit, y_b, nll_b, 0.0),
+                                   (:negbin, y_n, nll_n, α_t))
+            bh, μh, wh, conv = SF._fit_glm(Xg, yv, fam; α = al)
+            @test conv
+            g = ForwardDiff.gradient(nll, bh)
+            @test maximum(abs, g) < 1e-6
+            @test norm(ForwardDiff.hessian(nll, bh) \ g) < 1e-8
+            # fitted means are the inverse link of Xβ̂
+            η̂ = Xg * bh
+            exp_μ = fam === :logit ? 1 ./ (1 .+ exp.(-η̂)) : exp.(η̂)
+            @test maximum(abs, μh .- exp_μ) < 1e-10
+        end
+
+        # The log and logit links are canonical for the Poisson and the
+        # Bernoulli, so the IRLS weights reproduce the observed Hessian
+        # exactly. The log link is NOT canonical for NB2, so there the
+        # working weights give the expected information instead and the two
+        # genuinely differ -- which is why vcov uses X′WX and not the Hessian.
+        for (fam, yv, nll, al) in ((:poisson, y_p, nll_p, 0.0),
+                                   (:logit, y_b, nll_b, 0.0))
+            bh, _, wh, _ = SF._fit_glm(Xg, yv, fam; α = al)
+            H = ForwardDiff.hessian(nll, bh)
+            @test maximum(abs, (H .- Xg' * (wh .* Xg)) ./ abs.(H)) < 1e-10
+        end
+        let
+            bh, _, wh, _ = SF._fit_glm(Xg, y_n, :negbin; α = α_t)
+            H = ForwardDiff.hessian(nll_n, bh)
+            @test maximum(abs, (H .- Xg' * (wh .* Xg)) ./ abs.(H)) > 0.1
+        end
+
+        # ---- Pearson residuals use the right variance function --------
+        μv = [0.5, 2.0, 4.0]; yv3 = [1.0, 1.0, 5.0]
+        @test SF._pearson_resid(:gaussian, yv3, μv, 0.0) ≈ yv3 .- μv
+        @test SF._pearson_resid(:poisson, yv3, μv, 0.0) ≈ (yv3 .- μv) ./ sqrt.(μv)
+        @test SF._pearson_resid(:negbin, yv3, μv, 0.5) ≈
+              (yv3 .- μv) ./ sqrt.(μv .+ 0.5 .* μv .^ 2)
+        let p3 = [0.2, 0.5, 0.9], y3 = [0.0, 1.0, 1.0]
+            @test SF._pearson_resid(:logit, y3, p3, 0.0) ≈
+                  (y3 .- p3) ./ sqrt.(p3 .* (1 .- p3))
+        end
+
+        # ---- the dispersion update ------------------------------------
+        # For NB2, Var(y) = μ + αμ², so ((y-μ)² - μ)/μ² has mean α. The
+        # average is over the residual degrees of freedom, not N: μ̂ is
+        # fitted, so dividing by N biases α downwards.
+        y_od = [3.0, 6.0, 1.0]          # overdispersed, so α̂ > 0
+        raw_terms = ((y_od .- μv) .^ 2 .- μv) ./ μv .^ 2
+        @test sum(raw_terms) > 0
+        @test isapprox(SF._update_negbin_alpha(y_od, μv),
+                       sum(raw_terms) / 3; rtol = 1e-12)
+        @test isapprox(SF._update_negbin_alpha(y_od, μv; n_par = 2),
+                       sum(raw_terms) / 1; rtol = 1e-12)
+        # dividing by the residual df, not N, raises the estimate
+        @test SF._update_negbin_alpha(y_od, μv; n_par = 2) >
+              SF._update_negbin_alpha(y_od, μv)
+
+        # Underdispersed data makes the moment estimate negative, which is
+        # not a dispersion; the floor keeps it positive rather than
+        # handing a negative variance to the working weights.
+        @test sum(((yv3 .- μv) .^ 2 .- μv) ./ μv .^ 2) < 0
+        @test SF._update_negbin_alpha(yv3, μv) > 0
+        @test SF._update_negbin_alpha([1.0, 1.0], [1.0, 1.0]) > 0
+
+        # α is consistent: the bias shrinks with N. 1500 observations with no
+        # spatial structure should land within 10% of the truth.
+        function alpha_at(nn, R, seed)
+            rg = MersenneTwister(seed); acc = 0.0
+            for _ in 1:R
+                Xn = hcat(ones(nn), randn(rg, nn))
+                mu = exp.(Xn * [0.4, 0.6])
+                yn = Float64[rand(rg, NegativeBinomial(r_nb, r_nb / (r_nb + m)))
+                             for m in mu]
+                a = 0.0
+                for _ in 1:30
+                    _, mh, _, _ = SF._fit_glm(Xn, yn, :negbin; α = a)
+                    an = SF._update_negbin_alpha(yn, mh; n_par = size(Xn, 2))
+                    abs(an - a) < 1e-10 && (a = an; break)
+                    a = an
+                end
+                acc += a
+            end
+            acc / R
+        end
+        @test isapprox(alpha_at(1500, 40, 2001), α_t; rtol = 0.10)
+
+        # ---- coverage for the canonical families ----------------------
+        # Poisson and logit report the inverse expected information, which is
+        # the right variance for a canonical link; NB2 runs mildly low.
+        function esf_coverage(family, R, seed)
+            Wl = make_rook_weights(9); Nl = size(Wl, 1)
+            eb = spatial_eigenvectors(Wl; min_moran_ratio = 0.25)
+            ps = findall(>(1e-10), eb.values)
+            Esp = eb.vectors[:, ps[1:min(6, length(ps))]]
+            rg = MersenneTwister(seed); hit = 0
+            for _ in 1:R
+                Xr = randn(rg, Nl, 2)
+                et = 0.4 .+ Xr * [0.6, -0.3] .+ 0.8 .* (Esp * randn(rg, size(Esp, 2)))
+                yr = if family === :poisson
+                    Float64[rand(rg, Poisson(exp(clamp(e, -20, 5)))) for e in et]
+                else
+                    Float64[rand(rg, Bernoulli(1 / (1 + exp(-e)))) for e in et]
+                end
+                mm = fit_esf(Xr, yr, Wl; family = family, eigen_basis = eb,
+                             max_eigenvectors = 10)
+                abs(coef(mm)[2] - 0.6) <= 1.96 * stderror(mm)[2] && (hit += 1)
+            end
+            hit / R
+        end
+        @test esf_coverage(:poisson, 120, 1234) > 0.87
+        @test esf_coverage(:logit, 120, 1234) > 0.87
     end
 
     @testset "22. Regressions found by the example scripts" begin

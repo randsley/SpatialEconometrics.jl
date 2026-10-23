@@ -83,6 +83,7 @@ Each row was checked against an independent reference, not merely reviewed.
 | `spatial_eigenvectors` | the spectrum of `M W_sym M`, and the trace identity `Σλ = −S₀/N` | correct to 1e-14. No change needed |
 | `fit_esf` | the unbiased OLS covariance on the same design, plus 400-replication coverage | **every standard error was short by `√((N−P)/N)`** — finding 18 |
 | `fit_re_esf` | dense GLS, Woodbury, a REML grid, and 120-replication recovery of both variance components | correct to 1e-12 throughout. No change needed |
+| ESF GLM families | `Distributions.logpdf`, and a ForwardDiff score and Hessian at the IRLS optimum | likelihoods and IRLS exact; **the negative binomial's dispersion was biased low** — finding 19 |
 
 ## Open findings
 
@@ -612,6 +613,56 @@ its own generating model over 120 replications it recovers both variance
 components, `τ̂²` averaging 0.5017 against a true 0.5 and `σ̂²` 0.2526
 against 0.25, with coverage 94.3% and 95.3%. Nothing changed.
 
+### 19. The ESF negative binomial's dispersion was biased low — FIXED, partly
+
+First, what was right. All four `_glm_loglik` branches match the
+corresponding `Distributions.logpdf` to 1e-10, and `_fit_glm` reaches the
+actual maximum rather than merely stopping: differentiating an
+independently written log-likelihood at the returned `β̂` gives a score of
+1e-13 and a Newton step of 1e-16, for all three families. `_pearson_resid`
+uses the right variance function in each case, `μ` for the Poisson,
+`μ(1−μ)` for the logit and `μ + αμ²` for NB2. The IRLS working weights
+reproduce the observed Hessian to 1e-15 for the Poisson and the logit,
+whose links are canonical.
+
+For NB2 the log link is **not** canonical, so `X′WX` is the expected
+information and differs from the Hessian by 62% in places. That is the
+right matrix to use — the NB2 information is block diagonal in `β` and `α`
+— and the discrepancy is not a defect. It is recorded here because it
+looks alarming and is now pinned as a test in both directions: the
+canonical families must agree with the Hessian, and NB2 must not.
+
+The defect was in `_update_negbin_alpha`. For NB2,
+`Var(y) = μ + αμ²`, so `((y − μ)² − μ)/μ²` has mean `α`; the code averaged
+those terms over `N`. But `μ̂` is fitted, so the squared deviations are too
+small and the average comes out low. Dividing by the residual degrees of
+freedom instead — the usual Pearson dispersion convention — is strictly
+better. At a true `α = 0.5` over 300 replications:
+
+| N | 60 | 81 | 150 | 300 | 600 | 1500 |
+|---|---|---|---|---|---|---|
+| `/N` | −14.1% | −12.3% | −4.5% | −3.2% | −1.9% | +0.6% |
+| `/df` | −11.2% | −10.1% | −3.2% | −2.5% | −1.6% | +0.7% |
+
+Inside `fit_esf` at `N = 81` the estimate moved from 0.407 to 0.433.
+
+**Why this is only a partial fix.** The remaining bias is intrinsic to
+method of moments, not a degrees-of-freedom error — it shrinks with `N` and
+is gone by `N = 1500`, so the estimator is consistent. A dispersion that is
+too small makes the working weights `μ/(1+αμ)` too large and so the
+standard errors too small: coverage of a nominal 95% slope interval at
+`N = 81` is 91.6% after the fix, against 90.8% before and 95.2% for the
+Poisson on the same design. Replacing method of moments with the
+one-dimensional maximum likelihood estimate of `α` would remove most of
+what is left, but the docstring cites Chun et al. (2016) for the
+method-of-moments scheme, so that is a design change rather than a
+correction and is left to the user. The measured bias and its coverage
+consequence are now documented at the call site.
+
+Coverage for the two canonical families needs no caveat: 93.2% and 95.2%
+for the Poisson, 93.6% and 95.2% for the logit, over 250 replications at
+`N = 81`.
+
 ## Queue
 
 In priority order — unchecked variance first, since that is where the
@@ -620,22 +671,23 @@ suite is blindest and where three of the four bugs this week lived.
 The variance matrices are closed, and so are the panel diagnostics — all
 five functions in testset 14. What is left:
 
-Spatial filtering is closed. What is left:
+Spatial filtering is closed, all five functions and all four families.
+What is left:
 
 1. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
    estimator in that queue item not yet reached.
 2. The Bayesian and ordered probit samplers — testset 19's remaining
    estimators. `fit_spatial_probit` is verified; these two report posterior
    covariances from draws and have not been checked.
-3. The GLM families of `fit_esf` — `:poisson`, `:logit` and `:negbin` go
-   through `_fit_glm` and `_pearson_resid`, neither of which has been
-   checked against an independent GLM. Only the Gaussian branch is
-   verified.
-4. Simulation (17), regimes (16) beyond the variance, tables (18),
+3. Simulation (17), regimes (16) beyond the variance, tables (18),
    extension entry points (24).
-5. The GS2SLS first-stage correction left open in finding 10.
+4. The GS2SLS first-stage correction left open in finding 10.
+5. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
+   could use its own maximum likelihood estimate instead of method of
+   moments, which would lift its small-sample coverage from 91.6% toward
+   the 95.2% the Poisson achieves. See finding 19.
 
-Done: findings 1–18. Suite: 576 → 854 passing, none failing.
+Done: findings 1–19. Suite: 576 → 887 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
