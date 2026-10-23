@@ -446,8 +446,18 @@ Moran's I computed period by period for a panel, returned by
 [`panel_moran`](@ref).
 
 Fields: `period_results`, a vector of `MoranResult` with one entry
-per period; `pooled`, the statistic on the pooled residuals; and
-`T_periods`.
+per period; `pooled`; and `T_periods`.
+
+`pooled` is not Moran's I of the stacked residuals. Its `I_stat` is the
+average of the per-period statistics and its `z_stat` is Stouffer's
+combination `z̄ √T`, computed from the per-period z values rather than
+from `I_stat` and `Var_I`. Both treat the periods as independent, which
+residuals from a single panel fit are not: they share `β̂` and the fixed
+effects. Measured over 400 replications at `N = 64`, `T = 5` on residuals
+from a correctly specified `IndivFE` SAR fit, the combined z has standard
+deviation 1.07 rather than 1.00 and rejects 6.5-7.2% of the time at the 5%
+level, so read it as mildly liberal. On genuinely independent draws it is
+accurate (standard deviation 0.95, rejecting 3.9%).
 
 The per-period series is the useful part — it shows whether spatial
 dependence is stable over time or concentrated in particular periods, which
@@ -499,7 +509,12 @@ function panel_moran(
         avg_z = mean(z_vals)
         meta_z = avg_z * sqrt(T_per)
         meta_p = 2.0 * (1.0 - _normcdf(abs(meta_z)))
-        pooled = MoranResult(avg_I, pooled.E_I, pooled.Var_I, meta_z, meta_p, :panel_meta)
+        # I_stat here is an average over T_per periods, so the variance
+        # beside it has to be the variance of that average. Carrying the
+        # single-period variance over left the field too large by a factor
+        # of T_per. E_I needs no change: the mean of an average is the mean.
+        pooled = MoranResult(avg_I, pooled.E_I, pooled.Var_I / T_per,
+                             meta_z, meta_p, :panel_meta)
     end
 
     return PanelMoranResult(period_results, pooled, T_per)

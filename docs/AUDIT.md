@@ -79,6 +79,7 @@ Each row was checked against an independent reference, not merely reviewed.
 | `panel_lm_tests` | the closed-form score variances, and a 4000-replication Monte Carlo under the null | **the lag test was mis-scaled and the joint test added correlated scores** — findings 13, 14 |
 | `spatial_chow_test` | a 1500-replication Monte Carlo under the null | **the degrees of freedom were off by one** — finding 15 |
 | `spatial_hausman_test` | chosen covariance matrices, plus 250 replications on both fixed-effects pairings | **fabricated a statistic out of a noise direction** — finding 16 |
+| `panel_moran` | 2000 replications on independent draws and 400 on fitted residuals | statistic correct; **the pooled variance field was inconsistent with the statistic beside it** — finding 17 |
 
 ## Open findings
 
@@ -503,29 +504,58 @@ effects are correlated with `X`). Both pairings and both measured sizes are
 now in the docstring under a warning, so a borderline p-value cannot be
 read as if it were calibrated.
 
+### 17. Panel Moran's pooled variance did not match its own statistic — FIXED
+
+The statistic itself is sound. On independent draws the per-period `z` has
+mean −0.015 and standard deviation 0.981, the combined `z` 0.945, and the
+pooled test rejects 3.9% of the time at the 5% level; `E_I` matches
+`−1/(N−1)` exactly. On residuals from a correctly specified `IndivFE` SAR
+fit it stays centred at `ρ = 0` and at `ρ = 0.5` — so the spatial filter is
+working — with the combined `z` running a little wide, standard deviation
+1.07 and 6.5–7.2% rejection, because residuals from one panel fit share
+`β̂` and the fixed effects and so are not the independent periods that
+Stouffer's combination assumes. That is now in the docstring.
+
+The defect was in the pooled row's fields. `I_stat` is the **average** of
+the per-period statistics, but `Var_I` was copied from period one alone:
+
+```julia
+pooled = MoranResult(avg_I, pooled.E_I, pooled.Var_I, meta_z, meta_p, :panel_meta)
+```
+
+so the variance sat a factor of `T_per` above the spread of the quantity it
+was reported beside — 8.55e−3 against a sampling variance of 1.81e−3 for
+the average at `T = 5`, a ratio of 4.7. Anyone standardising `I_stat` by
+`Var_I` by hand got a `z` too small by `√T`. Now `Var_I / T_per`. `E_I`
+needed no change, since the mean of an average is the mean.
+
+This one is a different species from findings 13–16: the test was right and
+a reported field was wrong. It only matters because the struct invites the
+arithmetic — and the pooled `z_stat` does not use `Var_I` at all, which is
+now stated rather than left to be discovered.
+
 ## Queue
 
 In priority order — unchecked variance first, since that is where the
 suite is blindest and where three of the four bugs this week lived.
 
-The variance matrices are closed, and so are the panel diagnostics apart
-from `panel_moran`. What is left:
+The variance matrices are closed, and so are the panel diagnostics — all
+five functions in testset 14. What is left:
 
-1. `panel_moran` — the one function in testset 14 not yet checked against
-   anything. Its per-period `MoranResult`s and the pooled statistic have no
-   value pins.
-2. Spatial filtering, ESF and RE-ESF — 48 assertions; the pins are largely
-   self-referential.
-3. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
+1. Spatial filtering, ESF and RE-ESF — 48 assertions; the pins are largely
+   self-referential. The ESF diagnostics are test statistics whose null
+   distribution has not been checked, which findings 13–16 say is the
+   highest-yield place left to look.
+2. Dynamic system GMM — testset 5, zero pins. `fit_dynamic_gmm` is the one
    estimator in that queue item not yet reached.
-4. The Bayesian and ordered probit samplers — testset 19's remaining
+3. The Bayesian and ordered probit samplers — testset 19's remaining
    estimators. `fit_spatial_probit` is verified; these two report posterior
    covariances from draws and have not been checked.
-5. Simulation (17), regimes (16) beyond the variance, tables (18),
+4. Simulation (17), regimes (16) beyond the variance, tables (18),
    extension entry points (24).
-6. The GS2SLS first-stage correction left open in finding 10.
+5. The GS2SLS first-stage correction left open in finding 10.
 
-Done: findings 1–16. Suite: 576 → 810 passing, none failing.
+Done: findings 1–17. Suite: 576 → 819 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
@@ -549,8 +579,10 @@ satisfied the entirety of testset 14, because the assertions were
 `stat >= 0`, `0 <= p <= 1` and `df == 3`. A statistic that is twice its
 nominal size passes all three. Any diagnostic added from here on needs a
 null-distribution Monte Carlo before it is believed, and the two remaining
-unchecked test statistics — `panel_moran` and the ESF diagnostics — should
-be assumed mis-scaled until one is run.
+unchecked test statistics should be assumed mis-scaled until one is run.
+`panel_moran` was the first to be put through that and came out correct
+(finding 17), which is worth recording as evidence the rule is a prior and
+not a certainty; the ESF diagnostics are next.
 
 Finding 16 is also the first case where the defect was deliberate. The
 eigenvalue shift was written to stop an inversion from failing, and it

@@ -1441,6 +1441,42 @@ vcov(m::HausMock) = m.V
         shift = -minimum(ev.values) + 1.0e-6
         stat_ridge = dot(d, Symmetric(V_part + shift * I) \ d)
         @test stat_ridge > 50 * h_part.stat
+
+        # ---- panel_moran: the pooled row is internally consistent ----
+        # pooled.I_stat is an average over T_per periods, so the variance
+        # beside it must be the variance of that average. It carried the
+        # single-period variance, too large by a factor of T_per.
+        u = randn(MersenneTwister(2323), NT)
+        pm = panel_moran(u, W, N, T_per)
+        one_period = moran_global(u[1:N], W)
+        @test length(pm.period_results) == T_per
+        @test pm.T_periods == T_per
+        @test isapprox(pm.pooled.I_stat,
+                       mean(r.I_stat for r in pm.period_results); rtol = 1e-12)
+        @test isapprox(pm.pooled.E_I, one_period.E_I; rtol = 1e-12)
+        @test isapprox(pm.pooled.Var_I, one_period.Var_I / T_per; rtol = 1e-12)
+        # the combined z is Stouffer's, not I_stat standardised by Var_I
+        @test isapprox(pm.pooled.z_stat,
+                       mean(r.z_stat for r in pm.period_results) * sqrt(T_per);
+                       rtol = 1e-12)
+
+        # The variance of the average must track the spread of the average,
+        # not the spread of a single period. Over 400 independent draws the
+        # two differ by a factor of about T_per.
+        function moran_spread(seed, R)
+            rg = MersenneTwister(seed)
+            avg = zeros(R); first_p = zeros(R)
+            for r in 1:R
+                q = panel_moran(randn(rg, NT), W, N, T_per)
+                avg[r] = q.pooled.I_stat
+                first_p[r] = q.period_results[1].I_stat
+            end
+            (var(avg), var(first_p))
+        end
+        v_avg, v_one = moran_spread(2424, 400)
+        @test 2.5 < v_one / v_avg < 8.0
+        @test 0.5 < pm.pooled.Var_I / v_avg < 2.0
+        @test pm.pooled.Var_I < one_period.Var_I
     end
 
     @testset "15. Higher-Order Spatial Models (SLX, SAC, SDEM)" begin
