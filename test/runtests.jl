@@ -292,6 +292,25 @@ using NearestNeighbors
         @test m_mgwr.R2 > 0.5
         @test length(m_mgwr.bandwidths) == 3  # intercept + 2 vars
         @test size(m_mgwr.coef_local) == (N, 3)
+
+        # tr(S) is an effective parameter count, so it lives in [K, N].
+        # It was once formed with R^{-1} in place of R^{-T}, which pushed it
+        # past N on a badly scaled X and then collapsed the N - tr(S) divisor
+        # in sigma2 onto its floor of 1, leaving sigma2 equal to RSS.
+        @test 3.0 <= m_gwr.hat_trace <= N
+        @test isapprox(m_gwr.sigma2,
+                       sum(abs2, residuals(m_gwr)) / (N - m_gwr.hat_trace);
+                       rtol = 1e-10)
+
+        # As the bandwidth grows every weight tends to one, so GWR collapses
+        # onto OLS: tr(S) -> K and the local coefficients become the global
+        # ones. This pins the trace to a value known in closed form.
+        let Xc = hcat(ones(N), X), b_ols = Xc \ y
+            m_wide = fit_gwr(X, y, coords; bandwidth = FixedBandwidth(1.0e4))
+            @test isapprox(m_wide.hat_trace, 3.0; atol = 1e-4)
+            @test isapprox(vec(mean(m_wide.coef_local, dims = 1)), b_ols; rtol = 1e-6)
+            @test all(isapprox.(m_wide.coef_local[1, :], b_ols; rtol = 1e-6))
+        end
     end
 
     @testset "12. Spatial Weights Construction" begin

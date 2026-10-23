@@ -279,10 +279,14 @@ function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tr
         fitted[i] = dot(X[i, :], β_i)
         residuals[i] = y[i] - fitted[i]
 
-        # Hat matrix diagonal element: S[i,i] = x_i' (Xw'Xw)^{-1} x_iw * w_i
-        # Efficient: R = F.R, then S_ii = ||R^{-T} * (x_i * sqrt(w_i))||²
+        # Hat matrix diagonal: S[i,i] = w_i * x_i' (X'W_i X)^{-1} x_i.
+        # With Xw = W^{1/2}X and R from its QR, X'W_i X = R'R, so
+        # (X'W_i X)^{-1} = R^{-1}R^{-T} and S_ii = ||R^{-T} x_i sqrt(w_i)||².
+        # That is R' \ xi_w, NOT R \ xi_w: the latter forms (RR')^{-1} and
+        # inflates tr(S) past N on a badly scaled X, which then collapses
+        # the N - tr(S) divisor below to its floor of 1.
         xi_w = X[i, :] .* sqrt(w[i])
-        hat_diag[i] = sum(abs2, F.R \ xi_w)
+        hat_diag[i] = sum(abs2, F.R' \ xi_w)
     end
 
     tr_S = sum(hat_diag)
