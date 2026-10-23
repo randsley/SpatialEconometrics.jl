@@ -91,6 +91,13 @@ Each row was checked against an independent reference, not merely reviewed.
 | `_rho_logpost` | the dense `logabsdet(A) - 0.5*dot(r,r)` form, at six values of ρ | exact to 7e−15. No change needed |
 | `_sweep_latent!` | its untruncated stationary distribution against `N(μ, H⁻¹)` | correct: mean and covariance recovered to 1.4% and 1.5% over 40000 sweeps. No change needed |
 | `_rand_truncnorm` | `Distributions.truncated(Normal(…))` in four configurations | exact, including μ two SD outside the kept region. No change needed |
+| Turing extension SAR and SEM likelihoods | the model densities, read against `log|A| + log N(filtered residual)` | both correctly specified, and `@addlogprob!` is the right vehicle. No change needed |
+| `chebyshev_logdet` under the Bayesian prior | the exact log-determinant across the whole `Uniform(-0.99, 0.99)` support | accurate: error below 1e-3 for `|rho| <= 0.9`, worst case 0.17 at `N = 64` and falling to 0.026 at `N = 400`. No change needed |
+| `fit_spatial_regime` design and recovery | the block structure entry by entry, and 250-replication recovery | correct: blocks exact and full rank, biases under 0.015, coverage 92.0-94.8% across all seven parameters. No change needed |
+| `regime_chow_test` | the LR statistic by hand, and its size as `N` grows | statistic and df correct; both chi-squared(3) moments converge. Finite-sample over-rejection only, documented |
+| `coeftable` p-values and intervals | the exact normal CDF and quantile | correct: relative error 3.6e-3 at `z = 6` and 1e-2 at `z = 8`, monotone, never negative; `_qnorm` round-trips to 1e-10. No change needed |
+| `regression_table` | alignment across models with different parameter sets | correct: matches coefficients by name, blanks a name the model does not have. No change needed |
+| the three exporters' escaping | LaTeX, GitHub Markdown and RFC 4180 rules | **all three emitted their format's metacharacters unescaped, and `digits` was ignored** - finding 23 |
 | the six `simulate_spatial` DGPs | closed-form mean and covariance of `y` with `X` fixed, 60000 draws | all six correct: means within 1.8 Monte Carlo se, covariances within 1.3%. No change needed |
 | `monte_carlo_spatial` summaries | the bias and RMSE identities, and seed reproducibility | correct, and the OLS diagnostics it reports are sized (0.053/0.048/0.057 at ρ = 0) with power 0.84 for `lm_lag` at ρ = 0.4. **But an estimator reporting too few parameters was zero-filled** — finding 22 |
 | Gibbs β and cutpoint conditionals | the conjugate posterior, and Albert–Chib's order-statistic bounds | both as stated; `τ_1 = 0` and no intercept is the right identification. **But the accuracy claim in the docstring was wrong** — finding 21 |
@@ -861,21 +868,140 @@ power 0.695, 0.840 and 0.580 at ρ = 0.4, `lm_lag` strongest against a lag
 alternative as it should be. That calibration matters more than usual
 after findings 13–16, which were all mis-sized tests.
 
+### 23. The table exporters did not escape, and ignored `digits` - FIXED
+
+`to_latex`, `to_markdown` and `to_csv` each write into a format with its
+own metacharacters, and each passed coefficient names straight through.
+The names this package produces are not safe in any of the three:
+`W_x1` from SLX, `R1_(Intercept)` from regimes, and the Greek `ρ` and `λ`
+everywhere.
+
+**`to_markdown` emitted a table that will not render.** Its header was
+
+```
+| Variable | Estimate | Std.Err | z | P>|z| | Sig |
+|:---------|--------:|--------:|---:|------:|:---:|
+```
+
+The `P>|z|` contributes two further cell separators, so the header row
+declares eight cells against the separator row's six. No renderer lines
+that up. A coefficient name containing a pipe would shift its own row the
+same way.
+
+**`to_latex` emitted a document that will not compile.** A two-regime fit
+produced six bare underscores, `R1_(Intercept)` and the rest, and `_` in
+LaTeX text mode is an error, not a typo that renders oddly. The raw `ρ`
+also needs math mode under pdfLaTeX. Producing compilable LaTeX is the
+function's entire purpose.
+
+**`to_csv` emitted broken CSV.** A name holding a comma split into two
+fields, giving eight for a seven-column schema, with no quoting anywhere.
+
+**And both formatted exporters took a `digits` keyword and ignored it.**
+`to_latex` even built the format string and then never used it:
+
+```julia
+fmt = "%." * string(digits) * "f"    # dead
+est = @sprintf("%.4f", ct.estimate[i])
+```
+
+so `to_latex(ct; digits=2)` and `to_markdown(ct; digits=2)` returned four
+decimals, identical to the default. The signature promised control the
+body did not provide.
+
+All four are fixed: `_escape_latex` handles `_ & % # { } $ ~ ^` and the
+backslash and maps the Greek letters to math mode, `_escape_md` escapes
+pipes in cells and in the header, `_csv_field` quotes per RFC 4180, and a
+runtime `_fmt` built from `Printf.Format` carries `digits` into every
+numeric column of both formatted exporters.
+
+How this survived: testset 18 asserted only that the output *contained*
+`\begin{tabular}`, `name,estimate,std_error` and `| Variable |`. Each
+exporter was checked for a marker and never for the structure it was
+supposed to produce - so a table with mismatched column counts and a
+LaTeX file that will not compile both passed. Testset 18b now counts
+unescaped separators per row, parses the CSV back with an RFC 4180
+splitter and checks the names round-trip, requires every underscore to be
+escaped and no raw Greek to remain, and counts the decimals actually
+emitted at two `digits` settings.
+
+### Verified with no change: regimes, and the statistics behind the tables
+
+`fit_spatial_regime` builds its block-diagonal design exactly - each
+regime's columns zero outside that regime, its own intercept, its own
+slopes - at full rank, and recovers its parameters: over 250 replications
+at `N = 100` with two regimes, biases below 0.015 and interval coverage
+92.0-94.8% across all seven parameters, which also confirms the
+information-matrix variance fixed earlier is sound.
+
+`regime_chow_test` computes `2(ll_r - ll_p)` with
+`df = P_regime - P_pooled`, and both modules use the identical
+`-½N(log 2π + 1) + log|A| - ½N log σ²` convention, so the two likelihoods
+are comparable. Its size is the usual finite-sample LR over-rejection and
+nothing more:
+
+| N | size | mean statistic (df 3) | variance (6) |
+|---|---|---|---|
+| 100 | 0.068 (+3.2 se) | 3.241 | 7.03 |
+| 196 | 0.048 | 3.001 | 6.05 |
+| 400 | 0.042 | 3.002 | 5.81 |
+
+Both chi-squared(3) moments converge, which is what rules out a wrong
+statistic or wrong df. Power against genuinely different regimes is 1.000.
+
+The normal CDF behind every `coeftable` p-value is the Abramowitz & Stegun
+26.2.17 form, which factors out the density and so keeps its accuracy
+*relative* far into the tail: 3.6e-3 at `z = 6`, 1.0e-2 at `z = 8`,
+monotone throughout and never negative. `_qnorm` round-trips to 1e-10.
+`SpatialUtils`'s copy clamps to exactly zero past `|z| = 8` where
+`SpatialTables`'s keeps going, which is harmless either way.
+
+`regression_table` matches coefficients **by name** across models, so a
+parameter one model lacks leaves a blank rather than borrowing the figure
+beside it - the positional error that finding 16's sibling fixed in the
+Hausman test.
+
+### Verified with no change: the Turing extension's likelihood
+
+Both Bayesian models are correctly specified. `_sar_model` scores
+`log|I - rho W| + log N((I - rho W)y - X beta | 0, sigma^2 I)` and
+`_sem_model` filters the regression residual instead,
+`log|I - lambda W| + log N((I - lambda W)(y - X beta) | 0, sigma^2 I)`,
+which is the right distinction between a lag and an error process. The
+comment explaining why the likelihood goes through `@addlogprob!` rather
+than `~` is correct and worth keeping: a `~` on a local would make the
+data one more latent variable.
+
+The log-determinant is the one place an approximation enters a posterior,
+so it deserved checking at the order the extension actually uses (12, not
+the frequentist default of 6). Against the exact value across the full
+`Uniform(-0.99, 0.99)` prior:
+
+| N | max error | where | worst relative posterior tilt |
+|---|---|---|---|
+| 64 | 0.169 | `rho = -0.99` | 1.18x |
+| 196 | 0.045 | `rho = -0.99` | 1.05x |
+| 400 | 0.026 | `rho = +0.98` | 1.03x |
+
+For `|rho| <= 0.9` the error is below 1e-3 at every size, and the error
+*falls* with `N`. What is left is confined to the last one percent of the
+prior's support, where a posterior with any data in it has negligible
+mass. No change needed.
+
 ## Queue
 
 Closed so far: the variance matrices, the panel diagnostics (all five
 functions in testset 14), spatial filtering (all five functions, all four
 families), dynamic GMM, and the discrete-choice samplers. What is left:
 
-1. Regimes (16) beyond the variance, tables (18), extension entry
-   points (24).
+1. Extension entry points (24).
 2. The GS2SLS first-stage correction left open in finding 10.
 3. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
    could use its own maximum likelihood estimate instead of method of
    moments, which would lift its small-sample coverage from 91.6% toward
    the 95.2% the Poisson achieves. See finding 19.
 
-Done: findings 1–22. Suite: 576 → 1034 passing, none failing.
+Done: findings 1–23. Suite: 576 → 1069 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point

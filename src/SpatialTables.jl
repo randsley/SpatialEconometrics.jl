@@ -182,6 +182,66 @@ end
 
 Format coefficient table as a LaTeX tabular environment string.
 """
+# Each exporter writes into a format with its own metacharacters, and a
+# coefficient name is safe in none of them. The names this package produces
+# routinely carry `_` (`W_x1` from SLX, `R1_(Intercept)` from regimes) and
+# Greek letters (`ρ`, `λ`), so the escaping below is not decoration: without
+# it `to_latex` emits a document that will not compile and `to_markdown`
+# emits a table that will not render.
+
+const _LATEX_GREEK = Dict(
+    'ρ' => "\$\\rho\$",
+    'λ' => "\$\\lambda\$",
+    'θ' => "\$\\theta\$",
+    'σ' => "\$\\sigma\$",
+    'β' => "\$\\beta\$",
+    'τ' => "\$\\tau\$",
+    'α' => "\$\\alpha\$",
+    'μ' => "\$\\mu\$",
+    'γ' => "\$\\gamma\$",
+    'δ' => "\$\\delta\$",
+    'φ' => "\$\\phi\$",
+    'ω' => "\$\\omega\$",
+    'ε' => "\$\\varepsilon\$",
+    '²' => "\$^2\$"
+)
+
+# Escape a coefficient name for LaTeX text mode.
+function _escape_latex(str::AbstractString)
+    io = IOBuffer()
+    for c in str
+        if haskey(_LATEX_GREEK, c)
+            print(io, _LATEX_GREEK[c])
+        elseif c in ('_', '&', '%', '#', '{', '}', '$')
+            print(io, '\\', c)
+        elseif c == '~'
+            print(io, "\\textasciitilde{}")
+        elseif c == '^'
+            print(io, "\\textasciicircum{}")
+        elseif c == '\\'
+            print(io, "\\textbackslash{}")
+        else
+            print(io, c)
+        end
+    end
+    return String(take!(io))
+end
+
+# Escape a cell for a GitHub-flavoured Markdown table: an unescaped `|`
+# closes the cell early and shifts every column after it.
+_escape_md(str::AbstractString) = replace(str, "\\" => "\\\\", "|" => "\\|")
+
+# Quote a CSV field per RFC 4180 when it holds a comma, quote or newline.
+function _csv_field(str::AbstractString)
+    needs = any(c -> c in (',', '"', '\n', '\r'), str)
+    return needs ? '"' * replace(str, "\"" => "\"\"") * '"' : String(str)
+end
+
+# `digits` has to reach Printf at run time, so build the format rather than
+# relying on a literal @sprintf.
+_fmt(x::Real, digits::Int) =
+    Printf.format(Printf.Format("%." * string(max(digits, 0)) * "f"), x)
+
 function to_latex(ct::CoefTable; digits::Int=4)
     io = IOBuffer()
     println(io, "\\begin{tabular}{lcccc}")
@@ -190,12 +250,12 @@ function to_latex(ct::CoefTable; digits::Int=4)
     println(io, "\\hline")
     for i in eachindex(ct.names)
         stars = ct.p_value[i] < 0.001 ? "\$^{***}\$" : ct.p_value[i] < 0.01 ? "\$^{**}\$" : ct.p_value[i] < 0.05 ? "\$^{*}\$" : ""
-        fmt = "%." * string(digits) * "f"
-        est = @sprintf("%.4f", ct.estimate[i])
-        se = @sprintf("%.4f", ct.std_error[i])
-        zs = @sprintf("%.3f", ct.z_stat[i])
-        pv = @sprintf("%.4f", ct.p_value[i])
-        println(io, "$(ct.names[i]) & $est & $se & $zs & $pv$stars \\\\")
+        est = _fmt(ct.estimate[i], digits)
+        se = _fmt(ct.std_error[i], digits)
+        zs = _fmt(ct.z_stat[i], digits)
+        pv = _fmt(ct.p_value[i], digits)
+        nm = _escape_latex(ct.names[i])
+        println(io, "$nm & $est & $se & $zs & $pv$stars \\\\")
     end
     println(io, "\\hline")
     println(io, "\\end{tabular}")
@@ -212,8 +272,8 @@ function to_csv(ct::CoefTable)
     println(io, "name,estimate,std_error,z_stat,p_value,ci_lower,ci_upper")
     for i in eachindex(ct.names)
         @printf(io, "%s,%.8f,%.8f,%.6f,%.8f,%.8f,%.8f\n",
-            ct.names[i], ct.estimate[i], ct.std_error[i], ct.z_stat[i],
-            ct.p_value[i], ct.ci_lower[i], ct.ci_upper[i])
+            _csv_field(ct.names[i]), ct.estimate[i], ct.std_error[i],
+            ct.z_stat[i], ct.p_value[i], ct.ci_lower[i], ct.ci_upper[i])
     end
     return String(take!(io))
 end
@@ -225,13 +285,17 @@ Format coefficient table as a Markdown table string.
 """
 function to_markdown(ct::CoefTable; digits::Int=4)
     io = IOBuffer()
-    println(io, "| Variable | Estimate | Std.Err | z | P>|z| | Sig |")
+    # `P>|z|` needs escaped pipes: written bare they read as two further
+    # cell separators, so the header row declared eight cells against the
+    # separator row's six and no renderer lined the table up.
+    println(io, "| Variable | Estimate | Std.Err | z | P>\\|z\\| | Sig |")
     println(io, "|:---------|--------:|--------:|---:|------:|:---:|")
     for i in eachindex(ct.names)
         stars = ct.p_value[i] < 0.001 ? "***" : ct.p_value[i] < 0.01 ? "**" : ct.p_value[i] < 0.05 ? "*" : ""
-        @printf(io, "| %s | %.4f | %.4f | %.3f | %.4f | %s |\n",
-            ct.names[i], ct.estimate[i], ct.std_error[i], ct.z_stat[i],
-            ct.p_value[i], stars)
+        @printf(io, "| %s | %s | %s | %s | %s | %s |\n",
+            _escape_md(ct.names[i]), _fmt(ct.estimate[i], digits),
+            _fmt(ct.std_error[i], digits), _fmt(ct.z_stat[i], digits),
+            _fmt(ct.p_value[i], digits), stars)
     end
     return String(take!(io))
 end
