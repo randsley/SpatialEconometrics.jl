@@ -438,11 +438,35 @@ rate, which should land roughly in 0.2–0.5. The default `rho_proposal_sd` of 0
 targets that band; 0.05 overshoots to about 0.77 acceptance and mixes slowly.
 
 Because the observed signs pin the latent vector only up to scale, ‖β‖ and ρ
-trade off along a weakly identified ridge. The posterior is still centred
-correctly — over 8 replications at ρ = 0.4 the posterior mean averaged 0.374 at
-N = 196 — but its spread is wide (SD ≈ 0.10), so a single chain at small N can
-sit well away from the truth. Check `accept_rate` and lengthen the chain before
-reading much into one ρ estimate.
+trade off along a weakly identified ridge, and at small `N` the posterior is
+not centred on the truth. Over 40 replications on rook lattices at ρ = 0.4,
+with the chain at its default length:
+
+| N | ρ bias | β₁ bias | ρ coverage | β₁ coverage |
+|---|---|---|---|---|
+| 36 | −0.161 | +37.9% | 87.5% | 97.5% |
+| 64 | −0.160 | +23.6% | 80.0% | 92.5% |
+| 144 | −0.059 | +5.5% | 90.0% | 92.5% |
+| 256 | −0.025 | +3.1% | 92.5% | 97.5% |
+
+β₁ bias is a percentage of its true value. The Monte Carlo standard error on
+the ρ biases is 0.045 at `N = 36` falling to 0.018 at `N = 256`, so the first
+two are well clear of zero and the last is marginal. ρ is pulled toward zero
+and ‖β‖ pushed out together — that pairing *is* the ridge — and both decay
+with `N`.
+
+This is a property of the posterior at small `N`, not a mixing failure, so a
+longer chain does not remove it. At `N = 64`, over 30 replications on
+identical data, going from 1500 draws to 20000 raised the effective sample
+size for ρ from 75 to 929 while the ρ bias held at −0.107 and −0.101 and the
+β₁ bias at +0.197 and +0.194. Lengthen the chain to cut the Monte Carlo error
+in one chain's summaries — at the defaults the effective sample size for ρ is
+only about 100, so `vcov` and the posterior mean carry a few percent of noise
+— but read a small-`N` ρ as biased toward zero whatever the chain length.
+Check `accept_rate` sits in 0.2–0.5. When `N` is small and ρ is the quantity of
+interest, [`fit_spatial_probit`](@ref) is the better choice: its ρ bias runs
+the other way and is smaller from `N = 64` up (+0.044 at 64, +0.008 at 144,
+against −0.112 and −0.058 here on the same data).
 """
 function fit_bayesian_spatial_probit(
     W::M,
@@ -610,6 +634,13 @@ order statistics of the latent vector. `τ_0 = -∞` and `τ_J = +∞`.
 
 A binary `y` (J = 2) reduces to the probit above and is better served by
 [`fit_bayesian_spatial_probit`](@ref), which carries an intercept.
+
+The weak identification described for the binary sampler applies here too,
+and the free cutpoints move with it. Over 80 replications at `N = 64`, `J = 3`,
+ρ = 0.35: ρ bias −0.031, β biases +0.096 and −0.068, coverage 93.8%, 95.0% and
+91.2%. `τ_2` came out +0.103 high, the same proportional inflation as ‖β‖,
+because cutpoints and coefficients share the latent scale. `τ_1` is exactly 0
+in every draw by construction.
 """
 function fit_spatial_ordered_probit(
     W::M,

@@ -88,6 +88,10 @@ Each row was checked against an independent reference, not merely reviewed.
 | `fit_dynamic_gmm` `vcov` | Windmeijer (2005) eq. 4.4, and coverage over `N` from 50 to 800 | **the correction's two dominant terms were mis-assembled** — finding 20 |
 | `compute_ab_serial_correlation` | 300-replication Monte Carlo under a correctly specified model | correct: AR(2) standard deviation 0.97–1.06, rejecting 5.3–6.0%. No change needed |
 | `hansen_j` | the quadratic form `g′W₂g`, and its rejection rate | correct: rejects 3.3–5.3% at the 5% level. No change needed |
+| `_rho_logpost` | the dense `logabsdet(A) - 0.5*dot(r,r)` form, at six values of ρ | exact to 7e−15. No change needed |
+| `_sweep_latent!` | its untruncated stationary distribution against `N(μ, H⁻¹)` | correct: mean and covariance recovered to 1.4% and 1.5% over 40000 sweeps. No change needed |
+| `_rand_truncnorm` | `Distributions.truncated(Normal(…))` in four configurations | exact, including μ two SD outside the kept region. No change needed |
+| Gibbs β and cutpoint conditionals | the conjugate posterior, and Albert–Chib's order-statistic bounds | both as stated; `τ_1 = 0` and no intercept is the right identification. **But the accuracy claim in the docstring was wrong** — finding 21 |
 
 ## Open findings
 
@@ -740,31 +744,80 @@ first-order test on differenced residuals *must* reject. The AR(2) standard
 deviation stayed at 1.03 after finding 20 changed the variance matrix that
 feeds it, so that coupling is sound too.
 
+### 21. The Bayesian probit's accuracy claim was wrong — DOCSTRING FIXED
+
+This one is not a coding defect. Every internal of both Gibbs samplers
+verifies exactly, and they are in the table above. What was wrong is what
+the docstring told the user about how far to trust the output.
+
+It said the posterior "is still centred correctly — over 8 replications at
+ρ = 0.4 the posterior mean averaged 0.374 at N = 196". Eight replications
+cannot establish centring when the posterior SD is 0.10: the Monte Carlo
+standard error on that average is about 0.035, so it was consistent with a
+bias anywhere in ±0.07. Forty replications per size, at the default chain
+length, give:
+
+| N | ρ bias (mc se) | β₁ bias | ρ coverage | β₁ coverage |
+|---|---|---|---|---|
+| 36 | −0.161 (0.045) | +37.9% | 87.5% | 97.5% |
+| 64 | −0.160 (0.038) | +23.6% | 80.0% | 92.5% |
+| 144 | −0.059 (0.025) | +5.5% | 90.0% | 92.5% |
+| 256 | −0.025 (0.018) | +3.1% | 92.5% | 97.5% |
+
+At `N = 36` and `N = 64` the ρ bias is 3.6 and 4.2 standard errors from
+zero. It is real, it is toward zero, and ‖β‖ is inflated in step with it —
+which is the ridge the docstring correctly identified and then
+under-stated. ρ coverage bottoms out at 80%.
+
+The second error was the remedy: "Check `accept_rate` and lengthen the
+chain before reading much into one ρ estimate." Lengthening the chain does
+not touch the bias. At `N = 64`, 30 replications, identical data across all
+three settings:
+
+| draws / burn-in | β₀ bias | β₁ bias | β₂ bias | ρ bias | accept | ESS(ρ) |
+|---|---|---|---|---|---|---|
+| 1500 / 400 | +0.062 | +0.197 | −0.191 | −0.107 | 0.467 | 74.5 |
+| 6000 / 1500 | +0.060 | +0.194 | −0.190 | −0.096 | 0.464 | 269.6 |
+| 20000 / 5000 | +0.064 | +0.194 | −0.191 | −0.101 | 0.463 | 928.7 |
+
+A 13× longer chain multiplies the effective sample size by 12.5 — so the
+sampler mixes exactly as it should — and leaves every bias where it was.
+The bias is in the posterior at that `N`, not in the Monte Carlo
+approximation to it. The advice was aimed at the wrong quantity: a longer
+chain does cut the noise in one chain's `coef` and `vcov`, which matters
+because ESS(ρ) at the defaults is only about 100, but no chain length
+recovers ρ.
+
+Both docstrings now carry the measured tables, say that the bias is a
+small-`N` property rather than a mixing failure, and point to
+`fit_spatial_probit` when `N` is small and ρ is the quantity of interest —
+its ρ bias runs the other way (+0.105 at `N = 36`, +0.044 at 64, +0.008 at
+144, on the same data) and is the smaller of the two from `N = 64` up.
+
+The ordered sampler behaves the same way, as it must: at `N = 64`, `J = 3`,
+80 replications, ρ bias −0.031, β biases +0.096 and −0.068, and `τ_2` high by
++0.103 — the same proportional inflation as ‖β‖, since cutpoints and
+coefficients share the latent scale.
+
+Why it matters beyond the wording: a user reading "centred correctly" would
+take ρ̂ = 0.26 at `N = 64` as noise around 0.4 and lengthen the chain. The
+chain was never the problem.
+
 ## Queue
 
-In priority order — unchecked variance first, since that is where the
-suite is blindest and where three of the four bugs this week lived.
+Closed so far: the variance matrices, the panel diagnostics (all five
+functions in testset 14), spatial filtering (all five functions, all four
+families), dynamic GMM, and the discrete-choice samplers. What is left:
 
-The variance matrices are closed, and so are the panel diagnostics — all
-five functions in testset 14. What is left:
-
-Spatial filtering is closed, all five functions and all four families.
-What is left:
-
-Dynamic GMM is closed. What is left:
-
-1. The Bayesian and ordered probit samplers — testset 19's remaining
-   estimators. `fit_spatial_probit` is verified; these two report posterior
-   covariances from draws and have not been checked.
-2. Simulation (17), regimes (16) beyond the variance, tables (18),
+1. Simulation (17), regimes (16) beyond the variance, tables (18),
    extension entry points (24).
-3. The GS2SLS first-stage correction left open in finding 10.
-4. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
+2. The GS2SLS first-stage correction left open in finding 10.
+3. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
    could use its own maximum likelihood estimate instead of method of
    moments, which would lift its small-sample coverage from 91.6% toward
    the 95.2% the Poisson achieves. See finding 19.
 
-Done: findings 1–20. Suite: 576 → 963 passing, none failing.
+Done: findings 1–21. Suite: 576 → 994 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
