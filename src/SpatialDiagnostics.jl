@@ -560,11 +560,18 @@ An [`LMTestResult`](@ref).
 Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
 """
 function lm_test_lag(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
-    e, σ2, _, _ = _ols_residuals_and_sigma(y, X)
-    N = length(y)
-    We = W * e
-    D = _trace_W2_WtW_fast(W)
-    RS_lag = (dot(e, We) / σ2)^2 / D
+    e, σ2, β, qr_X = _ols_residuals_and_sigma(y, X)
+    Wy = W * y
+    Tr = _trace_W2_WtW_fast(W)
+
+    # Anselin (1988): the score is e'Wy/σ², and the information term is
+    # (W*X*β)'M(W*X*β)/σ² + tr(W'W + W²), M = I - X(X'X)⁻¹X'. Scoring with
+    # e'We and tr(W'W + W²) alone is the LM-ERROR statistic, not this one.
+    WXb = W * (X * β)
+    MWXb = WXb .- X * (qr_X \ WXb)
+    D = dot(MWXb, MWXb) / σ2 + Tr
+
+    RS_lag = (dot(e, Wy) / σ2)^2 / D
     # chi2(1) p-value: P(χ² > x) ≈ 2*(1 - Φ(√x))
     p_val = T(2.0) * (one(T) - T(_normcdf(sqrt(max(zero(T), RS_lag)))))
     return LMTestResult{T}(RS_lag, p_val, "LM-Lag")

@@ -187,9 +187,29 @@ using NearestNeighbors
         gc = geary_c(y_sar, W)
         @test gc.C_stat < 1.0  # positive autocorrelation → C < 1
 
-        lms = lm_tests(y_sar, hcat(ones(N), X), W)
+        Xc = hcat(ones(N), X)
+        lms = lm_tests(y_sar, Xc, W)
         @test lms.lag.stat > 0.0
         @test lms.lag.p_value < 0.05
+
+        # LM-lag and LM-error are different statistics. They were once written
+        # with the same body, so both reported the LM-error value under two
+        # labels; a sign-and-threshold check passes on that. Pin both to their
+        # closed forms instead.
+        let qrX = qr(Xc), Wd = Matrix(W)
+            b = qrX \ y_sar
+            e = y_sar .- Xc * b
+            s2 = dot(e, e) / N
+            Tr = tr(Wd' * Wd + Wd * Wd)
+            WXb = Wd * (Xc * b)
+            MWXb = WXb .- Xc * (qrX \ WXb)
+            lag_ref = (dot(e, Wd * y_sar) / s2)^2 / (dot(MWXb, MWXb) / s2 + Tr)
+            err_ref = (dot(e, Wd * e) / s2)^2 / Tr
+            @test isapprox(lms.lag.stat, lag_ref; rtol = 1e-8)
+            @test isapprox(lms.error.stat, err_ref; rtol = 1e-8)
+            @test !isapprox(lms.lag.stat, lms.error.stat; rtol = 1e-6)
+        end
+
 
         lisa = moran_local(y_sar, W; n_perm=199, rng=MersenneTwister(9091))
         @test length(lisa.local_I) == N
