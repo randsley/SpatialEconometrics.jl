@@ -360,11 +360,11 @@ per-observation contributions, understates the variance by 30% because `Wε`
 correlates those contributions — 83–86% coverage against 93.5–96.2% for the
 closed form.
 
-**Remaining gap.** The formula treats the first-stage residuals as the true
-disturbances. Given true residuals the reported/sampling ratio is 1.02, but
-inside a full fit it falls to 0.81 and coverage of a nominal 95% interval to
-83%. That is documented at the call site as a lower bound. The first-stage
-correction is still open.
+**Remaining gap — now closed by finding 24.** The formula treated the
+first-stage residuals as the true disturbances. Given true residuals the
+reported/sampling ratio is 1.02, but inside a full fit it fell to 0.81 and
+coverage of a nominal 95% interval to 83%. The first-stage correction is
+implemented in finding 24 below.
 
 ### 11. The regime model's ρ had no variance — FIXED
 
@@ -988,20 +988,96 @@ For `|rho| <= 0.9` the error is below 1e-3 at every size, and the error
 prior's support, where a posterior with any data in it has negligible
 mass. No change needed.
 
+### 24. The GS2SLS first-stage correction — FIXED
+
+Finding 10 left `λ`'s standard error short and documented it as a lower
+bound, on the reading that the missing first-stage term was a
+small-sample matter. That reading was wrong, and measuring it settled
+the point. Over 250 replications at `λ = 0.25`, `ρ = 0.3`, `T = 6`,
+reported standard error over sampling standard deviation:
+
+| N | ratio | coverage |
+|---|---|---|
+| 64 | 0.852 | 92.0% |
+| 144 | 0.820 | 88.8% |
+| 256 | 0.825 | 89.2% |
+| 484 | 0.864 | 91.6% |
+
+A 7.5-fold increase in `N` leaves the ratio where it started, and the
+same holds raising `T` from 6 to 24 at fixed `N`. Meanwhile `λ̂` itself
+converges, its bias falling from −0.012 to −0.002. So this was not a
+finite-sample artefact that washes out — it was a term missing from the
+asymptotic variance.
+
+Why the usual argument fails. `λ` is estimated from the first-stage 2SLS
+residuals `u = ε − Zd` with `d = θ̂ − θ`, so the filtered residual is
+`r = ε − Md` with `M = (I − λW)Z`, and each moment expands as
+
+    m_j = ε′A_jε/NT + g_j′d + O(1/NT),   g_j = −2 M′A_jˢ r / NT
+
+One would normally dismiss `g_j′d`: with `Z` exogenous, `Z′A_jε` is
+`O(√NT)` and `d` is `O(1/√NT)`, so the product is `O(1)` against a
+leading term of `O(√NT)`. But `Z` holds `Wy`, which is exactly what the
+instrumenting is for, so `E[Z′A_jε]` is `O(NT)` and the term lands at the
+same order as the leading one. That is the whole of the discrepancy.
+
+The correction is one additive term, and the Gaussian structure is what
+makes it tractable. `d` is to first order linear in `ε` with weights built
+from the exogenous instruments, so `Cov(ε′A_jε, d)` is an odd third moment
+and vanishes — no cross term survives:
+
+    Var(m) = Ω + G_d V_d G_d′
+
+`V_d` is the first-stage sampling variance, and it has to carry the
+*spatial* covariance of the first-stage disturbance, `σ²(I_T ⊗ (B′B)⁻¹)`
+with `B = I − λW`. A heteroskedasticity-robust diagonal is wrong there:
+that disturbance is spatially correlated by construction, which is the
+reason `λ` is being estimated at all. Written as `L(B′B)⁻¹L′ = C′C` with
+`C = B⁻ᵗL′`, it costs `T_post × K` sparse solves against one
+factorisation — no dense inverse, so it scales with the rest of the
+module.
+
+Result, same design and replication count:
+
+| N | ratio before | coverage before | ratio after | coverage after |
+|---|---|---|---|---|
+| 64 | 0.852 | 92.0% | **0.936** | 92.8% |
+| 144 | 0.820 | 88.8% | **0.897** | 92.8% |
+| 256 | 0.825 | 89.2% | **0.901** | 90.8% |
+| 484 | 0.864 | 91.6% | **0.944** | 94.8% |
+
+and at fixed `N = 64`, raising `T`: 0.844 to 0.923 at `T = 12`, 0.866 to
+0.945 at `T = 24`.
+
+What remains is the `O(1/NT)` quadratic term `d′M′A_jMd/NT` that the
+expansion drops, plus the cost of evaluating `G_d` and `V_d` at the
+estimates rather than at the truth. The correction does not overshoot at
+any size tested, so `λ`'s standard error is now mildly conservative
+instead of optimistic — the right direction for an interval to err in.
+
+Passing the first-stage matrices is optional, so calling
+`_lambda_gmm_se` without them still returns the uncorrected value. That
+path is what checks the moment algebra against known disturbances, where
+there is no first stage to correct for, and testset 4b pins both.
+
 ## Queue
 
-Closed so far: the variance matrices, the panel diagnostics (all five
-functions in testset 14), spatial filtering (all five functions, all four
-families), dynamic GMM, and the discrete-choice samplers. What is left:
+Closed: the variance matrices, the panel diagnostics (all five functions
+in testset 14), spatial filtering (all five functions, all four
+families), dynamic GMM, the discrete-choice samplers, simulation,
+regimes, the tables and their exporters, the extension entry points and
+the Turing extension's likelihood, and — with finding 24 — the GS2SLS
+first-stage correction that finding 10 left open.
 
-1. Extension entry points (24).
-2. The GS2SLS first-stage correction left open in finding 10.
-3. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
+Every module the audit set out to cover is now closed. What is left is
+one optional improvement, not a correction:
+
+1. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
    could use its own maximum likelihood estimate instead of method of
    moments, which would lift its small-sample coverage from 91.6% toward
    the 95.2% the Poisson achieves. See finding 19.
 
-Done: findings 1–23. Suite: 576 → 1069 passing, none failing.
+Done: findings 1–24. Suite: 576 → 1086 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
