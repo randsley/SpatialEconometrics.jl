@@ -559,19 +559,34 @@ An [`LMTestResult`](@ref).
 # References
 Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
 """
-function lm_test_lag(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
+# Shared pieces of the Anselin LM battery: the OLS residuals, tr(W'W + W^2),
+# the information term J_rho_rho built from the LAGGED FITTED VALUES W*X*b,
+# and the two scores d_rho = e'Wy/s2 and d_lam = e'We/s2.
+#
+# These live in one place on purpose. The four tests previously each carried
+# their own copy of this algebra and drifted: lm_test_lag ended up scoring
+# e'We (the LM-error numerator), and both robust tests formed d_rho as
+# e'Wy/s2 + e'We/s2 rather than e'Wy/s2.
+function _lm_components(y::AbstractVector{T}, X::AbstractMatrix{T},
+                        W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
     e, σ2, β, qr_X = _ols_residuals_and_sigma(y, X)
-    Wy = W * y
-    Tr = _trace_W2_WtW_fast(W)
+    Tr = _trace_W2_WtW_fast(W)              # tr(W'W + W^2)
 
-    # Anselin (1988): the score is e'Wy/σ², and the information term is
-    # (W*X*β)'M(W*X*β)/σ² + tr(W'W + W²), M = I - X(X'X)⁻¹X'. Scoring with
-    # e'We and tr(W'W + W²) alone is the LM-ERROR statistic, not this one.
-    WXb = W * (X * β)
-    MWXb = WXb .- X * (qr_X \ WXb)
-    D = dot(MWXb, MWXb) / σ2 + Tr
+    WXb  = W * (X * β)
+    MWXb = WXb .- X * (qr_X \ WXb)         # M = I - X(X'X)^{-1}X'
+    J    = dot(MWXb, MWXb) / σ2 + Tr        # J_rho_rho
 
-    RS_lag = (dot(e, Wy) / σ2)^2 / D
+    d_rho = dot(e, W * y) / σ2
+    d_lam = dot(e, W * e) / σ2
+    return (; e, σ2, Tr, J, d_rho, d_lam)
+end
+
+function lm_test_lag(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
+    c = _lm_components(y, X, W)
+
+    # Anselin (1988). Scoring e'We against tr(W'W + W²) instead would give
+    # the LM-ERROR statistic, not this one.
+    RS_lag = c.d_rho^2 / c.J
     # chi2(1) p-value: P(χ² > x) ≈ 2*(1 - Φ(√x))
     p_val = T(2.0) * (one(T) - T(_normcdf(sqrt(max(zero(T), RS_lag)))))
     return LMTestResult{T}(RS_lag, p_val, "LM-Lag")
@@ -597,11 +612,8 @@ An [`LMTestResult`](@ref).
 Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
 """
 function lm_test_error(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
-    e, σ2, _, _ = _ols_residuals_and_sigma(y, X)
-    N = length(y)
-    We = W * e
-    D = _trace_W2_WtW_fast(W)
-    RS_err = (dot(e, We) / σ2)^2 / D
+    c = _lm_components(y, X, W)
+    RS_err = c.d_lam^2 / c.Tr
     p_val = T(2.0) * (one(T) - T(_normcdf(sqrt(max(zero(T), RS_err)))))
     return LMTestResult{T}(RS_err, p_val, "LM-Error")
 end
@@ -630,24 +642,14 @@ tests for spatial dependence. *Regional Science and Urban Economics*,
 26(1).
 """
 function lm_test_robust_lag(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
-    e, σ2, _, qr_X = _ols_residuals_and_sigma(y, X)
-    N = length(y)
-    We = W * e
-    Wy = W * y
-    D = _trace_W2_WtW_fast(W)
+    c = _lm_components(y, X, W)
 
-    # MX = I - X(X'X)^{-1}X'
-    MWy = Wy .- X * (qr_X \ Wy)
-    J_rho_rho = dot(MWy, MWy) / σ2 + D
-    J_rho_lam = D
-    J_lam_lam = D
-
-    s_rho = dot(e, MWy) / σ2 + dot(e, We) / σ2
-    s_lam = dot(e, We) / σ2
-
-    # Robust LM-lag = (s_rho - s_lam)^2 / (J_rho_rho - J_rho_lam)
-    numer = (s_rho - s_lam)^2
-    denom = J_rho_rho - J_rho_lam
+    # Anselin, Bera, Florax & Yoon (1996), eq. for RS*_rho:
+    #     (d_rho - d_lam)^2 / (J_rho_rho - tr(W'W + W^2))
+    # The correction SUBTRACTS the error score; adding it instead turns the
+    # statistic into a second, inflated lag test that fires on SEM data.
+    numer = (c.d_rho - c.d_lam)^2
+    denom = c.J - c.Tr
     RS_rob_lag = numer / max(denom, T(1e-12))
     p_val = T(2.0) * (one(T) - T(_normcdf(sqrt(max(zero(T), RS_rob_lag)))))
     return LMTestResult{T}(RS_rob_lag, p_val, "Robust LM-Lag")
@@ -672,21 +674,12 @@ Anselin, L., Bera, A., Florax, R. & Yoon, M. (1996). *Regional Science and
 Urban Economics*, 26(1).
 """
 function lm_test_robust_error(y::AbstractVector{T}, X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
-    e, σ2, _, qr_X = _ols_residuals_and_sigma(y, X)
-    N = length(y)
-    We = W * e
-    Wy = W * y
-    D = _trace_W2_WtW_fast(W)
+    c = _lm_components(y, X, W)
 
-    MWy = Wy .- X * (qr_X \ Wy)
-    J_rho_rho = dot(MWy, MWy) / σ2 + D
-
-    s_rho = dot(e, MWy) / σ2 + dot(e, We) / σ2
-    s_lam = dot(e, We) / σ2
-
-    # Robust LM-error = (s_lam - D * s_rho / J_rho_rho)^2 / (D - D^2 / J_rho_rho)
-    numer = (s_lam - D * s_rho / J_rho_rho)^2
-    denom = D - D^2 / J_rho_rho
+    # Anselin, Bera, Florax & Yoon (1996), eq. for RS*_lambda:
+    #     (d_lam - T*d_rho/J)^2 / (T - T^2/J),   T = tr(W'W + W^2)
+    numer = (c.d_lam - c.Tr * c.d_rho / c.J)^2
+    denom = c.Tr - c.Tr^2 / c.J
     RS_rob_err = numer / max(denom, T(1e-12))
     p_val = T(2.0) * (one(T) - T(_normcdf(sqrt(max(zero(T), RS_rob_err)))))
     return LMTestResult{T}(RS_rob_err, p_val, "Robust LM-Error")
