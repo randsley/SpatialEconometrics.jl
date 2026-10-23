@@ -10,7 +10,8 @@ using StatsAPI
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
-       precompute_neumann_traces, brent_maximize, panel_spatial_lag!, panel_spatial_lag,
+       precompute_neumann_traces, spatial_trace_powers, g_traces,
+       brent_maximize, panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform, has_time_fe,
        _normcdf, _print_coef_table
 
@@ -178,6 +179,7 @@ function fit_dynamic_spatial_panel(
     varnames::Union{Nothing, Vector{String}}=nothing,
     rho_bounds::Tuple{T, T}=(T(-0.995), T(0.995)),
     n_bias_probes::Int=80,
+    max_exact_n::Int=1000,
     rng::AbstractRNG=Random.default_rng()
 ) where {V<:SpatialVariant, FE<:FixedEffectsSpec, T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
@@ -243,11 +245,13 @@ function fit_dynamic_spatial_panel(
     res_raw = e0 .- ρ_raw .* ed
     σ2_raw = dot(res_raw, res_raw) / NT_post
 
-    μ_traces = precompute_neumann_traces(W; max_power=60, n_probes=250, rng=rng)
+    μ_traces = spatial_trace_powers(W; max_power=60, max_exact_n=max_exact_n,
+                                    n_probes=250, rng=rng)
 
     vcov_mat, δ_bc, ρ_bc, σ2_bc, res_bc, spec_rad = yudjlee_bias_correction(
         fe_spec, Z_tilde, y_tilde, Wy_tilde, W,
-        δ_raw, ρ_raw, σ2_raw, N, T_post, μ_traces, n_bias_probes, rng
+        δ_raw, ρ_raw, σ2_raw, N, T_post, μ_traces, n_bias_probes, rng,
+        max_exact_n
     )
 
     return DynamicSpatialPanelModel{V, FE, T, M}(
@@ -271,7 +275,8 @@ function yudjlee_bias_correction(
     T_post::Int,
     μ_traces::Vector{T},
     n_probes::Int,
-    rng::AbstractRNG
+    rng::AbstractRNG,
+    max_exact_n::Int=1000
 ) where {T<:AbstractFloat}
 
     P = length(δ_raw)
@@ -288,29 +293,15 @@ function yudjlee_bias_correction(
     mul!(GZδ_mat, W, S_lu \ Zδ_mat)
     within_transform!(GZδ, N, T_post, fe_spec)
 
-    tr_G = zero(T)
-    for m in 1:(length(μ_traces) - 1)
-        tr_G += (ρ_raw^(m - 1)) * (N * μ_traces[m + 1])
-    end
+    tr_G, tr_G2, tr_GtG = g_traces(W, ρ_raw;
+                                   project_constant=has_time_fe(fe_spec),
+                                   max_exact_n=max_exact_n, n_probes=n_probes,
+                                   rng=rng, μ=μ_traces)
 
-    tr_G2 = zero(T)
-    for m in 1:(length(μ_traces) - 2)
-        tr_G2 += m * (ρ_raw^(m - 1)) * (N * μ_traces[m + 2])
-    end
-
-    if has_time_fe(fe_spec)
-        eig_1 = one(T) / (one(T) - ρ_raw)
-        tr_G  -= eig_1
-        tr_G2 -= eig_1^2
-    end
-
+    # The remaining bias-correction terms are genuinely probe-based: they
+    # involve the dynamic propagator, not a function of W alone.
     V0 = Matrix{T}(undef, N, n_probes)
     rand!(rng, V0, (-one(T), one(T)))
-
-    V_proj = has_time_fe(fe_spec) ? (V0 .- mean(V0; dims=1)) : V0
-    GV = S_lu \ (W * V_proj)
-    has_time_fe(fe_spec) && (GV .-= mean(GV; dims=1))
-    tr_GtG = dot(GV, GV) / n_probes
 
     U_curr = S_lu \ V0
     H_V0   = ((T_post - 1) / T(T_post)) .* U_curr

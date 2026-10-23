@@ -4,7 +4,7 @@ using LinearAlgebra
 using Statistics
 using Printf
 using StatsAPI
-import StatsAPI: loglikelihood, nobs, dof_residual, coef, vcov
+import StatsAPI: loglikelihood, nobs, dof_residual, coef, vcov, residuals
 
 import ..SpatialUtils: _normcdf, _chi2_sf
 
@@ -134,6 +134,40 @@ function Base.show(io::IO, r::VuongTestResult)
 end
 
 """
+    _pointwise_loglik(m) -> Vector{Float64}
+
+Per-observation log-likelihood contributions, summing to `loglikelihood(m)`.
+
+Vuong's ω̂ is the standard deviation of the per-observation log-likelihood
+ratio, so the aggregate log-likelihood is not enough to compute it.
+
+For the Gaussian models here the density splits into an observation-wise
+part and a Jacobian. The Jacobian — `log|I − ρW|`, and a second factor for
+SAC — is recovered as the residual between the stored log-likelihood and
+the observation-wise part rather than re-derived per model type, so this
+sums to `loglikelihood(m)` by construction and needs no knowledge of which
+spatial structure produced `m`.
+
+The Jacobian is then shared out evenly across observations. That is a
+convention, not an identity: `log|I − ρW|` is not separable across
+observations, and under spatial dependence no split of it is. It is the
+usual practical choice, and it cancels from ω̂ entirely whenever the two
+models' Jacobians agree.
+
+Requires `residuals(m)` to be the residual that enters the likelihood and
+the ML variance to be `e'e/n`, which holds for every model type here.
+"""
+function _pointwise_loglik(m::StatsAPI.RegressionModel)
+    e = residuals(m)
+    n = length(e)
+    σ2 = sum(abs2, e) / n
+    σ2 > 0 || error("cannot split the log-likelihood: the residual variance is zero")
+    base = -0.5 .* log(2π * σ2) .- (e .^ 2) ./ (2 * σ2)
+    jac = loglikelihood(m) - sum(base)
+    return base .+ jac / n
+end
+
+"""
     vuong_test(m1, m2)
 
 Vuong (1989) test for non-nested model comparison.
@@ -149,12 +183,20 @@ function vuong_test(m1::StatsAPI.RegressionModel, m2::StatsAPI.RegressionModel)
 
     aic_correction = (k1 - k2) / n
 
-    diff = (ll1 - ll2) / n
-    adj_diff = diff - aic_correction
+    # ω̂ is the standard deviation of the PER-OBSERVATION log-likelihood
+    # ratio. It cannot be had from the aggregate log-likelihoods, and the
+    # previous version tried: sqrt(abs(2(ll1-ll2)/n - adj^2)) is twice a mean
+    # difference, not a variance. It came out 0.71x the right size on two
+    # non-nested SLX models, and because the quantity under the root goes
+    # negative whenever model 1 fits worse, the abs() left the statistic
+    # non-antisymmetric in its arguments -- +0.9871 against -0.9804, where a
+    # Vuong statistic must flip sign exactly.
+    mᵢ = _pointwise_loglik(m1) .- _pointwise_loglik(m2)
+    omega = sqrt(sum(abs2, mᵢ .- mean(mᵢ)) / n)
 
-    omega = sqrt(abs(2.0 * (ll1 - ll2) / n - adj_diff^2) + eps())
-
-    stat = sqrt(Float64(n)) * adj_diff / omega
+    # Vuong's AIC-corrected LR, over sqrt(n) ω̂.
+    numerator = (ll1 - ll2) - (k1 - k2)
+    stat = omega > 0 ? numerator / (sqrt(Float64(n)) * omega) : 0.0
 
     p_value = 2.0 * (1.0 - _normcdf(abs(stat)))
 

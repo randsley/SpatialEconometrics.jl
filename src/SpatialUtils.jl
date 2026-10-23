@@ -10,7 +10,8 @@ export LogDetMethod, ExactLU, ChebyshevApprox,
        SpatialVariant, SAR, SDM, SARAR,
        FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
        precompute_chebyshev_traces, chebyshev_logdet,
-       precompute_neumann_traces, brent_maximize,
+       precompute_neumann_traces, spatial_trace_powers, g_traces,
+       brent_maximize,
        panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform,
        effective_dims, has_indiv_fe, has_time_fe,
@@ -303,6 +304,121 @@ function precompute_neumann_traces(
         copyto!(V_curr, V_next)
     end
     return μ
+end
+
+"""
+    spatial_trace_powers(W; max_power, max_exact_n, n_probes, rng)
+
+Traces of powers of `W`, normalised: entry `m + 1` is `tr(Wᵐ) / N`.
+
+Computed exactly from the eigenvalues of `W` when `N <= max_exact_n`,
+since `tr(Wᵐ) = Σᵢ λᵢᵐ` and one decomposition serves every power. Above
+that size it falls back to [`precompute_neumann_traces`](@ref), whose
+Hutchinson estimates are stochastic — so pass `rng` if the result has to
+be reproducible.
+
+These traces are not an internal detail: `spatial_effects` reads them to
+split a marginal effect into its direct and indirect parts. Estimating
+them by unseeded random probes made the reported impacts, and the
+standard errors built from the same traces, differ from one run to the
+next on identical data.
+"""
+function spatial_trace_powers(
+    W::AbstractSparseMatrix{T};
+    max_power::Int=60,
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
+) where {T<:AbstractFloat}
+    N = size(W, 1)
+    if N > max_exact_n
+        return precompute_neumann_traces(W; max_power=max_power,
+                                         n_probes=n_probes, rng=rng)
+    end
+    λ = eigvals(Matrix{T}(W))          # generally complex: W need not be symmetric
+    μ = zeros(T, max_power + 1)
+    pow = ones(complex(T), N)
+    μ[1] = one(T)
+    @inbounds for m in 1:max_power
+        pow .*= λ
+        μ[m + 1] = T(real(sum(pow)) / N)
+    end
+    return μ
+end
+
+"""
+    g_traces(W, ρ; project_constant, max_exact_n, n_probes, rng, μ)
+
+The three traces of `G = W (I - ρW)⁻¹` that a spatial information matrix
+needs: `(tr(G), tr(G²), tr(GᵀG))`.
+
+When `N <= max_exact_n` these are formed from `G` itself — one sparse
+factorization and `N` solves — and are exact. Above that size `tr(G)` and
+`tr(G²)` come from the power traces `μ` (supply them, or they are
+recomputed) and `tr(GᵀG)` from Hutchinson probes drawn against `rng`.
+Only `tr(GᵀG)` genuinely needs probing: it is not a function of the
+eigenvalues of `W`, being invariant under neither similarity nor
+transposition.
+
+`project_constant` removes the constant eigenvector before taking the
+traces, for the panel estimators that sweep out time effects. For a
+row-standardised `W` the constant direction is an eigenvector of `G` with
+eigenvalue `1 / (1 - ρ)`; projecting `G` on both sides handles it without
+assuming that, which the closed-form subtraction it replaces did assume.
+"""
+function g_traces(
+    W::AbstractSparseMatrix{T},
+    ρ::T;
+    project_constant::Bool=false,
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng(),
+    μ::Union{Nothing,Vector{T}}=nothing
+) where {T<:AbstractFloat}
+    N = size(W, 1)
+    A_lu = lu(sparse(one(T) * I, N, N) - ρ * W)
+
+    if N <= max_exact_n
+        G = A_lu \ Matrix{T}(W)        # A and W commute, so this is W(I-ρW)⁻¹
+        if project_constant
+            G .-= mean(G; dims=1)
+            G .-= mean(G; dims=2)
+        end
+        tr_G = zero(T); tr_G2 = zero(T); tr_GtG = zero(T)
+        @inbounds for j in 1:N
+            tr_G += G[j, j]
+            for i in 1:N
+                tr_G2 += G[i, j] * G[j, i]
+                tr_GtG += G[i, j]^2
+            end
+        end
+        return (tr_G, tr_G2, tr_GtG)
+    end
+
+    μv = isnothing(μ) ? precompute_neumann_traces(W; max_power=60,
+                                                  n_probes=n_probes, rng=rng) : μ
+    tr_G = zero(T)
+    @inbounds for m in 1:(length(μv) - 1)
+        tr_G += (ρ^(m - 1)) * (N * μv[m + 1])
+    end
+    tr_G2 = zero(T)
+    @inbounds for m in 1:(length(μv) - 2)
+        tr_G2 += m * (ρ^(m - 1)) * (N * μv[m + 2])
+    end
+    if project_constant
+        eig_1 = one(T) / (one(T) - ρ)
+        tr_G -= eig_1
+        tr_G2 -= eig_1^2
+    end
+
+    V = Matrix{T}(undef, N, n_probes)
+    rand!(rng, V, (-one(T), one(T)))
+    project_constant && (V .-= mean(V; dims=1))
+    GV = A_lu \ (W * V)
+    project_constant && (GV .-= mean(GV; dims=1))
+    tr_GtG = dot(GV, GV) / n_probes
+
+    return (tr_G, tr_G2, tr_GtG)
 end
 
 # ─── Brent's method maximizer ─────────────────────────────────────────

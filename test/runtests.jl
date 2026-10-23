@@ -798,6 +798,254 @@ using NearestNeighbors
         @test occursin("AIC", tbl)
     end
 
+    @testset "13b. Log-likelihoods against an independent Gaussian density" begin
+        # Every one of these was previously asserted only to be finite. The
+        # concentrated likelihood each estimator maximises is rewritten here
+        # straight from the density, with the filtered residual formed
+        # explicitly, so a wrong constant, a dropped Jacobian or the wrong
+        # filter would all show up.
+        rng = MersenneTwister(1_300_013)
+        L = 9; N = L * L
+        W = make_rook_weights(L); Wd = Matrix(W)
+        X = hcat(randn(rng, N), randn(rng, N)); Xa = hcat(ones(N), X)
+        beta = [1.0, 2.0, -1.0]
+        y_lag = (I - 0.5 .* Wd) \ (Xa * beta .+ randn(rng, N))
+        y_err = Xa * beta .+ ((I - 0.4 .* Wd) \ randn(rng, N))
+
+        ld(A) = first(logabsdet(A))
+        gll(e, s2, jac) = -0.5N * log(2pi) - 0.5N * log(s2) -
+                          dot(e, e) / (2s2) + jac
+        Xsdm = hcat(ones(N), X, Wd * X)
+
+        m_sar = fit_spatial(SAR(), W, X, y_lag; method = ExactLU())
+        e_sar = (I - m_sar.rho .* Wd) * y_lag .- Xa * coef(m_sar)[1:3]
+        @test isapprox(loglikelihood(m_sar),
+                       gll(e_sar, m_sar.sigma2, ld(I - m_sar.rho .* Wd));
+                       rtol = 1e-12)
+        @test isapprox(m_sar.sigma2, dot(e_sar, e_sar) / N; rtol = 1e-12)
+
+        m_sdm = fit_spatial(SDM(), W, X, y_lag; method = ExactLU())
+        e_sdm = (I - m_sdm.rho .* Wd) * y_lag .- Xsdm * coef(m_sdm)[1:5]
+        @test isapprox(loglikelihood(m_sdm),
+                       gll(e_sdm, m_sdm.sigma2, ld(I - m_sdm.rho .* Wd));
+                       rtol = 1e-12)
+
+        m_sem = fit_spatial_error(W, X, y_err; method = ExactLU())
+        e_sem = (I - m_sem.lambda .* Wd) * (y_err .- Xa * coef(m_sem)[1:3])
+        @test isapprox(loglikelihood(m_sem),
+                       gll(e_sem, m_sem.sigma2, ld(I - m_sem.lambda .* Wd));
+                       rtol = 1e-12)
+
+        m_slx2 = fit_slx(W, X, y_lag)
+        e_slx2 = y_lag .- Xsdm * coef(m_slx2)[1:5]
+        @test isapprox(loglikelihood(m_slx2), gll(e_slx2, m_slx2.sigma2, 0.0);
+                       rtol = 1e-12)
+
+        # SAC carries two Jacobians, and its filter is (I-lambda*W2)(I-rho*W1).
+        m_sac2 = fit_sac(W, W, X, y_lag; method = ExactLU())
+        A = I - m_sac2.rho .* Wd; B = I - m_sac2.lambda .* Wd
+        e_sac2 = B * (A * y_lag .- Xa * coef(m_sac2)[1:3])
+        @test isapprox(loglikelihood(m_sac2),
+                       gll(e_sac2, m_sac2.sigma2, ld(A) + ld(B)); rtol = 1e-12)
+
+        m_sdem2 = fit_sdem(W, X, y_err; method = ExactLU())
+        e_sdem2 = (I - m_sdem2.lambda .* Wd) *
+                  (y_err .- Xsdm * coef(m_sdem2)[1:5])
+        @test isapprox(loglikelihood(m_sdem2),
+                       gll(e_sdem2, m_sdem2.sigma2,
+                           ld(I - m_sdem2.lambda .* Wd)); rtol = 1e-12)
+
+        # residuals(m) must BE the residual that enters the likelihood, and the
+        # ML variance must be e-prime-e over n. _pointwise_loglik needs both.
+        for (m, jac) in ((m_sar, ld(I - m_sar.rho .* Wd)),
+                         (m_sdm, ld(I - m_sdm.rho .* Wd)),
+                         (m_sem, ld(I - m_sem.lambda .* Wd)),
+                         (m_slx2, 0.0),
+                         (m_sac2, ld(A) + ld(B)),
+                         (m_sdem2, ld(I - m_sdem2.lambda .* Wd)))
+            e = residuals(m)
+            @test isapprox(sum(abs2, e) / N, m.sigma2; rtol = 1e-10)
+            @test isapprox(loglikelihood(m), gll(e, m.sigma2, jac); rtol = 1e-12)
+        end
+    end
+
+    @testset "13c. Vuong: omega is a variance of pointwise ratios" begin
+        # vuong_test built omega out of the AGGREGATE log-likelihoods, as
+        # sqrt(abs(2(ll1-ll2)/n - adj^2)). That is twice a mean difference, not
+        # a variance: it came out 0.71x the right size here, giving p = 0.324
+        # against a correct 0.482. And because the quantity under the root goes
+        # negative when model 1 fits worse, the abs() left the statistic
+        # non-antisymmetric in its arguments. Only 0 <= p <= 1 was asserted.
+        MS = SpatialEconometrics.SpatialModelSelection
+        rng = MersenneTwister(1_300_014)
+        L = 12; N = L * L
+        W1 = make_rook_weights(L); W2 = make_queen_weights(L)
+        W1d = Matrix(W1); W2d = Matrix(W2)
+        X = hcat(randn(rng, N), randn(rng, N))
+        y = 1.0 .+ X * [2.0, -1.0] .+ 0.6 .* (W1d * X[:, 1]) .+ randn(rng, N)
+
+        # Non-nested: same response, different W. Both are plain OLS, so the
+        # per-observation log-density is unambiguous and can be written out.
+        m1 = fit_slx(W1, X, y); m2 = fit_slx(W2, X, y)
+
+        function ll_i(m, Wd)
+            Xa = hcat(ones(N), X, Wd * X)
+            e = y .- Xa * coef(m)[1:size(Xa, 2)]
+            s2 = m.sigma2
+            -0.5 .* log(2pi * s2) .- (e .^ 2) ./ (2s2)
+        end
+        l1 = ll_i(m1, W1d); l2 = ll_i(m2, W2d)
+        @test isapprox(sum(l1), loglikelihood(m1); rtol = 1e-12)
+        @test isapprox(sum(l2), loglikelihood(m2); rtol = 1e-12)
+        @test isapprox(MS._pointwise_loglik(m1), l1; rtol = 1e-10)
+
+        # The contributions have to sum to the stored log-likelihood for every
+        # model type, Jacobian and all. That is what lets one routine serve
+        # them without knowing which spatial structure produced the fit.
+        y_lag = (I - 0.5 .* W1d) \ (hcat(ones(N), X) * [1.0, 2.0, -1.0] .+
+                                    randn(rng, N))
+        for m in (fit_spatial(SAR(), W1, X, y_lag; method = ExactLU()),
+                  fit_spatial(SDM(), W1, X, y_lag; method = ExactLU()),
+                  fit_spatial_error(W1, X, y_lag; method = ExactLU()),
+                  fit_sac(W1, W1, X, y_lag; method = ExactLU()),
+                  fit_sdem(W1, X, y_lag; method = ExactLU()),
+                  m1)
+            @test length(MS._pointwise_loglik(m)) == N
+            @test isapprox(sum(MS._pointwise_loglik(m)), loglikelihood(m);
+                           rtol = 1e-12)
+        end
+
+        k1 = N - dof_residual(m1); k2 = N - dof_residual(m2)
+        mi = l1 .- l2
+        omega_ref = sqrt(sum(abs2, mi .- mean(mi)) / N)
+        z_ref = ((loglikelihood(m1) - loglikelihood(m2)) - (k1 - k2)) /
+                (sqrt(N) * omega_ref)
+
+        vt = vuong_test(m1, m2)
+        @test isapprox(vt.stat, z_ref; rtol = 1e-10)
+        @test isapprox(vt.stat, 1.87685263; atol = 1e-6)
+        @test isapprox(vt.p_value, 0.06053817; atol = 1e-7)
+
+        # Guard the specific defect rather than only the value, so this stays
+        # a regression test under any draw: rebuild the old omega and check it
+        # is both wrong and wrong by a margin that moves the p-value.
+        adj_old = ((loglikelihood(m1) - loglikelihood(m2)) - (k1 - k2)) / N
+        omega_old = sqrt(abs(2.0 * (loglikelihood(m1) - loglikelihood(m2)) / N -
+                             adj_old^2) + eps())
+        @test !isapprox(omega_old, omega_ref; rtol = 0.05)
+        stat_old = sqrt(N) * adj_old / omega_old
+        @test !isapprox(stat_old, vt.stat; rtol = 0.05)
+
+        # A Vuong statistic flips sign exactly when its arguments swap. The old
+        # one gave +0.9871 against -0.9804.
+        vt_rev = vuong_test(m2, m1)
+        @test isapprox(vt.stat, -vt_rev.stat; rtol = 1e-12)
+        @test isapprox(vt.p_value, vt_rev.p_value; rtol = 1e-12)
+
+        # omega is a standard deviation, so it must not collapse towards zero
+        # just because the two fits are close.
+        @test omega_ref > 0.1
+        @test 0.0 <= vt.p_value <= 1.0
+    end
+
+    @testset "13d. Trace-based variances are exact and reproducible" begin
+        # tr(G), tr(G^2) and tr(G-transpose-G) were estimated by unseeded
+        # Hutchinson probes off the global RNG: 250 for the power traces, 30
+        # for the last one. So fitting the same model twice gave different
+        # standard errors (0.5% apart on the rho SE at N = 81), the fit quietly
+        # consumed global RNG state, and since spatial_effects reads the same
+        # power traces, the reported impacts moved between runs as well. Of the
+        # 21 assertions that touched a standard error, 20 checked only size.
+        SU = SpatialEconometrics.SpatialUtils
+        L = 8; N = L * L
+        W = make_rook_weights(L); Wd = Matrix(W)
+        rng = MersenneTwister(1_300_015)
+        X = hcat(randn(rng, N), randn(rng, N)); Xa = hcat(ones(N), X)
+        y = (I - 0.5 .* Wd) \ (Xa * [1.0, 2.0, -1.0] .+ randn(rng, N))
+
+        # Power traces against dense powers of W.
+        mu = SU.spatial_trace_powers(W; max_power = 12, max_exact_n = 10_000)
+        @test mu[1] == 1.0
+        Pm = Matrix{Float64}(I, N, N)
+        for m in 1:12
+            Pm = Pm * Wd
+            @test isapprox(mu[m + 1], tr(Pm) / N; atol = 1e-12)
+        end
+
+        # The three G traces against a dense G = W(I - rho*W)^-1, in both the
+        # plain and the constant-projected form the panel estimators need.
+        for rho in (-0.6, 0.3, 0.8), pc in (false, true)
+            G = Wd * inv(I - rho .* Wd)
+            if pc
+                Q = I - ones(N, N) ./ N
+                G = Q * G * Q
+            end
+            g = SU.g_traces(W, rho; project_constant = pc, max_exact_n = 10_000)
+            @test isapprox(g[1], tr(G); atol = 1e-10)
+            @test isapprox(g[2], tr(G * G); atol = 1e-9)
+            @test isapprox(g[3], sum(abs2, G); atol = 1e-9)
+        end
+
+        # Above the size gate the probe path runs instead. Seeded, it has to
+        # repeat exactly, and it has to land near the exact value.
+        g_ex = SU.g_traces(W, 0.5; max_exact_n = 10_000)
+        g_p1 = SU.g_traces(W, 0.5; max_exact_n = 0, n_probes = 400,
+                           rng = MersenneTwister(7))
+        g_p2 = SU.g_traces(W, 0.5; max_exact_n = 0, n_probes = 400,
+                           rng = MersenneTwister(7))
+        @test g_p1 == g_p2
+        @test isapprox(g_p1[3], g_ex[3]; rtol = 0.15)
+
+        # The SAR variance against the expected information matrix, written out
+        # densely with no probes anywhere. This is the first assertion in the
+        # suite to check a standard error against a value rather than a size.
+        m = fit_spatial(SAR(), W, X, y; method = ExactLU())
+        b = coef(m)[1:3]; rho_h = m.rho; s2 = m.sigma2; P = 3
+        G = Wd * inv(I - rho_h .* Wd); Gxb = G * (Xa * b)
+        Ie = zeros(P + 2, P + 2)
+        Ie[1:P, 1:P] = (transpose(Xa) * Xa) ./ s2
+        Ie[1:P, P + 1] = (transpose(Xa) * Gxb) ./ s2
+        Ie[P + 1, 1:P] = Ie[1:P, P + 1]
+        Ie[P + 1, P + 1] = dot(Gxb, Gxb) / s2 + tr(transpose(G) * G) + tr(G * G)
+        Ie[P + 1, P + 2] = tr(G) / s2
+        Ie[P + 2, P + 1] = Ie[P + 1, P + 2]
+        Ie[P + 2, P + 2] = N / (2 * s2^2)
+        se_ref = sqrt.(diag(inv(Symmetric(Ie)))[1:(P + 1)])
+        @test isapprox(stderror(m), se_ref; rtol = 1e-8)
+        @test isapprox(m.rho_se, se_ref[P + 1]; rtol = 1e-8)
+
+        # Same data, same call: bit-identical variance, traces and impacts.
+        fits = [fit_spatial(SAR(), W, X, y; method = ExactLU()) for _ in 1:4]
+        for f in fits
+            @test vcov(f) == vcov(fits[1])
+            @test f.rho_se == fits[1].rho_se
+            @test f.trace_powers == fits[1].trace_powers
+        end
+        sdm = [fit_spatial(SDM(), W, X, y; method = ExactLU()) for _ in 1:3]
+        effs = [spatial_effects(f) for f in sdm]
+        for e in effs
+            @test e.direct == effs[1].direct
+            @test e.indirect == effs[1].indirect
+            @test e.indirect_se == effs[1].indirect_se
+        end
+
+        # The panel estimators shared the defect, including the time-FE branch
+        # that projects out the constant eigenvector.
+        Np = 36; Tp = 6
+        Wp = make_rook_weights(6)
+        rng2 = MersenneTwister(1_300_016)
+        Xp = randn(rng2, Np * Tp, 2)
+        yp = Xp * [1.0, -0.5] .+ randn(rng2, Np * Tp)
+        for fe in (IndivFE(), TwoWayFE())
+            ps = [fit_spatial_panel(SAR(), fe, Wp, Xp, yp, Np, Tp) for _ in 1:3]
+            for f in ps
+                @test vcov(f) == vcov(ps[1])
+                @test f.rho_se == ps[1].rho_se
+            end
+            @test all(isfinite, stderror(ps[1]))
+        end
+    end
+
     @testset "14. Spatial Panel Diagnostics" begin
         rng = MersenneTwister(1400); L = 10; N = L * L; T_per = 8; NT = N * T_per
         W = make_rook_weights(L)

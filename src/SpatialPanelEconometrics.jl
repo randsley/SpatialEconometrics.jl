@@ -10,7 +10,8 @@ using StatsAPI
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
-       precompute_neumann_traces, brent_maximize, panel_spatial_lag!, panel_spatial_lag,
+       precompute_neumann_traces, spatial_trace_powers, g_traces,
+       brent_maximize, panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform, effective_dims, has_indiv_fe, has_time_fe,
        _normcdf, _print_coef_table
 
@@ -222,7 +223,10 @@ function fit_spatial_panel(
     approach::A=LeeYuTransformation(),
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
     varnames::Union{Nothing, Vector{String}}=nothing,
-    rho_bounds::Tuple{T, T}=(T(-0.995), T(0.995))
+    rho_bounds::Tuple{T, T}=(T(-0.995), T(0.995)),
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {
     V<:SpatialVariant,
     FE<:FixedEffectsSpec,
@@ -287,12 +291,14 @@ function fit_spatial_panel(
     σ2_uncorrected = rss_raw / (N * T_per)
     σ2_trans = rss_raw / (N_eff * T_eff)
 
-    μ_traces = precompute_neumann_traces(W; max_power=60, n_probes=250)
+    μ_traces = spatial_trace_powers(W; max_power=60, max_exact_n=max_exact_n,
+                                    n_probes=vcov_probes, rng=rng)
 
     vcov_mat, β_final, ρ_final, σ2_final, res_final = finalize_panel_inference(
         approach, fe_spec, X_tilde, y_tilde, Wy_tilde, W,
         β_raw, ρ_raw, σ2_uncorrected, σ2_trans,
-        N, T_per, N_eff, T_eff, μ_traces
+        N, T_per, N_eff, T_eff, μ_traces;
+        max_exact_n=max_exact_n, n_probes=vcov_probes, rng=rng
     )
 
     P = length(β_final)
@@ -321,7 +327,10 @@ function finalize_panel_inference(
     T_per::Int,
     N_eff::Int,
     T_eff::Int,
-    μ_traces::Vector{T}
+    μ_traces::Vector{T};
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat}
 
     P = length(β_raw)
@@ -335,28 +344,10 @@ function finalize_panel_inference(
     mul!(GXb_mat, W, A_lu \ Xb_mat)
     within_transform!(GXb, N, T_per, fe_spec)
 
-    tr_G = zero(T)
-    for m in 1:(length(μ_traces) - 1)
-        tr_G += (ρ_raw^(m - 1)) * (N * μ_traces[m + 1])
-    end
-
-    tr_G2 = zero(T)
-    for m in 1:(length(μ_traces) - 2)
-        tr_G2 += m * (ρ_raw^(m - 1)) * (N * μ_traces[m + 2])
-    end
-
-    if has_time_fe(fe_spec)
-        eig_1 = one(T) / (one(T) - ρ_raw)
-        tr_G -= eig_1
-        tr_G2 -= eig_1^2
-    end
-
-    n_p = 30
-    V_probe = rand((-one(T), one(T)), N, n_p)
-    has_time_fe(fe_spec) && (V_probe .-= mean(V_probe; dims=1))
-    GV = A_lu \ (W * V_probe)
-    has_time_fe(fe_spec) && (GV .-= mean(GV; dims=1))
-    tr_GtG = dot(GV, GV) / n_p
+    tr_G, tr_G2, tr_GtG = g_traces(W, ρ_raw;
+                                   project_constant=has_time_fe(fe_spec),
+                                   max_exact_n=max_exact_n, n_probes=n_probes,
+                                   rng=rng, μ=μ_traces)
 
     σ2_eval = (approach isa DirectQML && !approach.bias_correct) ? σ2_uncorrected : σ2_trans
     NT_eff = N_eff * T_eff

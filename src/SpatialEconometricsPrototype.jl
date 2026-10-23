@@ -10,7 +10,8 @@ using StatsAPI
 
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
-       precompute_neumann_traces, brent_maximize, _normcdf, _print_coef_table
+       precompute_neumann_traces, spatial_trace_powers, g_traces,
+       brent_maximize, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -169,7 +170,10 @@ function fit_spatial(
     y::AbstractVector{T};
     method::LogDetMethod=ChebyshevApprox(order=6, n_probes=0),
     varnames::Union{Nothing, Vector{String}}=nothing,
-    rho_bounds::Tuple{T, T}=(T(-0.995), T(0.995))
+    rho_bounds::Tuple{T, T}=(T(-0.995), T(0.995)),
+    max_exact_n::Int=1000,
+    vcov_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {V<:SpatialVariant, T<:AbstractFloat, M<:AbstractSparseMatrix{T}}
 
     N, K = size(X)
@@ -212,8 +216,11 @@ function fit_spatial(
     res = e0 .- ρ_hat .* ed
     σ2_hat = dot(res, res) / N
 
-    μ_traces = precompute_neumann_traces(W; max_power=60, n_probes=250)
-    vcov_mat, ρ_se = compute_asymptotic_vcov(X_aug, W, β_hat, ρ_hat, σ2_hat, μ_traces)
+    μ_traces = spatial_trace_powers(W; max_power=60, max_exact_n=max_exact_n,
+                                    n_probes=vcov_probes, rng=rng)
+    vcov_mat, ρ_se = compute_asymptotic_vcov(X_aug, W, β_hat, ρ_hat, σ2_hat, μ_traces;
+                                             max_exact_n=max_exact_n,
+                                             n_probes=vcov_probes, rng=rng)
     full_coef = vcat(β_hat, ρ_hat)
 
     return SpatialRegressionModel{V, T, M}(
@@ -228,7 +235,10 @@ function compute_asymptotic_vcov(
     β::Vector{T},
     ρ::T,
     σ2::T,
-    μ_traces::Vector{T}
+    μ_traces::Vector{T};
+    max_exact_n::Int=1000,
+    n_probes::Int=250,
+    rng::AbstractRNG=Random.default_rng()
 ) where {T<:AbstractFloat}
     N, P = size(X_aug)
     I_sparse = sparse(one(T) * I, N, N)
@@ -236,24 +246,12 @@ function compute_asymptotic_vcov(
     Xb = X_aug * β
     GXb = W * (A_lu \ Xb)
 
-    tr_G2 = zero(T)
-    for m in 1:(length(μ_traces) - 2)
-        tr_G2 += m * (ρ^(m - 1)) * (N * μ_traces[m + 2])
-    end
-
-    n_p = 30
-    V_probe = rand((-one(T), one(T)), N, n_p)
-    GV = A_lu \ (W * V_probe)
-    tr_GtG = dot(GV, GV) / n_p
+    tr_G, tr_G2, tr_GtG = g_traces(W, ρ; max_exact_n=max_exact_n,
+                                   n_probes=n_probes, rng=rng, μ=μ_traces)
 
     I_ββ = (X_aug' * X_aug) ./ σ2
     I_βρ = (X_aug' * GXb) ./ σ2
     I_ρρ = (dot(GXb, GXb) / σ2) + tr_G2 + tr_GtG
-
-    tr_G = zero(T)
-    for m in 1:(length(μ_traces) - 1)
-        tr_G += (ρ^(m - 1)) * (N * μ_traces[m + 1])
-    end
 
     I_ρσ2 = tr_G / σ2
     I_σ2σ2 = N / (2 * σ2^2)
