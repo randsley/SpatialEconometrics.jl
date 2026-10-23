@@ -2,8 +2,8 @@
 
 > **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,156 test assertions in 42 testsets with both package
-> extensions installed, 19 examples, 9 notebooks, 2 package extensions,
+> 22 submodules, 1,229 test assertions in 48 testsets with both package
+> extensions installed, 20 examples, 9 notebooks, 2 package extensions,
 > CI/CD and 21 Documenter.jl pages. **Phases 4, 5 and 6
 > are complete except item #10 (Performance)**, which is the next piece of work.
 > Tier 3 is untouched, and the correctness audit in `docs/AUDIT.md` is closed
@@ -221,15 +221,19 @@ spatial lags belong in the model, and which `W` to run it on.
 
 | Feature | Description | Reference |
 |---|---|---|
-| Durbin score tests | Five Rao score statistics for the spatial Durbin model: joint `λ = 0, γ = 0`; `λ = 0` with and without `γ ≠ 0`; `γ = 0` with and without `λ ≠ 0`; plus significance of each individual Durbin term | Koley & Bera (2023); Bera & Yoon (1993) |
+| ~~Durbin score tests~~ — **delivered**, see `sdm_tests` | Five Rao score statistics for the spatial Durbin model: joint `ρ = 0, θ = 0`; `ρ = 0` with and without `θ ≠ 0`; `θ = 0` with and without `ρ ≠ 0`; plus significance of each individual Durbin term | Koley & Bera (2023); Bera & Yoon (1993) |
 | SDEM specification roadmap | Iterative search over {SDE, SLX, SE} × `W`, for the local-spillover case where the Durbin terms sit in the error | Sutton & Sutton (2023) |
 | Bayesian SD vs SDE comparison | Posterior model probabilities over global versus local spillovers, jointly with the `W` specification | LeSage (2014, 2015) |
 
-The score tests are the closest fit to what is already here: the package
-ships `lm_test_lag`, `lm_test_error` and their robust forms in
-`SpatialDiagnostics.jl`, and these five extend that battery from SAR/SE to
-the Durbin model under the same Rao score framework. `W` selection by AIC
-is in [#6](#6-weight-matrix-construction).
+The score tests were the closest fit to what was already here, and are now
+delivered: `SpatialDiagnostics.jl` ships `lm_test_sdm`, `lm_test_durbin`,
+`lm_test_robust_durbin`, `lm_test_robust_lag_durbin` and
+`lm_test_durbin_terms`, collected by `sdm_tests`, extending the existing
+`lm_test_lag`/`lm_test_error` battery from SAR/SE to the Durbin model under
+the same Rao score framework. Their measured null distribution and the
+robust-size property are in `docs/AUDIT.md`; `examples/20_specification_search.jl`
+runs the battery end to end. `W` selection by AIC is in
+[#6](#6-weight-matrix-construction) and is the next item.
 
 **Dependencies:** None
 
@@ -662,7 +666,7 @@ cleanest demonstration that the package's machinery is not about geography.
 | 11 | Performance (#10) | ~600 | — | ⬜ **Next up** |
 | | **Phase 6 total** | **~1,450** | | |
 
-### Phase 6B — ⬜ Specification search & `W` selection
+### Phase 6B — 🚧 Specification search & `W` selection
 
 Small, cohesive, and all of it extends modules that are already finished and
 audited. Cheap to build and cheap to verify, which is why it sits before the
@@ -670,7 +674,7 @@ Tier 3 builds rather than inside them.
 
 | Priority | Item | Est. Lines | Rationale |
 |---|---|---|---|
-| 12 | Durbin score tests (#5) | ~350 | Extends the existing LM battery from SAR/SE to SD |
+| ~~12~~ | ✅ Durbin score tests (#5) | 350 | Delivered: `sdm_tests`, testset 27, null distribution in `docs/AUDIT.md` |
 | 13 | knn `W` selection by AIC (#6) | ~150 | `knn_weights` + `spatial_aic` already exist |
 | 14 | SDEM roadmap + Bayesian SD/SDE (#5) | ~400 | Local vs global spillovers |
 | 15 | Spatio-temporal Moran PCA (#7) | ~300 | Reuses the eigenvector basis |
@@ -710,19 +714,21 @@ Rows above the rule are measured; rows below are estimates.
 |---|---|---|---|
 | **v0.3.0** (registered) | 13 | 54 | ~6,500 |
 | **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
+| **master** (+ Phase 6B item 1) | 22 | 1,229 | 13,716 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 13,331 lines of
-`src/`, 3,702 lines of tests (1,156 assertions in 42 testsets with both
-package extensions installed), 2,351 lines of examples across 19 scripts,
+Measured on master: 22 submodules plus the umbrella across 13,716 lines of
+`src/`, 3,894 lines of tests (1,229 assertions in 48 testsets with both
+package extensions installed), 2,450 lines of examples across 20 scripts,
 398 lines of package extensions, 21 documentation pages and 9 notebooks
 (3 Jupyter, 6 Pluto).
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed
-form, a published number or an independently written reference.
+form, a published number or an independently written reference. The 73 on top
+of that are Phase 6B's first item, which came in under the same rule.
 
 The earlier per-release projections (v0.4.0 at 16 modules, v0.5.0 at 20,
 v0.6.0 at 23) were overtaken: Phases 4, 5 and 6 all landed on the 0.4.0

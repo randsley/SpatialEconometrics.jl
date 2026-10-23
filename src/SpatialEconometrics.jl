@@ -67,7 +67,7 @@ import .SpatialGS2SLSPanel: GS2SLSModel, fit_gs2sls_panel
 import .DynamicPanelSystemGMM: GMMVariant, DifferenceGMM, SystemGMM, SystemGMMModel, fit_dynamic_gmm
 import .StructuralMacroCalibration: CalibrationResult, balance_gras, balance_gras_full, balance_generalized_ce, sam_leontief_multipliers
 import .SpatialHAC: KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel, DistanceMetric, EuclideanDistance, HaversineDistance, AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC, vcov_driscoll_kraay, vcov_conley, RobustInferenceTable
-import .SpatialDiagnostics: MoranResult, LISAResult, LMTestResult, GearyCResult, moran_global, moran_local, geary_c, lm_test_lag, lm_test_error, lm_test_robust_lag, lm_test_robust_error, lm_tests
+import .SpatialDiagnostics: MoranResult, LISAResult, LMTestResult, GearyCResult, ScoreTestResult, moran_global, moran_local, geary_c, lm_test_lag, lm_test_error, lm_test_robust_lag, lm_test_robust_error, lm_tests, lm_test_sdm, lm_test_durbin, lm_test_robust_durbin, lm_test_robust_lag_durbin, lm_test_durbin_terms, sdm_tests
 import .SpatialErrorModel: SpatialErrorRegressionModel, SpatialErrorPanelModel, fit_spatial_error
 import .GWREstimation: GWRModel, MGWRModel, fit_gwr, fit_mgwr, BandwidthType, FixedBandwidth, AdaptiveBandwidth, KernelFunction, GaussianKernel, BisquareKernel, ExponentialKernel
 import .SpatialGravityModels: GravityModel, GravityVariant, PoissonGravity, NegBinGravity, GravityFE, OriginFE, DestinationFE, BilateralFE, fit_gravity, multilateral_resistance
@@ -470,6 +470,8 @@ export
     MoranResult, LISAResult, LMTestResult, GearyCResult,
     moran_global, moran_local, geary_c,
     lm_test_lag, lm_test_error, lm_test_robust_lag, lm_test_robust_error, lm_tests,
+    ScoreTestResult, lm_test_sdm, lm_test_durbin, lm_test_robust_durbin,
+    lm_test_robust_lag_durbin, lm_test_durbin_terms, sdm_tests,
     make_rook_weights, make_queen_weights,
     # SpatialWeights
     knn_weights, distance_weights, band_weights, block_diagonal_weights,

@@ -1203,6 +1203,8 @@ outstanding.
 
 Done: findings 1–25. Suite: 576 → 1156 passing, none failing.
 
+Post-audit, under the standing rule in the last section: 1229 passing.
+
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
 estimates were right throughout. Findings 8 and 12 broke that: a
@@ -1243,3 +1245,47 @@ three statistics clamped at zero noted in finding 3 are the same instinct.
 
 Closing an item means: an independent reference exists, it is committed as a
 test in `test/runtests.jl`, and the row above moves to "Verified correct".
+
+## New diagnostics under the standing rule
+
+The audit left one standing rule: *any diagnostic added from here on needs a
+null-distribution Monte Carlo before it is believed.* This section records
+diagnostics added after the audit closed and what was measured for each,
+so the rule has somewhere to be satisfied.
+
+| Added | Diagnostic | Null distribution measured | Verdict |
+|---|---|---|---|
+| 2026-10-23 | `sdm_tests` — the five Koley & Bera Durbin score statistics | 20000 replications, `N = 81`: mean = df to within 2.6%, variance = 2df to within 1.9%, size 0.047–0.054 at the 5% level and 0.009–0.010 at the 1% | Verified correct |
+
+Four checks, in testset 27:
+
+1. **Reduction.** `RS_rho` is algebraically the existing `lm_test_lag`, and
+   agrees with it to 0.00e+00. The per-term formula applied at the `rho`
+   position reproduces `lm_test_robust_lag_durbin` to 2.22e-16, confirming
+   the block-inverse identity the robust forms rest on.
+2. **Scores against ForwardDiff.** The SDM Gaussian log-likelihood written
+   independently in the test file, differentiated at the OLS null: `d_rho`
+   agrees to 1.33e-15, the two `d_theta` to 1.33e-15 and 4.44e-16, and the
+   nuisance scores vanish (1.34e-14 for `beta`, exactly 0 for `sigma2`),
+   which is what makes these the right scores to be testing.
+3. **Null distribution.** The table above.
+4. **The robust property.** Under SAR data with `theta = 0` exactly, the
+   plain `durbin` statistic rejects 16.1% of the time at the 5% level while
+   `robust_durbin` rejects 5.1%. Under SLX data with `rho = 0` exactly,
+   `lm_test_lag` rejects 7.0% while `robust_lag` rejects 5.2%. This is the
+   sharpest of the four: the correction uses `J_rho_theta`, so a robust
+   statistic cannot land on its nominal size if the cross-information block
+   is wrong.
+
+One methodological note, because it cost an hour. Check 3 was first written
+as *the information matrix equals the Monte Carlo covariance of the score*,
+which is the textbook identity. It failed by 37%, with the `theta` diagonal
+running about a third low. The identity holds at the true `sigma2`; the
+implemented score divides by `sigma2`-hat, whose own variability at `N = 81`
+inflates the covariance of the score, while leaving the *statistic*
+correctly scaled because the same `sigma2`-hat appears in `d` and in `J`.
+Comparing the matrices is therefore the wrong check at finite `N`. The
+property that matters, and the one the committed test makes, is that the
+statistic is chi-squared: mean = df, variance = 2df, correct size in the
+tail. Findings 13–16 were all scale errors, and the mean of the statistic
+is what catches a scale error.
