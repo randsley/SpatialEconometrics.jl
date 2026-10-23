@@ -39,6 +39,41 @@ function _lgamma(z::Real)
     return -tmp + log(2.5066282746310005 * ser / x)
 end
 
+# Digamma ψ(x) = d/dx log Γ(x), for x > 0. Recur up to the asymptotic
+# regime, then the Bernoulli series
+# ψ(x) ~ log x − 1/2x − 1/12x² + 1/120x⁴ − 1/252x⁶ + 1/240x⁸ − 1/132x¹⁰.
+function _digamma(x::Real)
+    z = Float64(x)
+    z <= 0.0 && return -Inf
+    s = 0.0
+    while z < 10.0
+        s -= 1.0 / z
+        z += 1.0
+    end
+    q = 1.0 / (z * z)
+    return s + log(z) - 0.5 / z -
+           q * (1/12 - q * (1/120 - q * (1/252 - q * (1/240 - q * (1/132)))))
+end
+
+# Trigamma ψ₁(x) = d²/dx² log Γ(x), for x > 0. Same construction, with
+# ψ₁(x) = ψ₁(x+1) + 1/x² as the recurrence and
+# ψ₁(x) ~ 1/x + 1/2x² + 1/6x³ − 1/30x⁵ + 1/42x⁷ − 1/30x⁹ + 5/66x¹¹.
+# The series is pushed out to x ≥ 20 because truncating at 10 leaves 7e-13,
+# which is visible against ψ₁(m) = π²/6 − Σ_{k<m} 1/k².
+function _trigamma(x::Real)
+    z = Float64(x)
+    z <= 0.0 && return Inf
+    s = 0.0
+    while z < 20.0
+        s += 1.0 / (z * z)
+        z += 1.0
+    end
+    iz = 1.0 / z
+    q = iz * iz
+    return s + iz * (1.0 + iz * (0.5 + iz *
+        (1/6 - q * (1/30 - q * (1/42 - q * (1/30 - q * (5/66)))))))
+end
+
 """
     moran_coefficient(y, W)
 
@@ -285,20 +320,22 @@ function _fit_glm(X::AbstractMatrix{T}, y::AbstractVector{T}, family::Symbol;
     return β, μ, w, converged
 end
 
-# Method-of-moments dispersion update for the negative binomial. For NB2,
-# Var(y) = μ + αμ², so ((y - μ)² - μ)/μ² has mean α. The average is taken
-# over the residual degrees of freedom rather than N, the usual Pearson
-# dispersion convention: μ̂ is fitted, so the squared deviations are too
-# small and dividing by N biases α downwards. Pass `n_par` as the number of
-# columns in the design that produced μ.
+# Method-of-moments dispersion update for the negative binomial -- the
+# scheme of Chun et al. (2016), reached through `dispersion=:moments`. For
+# NB2, Var(y) = μ + αμ², so ((y - μ)² - μ)/μ² has mean α. The average is
+# taken over the residual degrees of freedom rather than N, the usual
+# Pearson dispersion convention: μ̂ is fitted, so the squared deviations are
+# too small and dividing by N biases α downwards. Pass `n_par` as the
+# number of columns in the design that produced μ.
 #
-# This removes only part of the bias -- the rest is intrinsic to
-# method-of-moments and shrinks with N. Measured at a true α of 0.5 over
-# 300 replications with a two-column design:
-#
-#   N      60     81    150    300    600   1500
-#   /N   -14.1% -12.3%  -4.5%  -3.2%  -1.9%  +0.6%
-#   /df  -11.2% -10.1%  -3.2%  -2.5%  -1.6%  +0.7%
+# Dividing by the df removes only part of that bias; the rest is intrinsic
+# to the moment estimator and shrinks with N. It is also the noisier of the
+# two estimators at every N -- see `_negbin_alpha_mle`, which is the
+# default -- and its *mean* bias is a poor summary, because the sampling
+# distribution of α̂ is right-skewed and the mean moves several points
+# between seeds. At N = 81 over five independent 1000-replication runs the
+# mean bias ranged over -3.7% to -9.8% while the rmse stayed within
+# 0.269-0.288.
 function _update_negbin_alpha(y::AbstractVector{T}, μ::AbstractVector{T};
                               n_par::Int=0) where {T}
     N = length(y)
@@ -308,6 +345,99 @@ function _update_negbin_alpha(y::AbstractVector{T}, μ::AbstractVector{T};
         num += ((y[i] - μi)^2 - μi) / (μi^2)
     end
     return max(T(1e-6), num / max(N - n_par, 1))
+end
+
+# ── NB2 dispersion by maximum likelihood ──────────────────────────────
+#
+# Profile score for α at fixed μ, written in θ = 1/α:
+#
+#   s(θ) = Σᵢ [ ψ(yᵢ+θ) − ψ(θ) + log(θ/(θ+μᵢ)) + 1 − (θ+yᵢ)/(θ+μᵢ) ]
+#
+# and ∂ℓ/∂α = −θ² s(θ), so a root of s is a stationary point of the
+# log-likelihood in α. Returns (s, s′) with the derivative in θ.
+function _negbin_theta_score(y::AbstractVector{T}, μ::AbstractVector{T},
+                             θ::Float64) where {T}
+    s = 0.0
+    ds = 0.0
+    ψθ = _digamma(θ)
+    ψ1θ = _trigamma(θ)
+    @inbounds for i in eachindex(y)
+        μi = max(Float64(μ[i]), 1e-10)
+        yi = Float64(y[i])
+        tμ = θ + μi
+        s += _digamma(yi + θ) - ψθ + log(θ / tμ) + 1.0 - (θ + yi) / tμ
+        ds += _trigamma(yi + θ) - ψ1θ + 1.0 / θ - 1.0 / tμ - (μi - yi) / (tμ * tμ)
+    end
+    return s, ds
+end
+
+# Maximum likelihood estimate of the NB2 dispersion α at fixed μ: the
+# one-dimensional root of the profile score above, by Newton on log θ with
+# a maintained bracket so a bad Newton step falls back to bisection.
+#
+# `α_start` is a warm start -- pass the previous sweep's α inside an
+# alternating loop, or leave it at zero to start from the moment estimate.
+#
+# The score as α → 0⁺ is ∂ℓ/∂α = ½ Σ[(yᵢ−μᵢ)² − yᵢ], the Poisson
+# overdispersion score; only its sign is wanted below, so the ½ is dropped.
+# When it is non-positive the likelihood is maximised at the Poisson limit
+# and α̂ sits on `α_min`, which is also what keeps the working weights
+# μ/(1+αμ) finite there.
+function _negbin_alpha_mle(y::AbstractVector{T}, μ::AbstractVector{T};
+                           α_start::Real=0.0, α_min::Real=1e-6,
+                           α_max::Real=1e6, maxiter::Int=60,
+                           tol::Real=1e-12) where {T}
+    s_at_zero = 0.0
+    @inbounds for i in eachindex(y)
+        μi = max(Float64(μ[i]), 1e-10)
+        yi = Float64(y[i])
+        s_at_zero += (yi - μi)^2 - yi
+    end
+    s_at_zero <= 0.0 && return T(α_min)
+
+    lo = Float64(α_min)
+    hi = Float64(α_max)
+    α = Float64(α_start) > 0.0 ? clamp(Float64(α_start), lo, hi) :
+        clamp(Float64(_update_negbin_alpha(y, μ)), lo, hi)
+    # ∂ℓ/∂α = −θ²s(θ), so s < 0 below the maximum and s > 0 above it:
+    # s(1/α) < 0 means α is too small. Double or halve until bracketed.
+    s, _ = _negbin_theta_score(y, μ, 1.0 / α)
+    if s < 0.0
+        lo = α
+        while lo < hi
+            α = min(2.0 * lo, hi)
+            sa, _ = _negbin_theta_score(y, μ, 1.0 / α)
+            sa >= 0.0 && (hi = α; break)
+            lo = α
+        end
+        lo >= hi && return T(hi)
+    else
+        hi = α
+        while hi > lo
+            α = max(0.5 * hi, lo)
+            sa, _ = _negbin_theta_score(y, μ, 1.0 / α)
+            sa < 0.0 && (lo = α; break)
+            hi = α
+        end
+        hi <= lo && return T(lo)
+    end
+
+    α = sqrt(lo * hi)
+    for _ in 1:maxiter
+        θ = 1.0 / α
+        s, ds = _negbin_theta_score(y, μ, θ)
+        s < 0.0 ? (lo = α) : (hi = α)
+        # d s / d log θ = θ s′(θ), and log θ = −log α.
+        step = θ * ds
+        α_new = abs(step) > 0.0 ? α * exp(s / step) : sqrt(lo * hi)
+        if !(isfinite(α_new)) || α_new <= lo || α_new >= hi
+            α_new = sqrt(lo * hi)
+        end
+        converged = abs(α_new - α) <= tol * α
+        α = α_new
+        converged && break
+    end
+    return T(clamp(α, α_min, α_max))
 end
 
 function _pearson_resid(family::Symbol, y::AbstractVector{T}, μ::AbstractVector{T},
@@ -383,9 +513,10 @@ g(\\mu) = \\alpha + X\\beta + E_{sel}\\gamma
 ```
 
 `family` is `:gaussian` (OLS), `:poisson`, `:logit`, or `:negbin`; the last three
-are fit by IRLS, with the negative binomial's dispersion updated by method of
-moments between IRLS passes (Chun et al., 2016). This makes ESF usable wherever a
-GLM is, which parametric SAR/SEM cannot match.
+are fit by IRLS. The negative binomial's dispersion is re-estimated between IRLS
+passes, by its own maximum likelihood (`dispersion=:mle`, the default) or by the
+method of moments of Chun et al. (2016) (`dispersion=:moments`). This makes ESF
+usable wherever a GLM is, which parametric SAR/SEM cannot match.
 
 Eigenvectors are added greedily. `criterion=:moran` picks, at each step, the
 candidate that most reduces the absolute Moran coefficient of the residuals
@@ -431,21 +562,47 @@ Newton step moves by 1e-16.
 
 `vcov` is the inverse of the IRLS information `X′WX`. The log and logit
 links are canonical for the Poisson and the Bernoulli, so that is also
-the observed Hessian, and coverage of a nominal 95% slope interval comes
-out at 93.2-95.2% over 250 replications at `N = 81`.
+the observed Hessian; the coverage those two reach is in the table below.
 
 The log link is **not** canonical for NB2, so `X′WX` is the expected
 information there and genuinely differs from the Hessian. That is the
 right choice — the NB2 information matrix is block diagonal in `β` and
-`α`, so estimating the dispersion does not inflate `Var(β̂)` — but the
-dispersion itself is estimated by method of moments and runs low in small
-samples, about −13% at `N = 81` against a true `α = 0.5`, shrinking to
-under −2% by `N = 1500`. A dispersion that is too small makes the working
-weights too large, so negative-binomial slope intervals are mildly
-optimistic: 91.6% coverage at `N = 81` on the same design where the
-Poisson gives 95.2%. Switching the dispersion to its own maximum
-likelihood estimate would remove most of that, at the cost of departing
-from the method-of-moments scheme of Chun et al. (2016).
+`α`, so estimating the dispersion does not inflate `Var(β̂)`.
+
+The dispersion itself is estimated by maximum likelihood: the root of the
+profile score for `α` at the current `μ`, found by Newton on `log(1/α)`
+within a maintained bracket. The alternative, `dispersion=:moments`, is
+the Pearson moment estimate of Chun et al. (2016), kept because that is
+the scheme the method was published with. The MLE is the more precise of
+the two at every sample size: at a true `α = 0.5` over 3000 samples its
+root mean squared error is 0.199 against the moment estimate's 0.285 at
+`N = 81`, and 0.046 against 0.067 at `N = 1500` — about a third off
+throughout — and it is the closer of the two on roughly two samples in
+three. Its median bias at `N = 81` is −8.7% against −16.2%.
+
+The moment estimate also reports a dispersion on the positivity floor far
+more often: on the `N = 81` coverage design below it does so for 5.6% of
+fits against the MLE's 0.7%. Those fits keep the working weights at their
+Poisson values, and their slope intervals cover 13 to 19 points worse
+than the same scheme's other fits.
+
+Coverage of a nominal 95% slope interval at `N = 81`, over 6000
+replications on the design described above:
+
+| | β₁ | β₂ |
+|---|---|---|
+| Poisson | 93.1% | 93.2% |
+| logit | 94.5% | 94.7% |
+| negbin, `:mle` | 93.3% | 92.6% |
+| negbin, `:moments` | 92.2% | 91.6% |
+
+So the dispersion is no longer what holds the negative binomial back: on
+`:mle` it covers as well as the Poisson does. What the three count and
+binary families still have in common is the post-selection effect
+described above under *Inference after selection* — the mean standard
+error is 0.92 of `β̂`'s actual sampling standard deviation for every one
+of them, `:moments` and `:mle` alike — and that, not the dispersion, is
+what the last two points are.
 """
 function fit_esf(
     X::AbstractMatrix{T},
@@ -454,6 +611,7 @@ function fit_esf(
     family::Symbol=:gaussian,
     max_eigenvectors::Int=20,
     criterion::Symbol=:moran,
+    dispersion::Symbol=:mle,
     min_moran_ratio::Real=0.25,
     moran_tol::Real=0.05,
     n_candidates::Union{Nothing, Int}=nothing,
@@ -465,6 +623,7 @@ function fit_esf(
     @assert length(y) == N "y and X must have the same number of rows"
     @assert family in _ESF_FAMILIES "family must be one of $(_ESF_FAMILIES)"
     @assert criterion in (:moran, :aic) "criterion must be :moran or :aic"
+    @assert dispersion in (:mle, :moments) "dispersion must be :mle or :moments"
     @assert max_eigenvectors >= 0
     family === :logit && @assert all(v -> v == zero(T) || v == one(T), y) "logit requires y coded 0/1"
     if family === :poisson || family === :negbin
@@ -487,7 +646,9 @@ function fit_esf(
         β, μ, w, conv = _fit_glm(Xf, yv, family)
         if family === :negbin
             for _ in 1:12
-                α_new = _update_negbin_alpha(yv, μ; n_par=size(Xf, 2))
+                α_new = dispersion === :mle ?
+                    _negbin_alpha_mle(yv, μ; α_start=α) :
+                    _update_negbin_alpha(yv, μ; n_par=size(Xf, 2))
                 abs(α_new - α) < T(1e-8) && (α = α_new; break)
                 α = α_new
                 β, μ, w, conv = _fit_glm(Xf, yv, family; α=α)

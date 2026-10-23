@@ -83,7 +83,7 @@ Each row was checked against an independent reference, not merely reviewed.
 | `spatial_eigenvectors` | the spectrum of `M W_sym M`, and the trace identity `Σλ = −S₀/N` | correct to 1e-14. No change needed |
 | `fit_esf` | the unbiased OLS covariance on the same design, plus 400-replication coverage | **every standard error was short by `√((N−P)/N)`** — finding 18 |
 | `fit_re_esf` | dense GLS, Woodbury, a REML grid, and 120-replication recovery of both variance components | correct to 1e-12 throughout. No change needed |
-| ESF GLM families | `Distributions.logpdf`, and a ForwardDiff score and Hessian at the IRLS optimum | likelihoods and IRLS exact; **the negative binomial's dispersion was biased low** — finding 19 |
+| ESF GLM families | `Distributions.logpdf`, and a ForwardDiff score and Hessian at the IRLS optimum | likelihoods and IRLS exact; **the negative binomial's dispersion was biased low** — finding 19, and now has its own MLE — finding 25 |
 | `build_gmm_system` | the instrument structure in Roodman (2009), checked entry by entry | correct: lag layout, collapsing, level block and `H` all as specified. No change needed |
 | `fit_dynamic_gmm` `vcov` | Windmeijer (2005) eq. 4.4, and coverage over `N` from 50 to 800 | **the correction's two dominant terms were mis-assembled** — finding 20 |
 | `compute_ab_serial_correlation` | 300-replication Monte Carlo under a correctly specified model | correct: AR(2) standard deviation 0.97–1.06, rejecting 5.3–6.0%. No change needed |
@@ -630,7 +630,7 @@ its own generating model over 120 replications it recovers both variance
 components, `τ̂²` averaging 0.5017 against a true 0.5 and `σ̂²` 0.2526
 against 0.25, with coverage 94.3% and 95.3%. Nothing changed.
 
-### 19. The ESF negative binomial's dispersion was biased low — FIXED, partly
+### 19. The ESF negative binomial's dispersion was biased low — FIXED, and finished in finding 25
 
 First, what was right. All four `_glm_loglik` branches match the
 corresponding `Distributions.logpdf` to 1e-10, and `_fit_glm` reaches the
@@ -663,7 +663,7 @@ better. At a true `α = 0.5` over 300 replications:
 
 Inside `fit_esf` at `N = 81` the estimate moved from 0.407 to 0.433.
 
-**Why this is only a partial fix.** The remaining bias is intrinsic to
+**Why this was only a partial fix.** The remaining bias is intrinsic to
 method of moments, not a degrees-of-freedom error — it shrinks with `N` and
 is gone by `N = 1500`, so the estimator is consistent. A dispersion that is
 too small makes the working weights `μ/(1+αμ)` too large and so the
@@ -672,9 +672,17 @@ standard errors too small: coverage of a nominal 95% slope interval at
 Poisson on the same design. Replacing method of moments with the
 one-dimensional maximum likelihood estimate of `α` would remove most of
 what is left, but the docstring cites Chun et al. (2016) for the
-method-of-moments scheme, so that is a design change rather than a
-correction and is left to the user. The measured bias and its coverage
-consequence are now documented at the call site.
+method-of-moments scheme, so that was a design change rather than a
+correction.
+
+**Finding 25 made that change.** `dispersion=:mle` is now the default and
+the moment scheme is kept as `dispersion=:moments`. Two numbers in the
+paragraph above do not survive the larger Monte Carlo run there and should
+be read from finding 25 instead: the single-slope figures 91.6% and 95.2%
+are 250-replication estimates, and at 6000 replications the Poisson's own
+coverage on this design is 93.1-93.2%, not 95.2%. The table of mean biases
+above is likewise seed-sensitive — see finding 25 — though the ordering
+`/df` over `/N` it was reported to establish holds.
 
 Coverage for the two canonical families needs no caveat: 93.2% and 95.2%
 for the Poisson, 93.6% and 95.2% for the logit, over 250 replications at
@@ -1060,6 +1068,125 @@ Passing the first-stage matrices is optional, so calling
 path is what checks the moment algebra against known disturbances, where
 there is no first stage to correct for, and testset 4b pins both.
 
+### 25. The ESF negative binomial's dispersion now has its own MLE — DONE
+
+Finding 19 left the dispersion on method of moments and recorded the
+consequence rather than fixing it. `fit_esf` now takes
+`dispersion=:mle` (the default) or `dispersion=:moments`, which is the
+Chun et al. (2016) scheme the method was published with, kept because the
+docstring cites it.
+
+The MLE is the root of the profile score for `α` at the current `μ`,
+written in `θ = 1/α`:
+
+    s(θ) = Σᵢ [ ψ(yᵢ+θ) − ψ(θ) + log(θ/(θ+μᵢ)) + 1 − (θ+yᵢ)/(θ+μᵢ) ]
+
+with `∂ℓ/∂α = −θ²s(θ)`, solved by Newton on `log θ` inside a maintained
+bracket so a bad step falls back to bisection. As `α → 0⁺` the score is
+`½Σ[(yᵢ−μᵢ)² − yᵢ]`, the Poisson overdispersion score; when that is
+non-positive the likelihood is maximised at the Poisson limit and `α̂`
+sits on the positivity floor, which is the honest answer there rather
+than a negative variance.
+
+Checked against independent references, not merely reviewed:
+
+- `ψ` and `ψ₁` against `ψ(1) = −γ`, `ψ(½) = −γ−2log2`,
+  `ψ(m) = −γ + Σ_{k<m} 1/k`, `ψ₁(1) = π²/6`, `ψ₁(½) = π²/2`,
+  `ψ₁(m) = π²/6 − Σ_{k<m} 1/k²`, and both recurrences across the switch
+  from recursion to the asymptotic series: 1e-13 and 1e-12. The first
+  version truncated the trigamma series at `x ≥ 10`, which left 7e-13 —
+  visible against the closed form, so the series was pushed to `x ≥ 20`.
+- the score against `ForwardDiff` on the `Distributions` NB2
+  log-likelihood differentiated in `α`: 1e-10 at `α = 0.2, 0.5, 0.6, 1.3`.
+  The reported derivative in `θ` against a central difference of the
+  score: 1e-6.
+- `α̂` is not merely close to the best point of a 2001-point grid over
+  `[0.05, 2]` — it is better, and the score vanishes there to 1e-8.
+
+**What it buys.** Mostly precision, not bias. At a true `α = 0.5`, over
+3000 replications per cell — three independent 1000-replication runs
+pooled, on the two-column design of finding 19, both estimators run on
+the same samples:
+
+| N | 60 | 81 | 150 | 300 | 600 | 1500 |
+|---|---|---|---|---|---|---|
+| `:moments` mean bias | −11.5% | −8.5% | −5.0% | −2.3% | −1.1% | −0.4% |
+| `:mle` mean bias | −7.3% | −5.7% | −3.6% | −1.1% | −1.0% | −0.2% |
+| `:moments` median bias | −18.2% | −16.2% | −9.3% | −5.0% | −2.9% | −0.8% |
+| `:mle` median bias | −11.5% | −8.7% | −4.6% | −1.8% | −1.2% | −0.5% |
+| `:moments` rmse | 0.309 | 0.285 | 0.204 | 0.146 | 0.109 | 0.067 |
+| `:mle` rmse | **0.229** | **0.199** | **0.140** | **0.101** | **0.071** | **0.046** |
+| rmse ratio | 0.74 | 0.70 | 0.69 | 0.69 | 0.65 | 0.68 |
+| `:mle` the closer of the two | 62.6% | 64.9% | 64.5% | 65.1% | 68.2% | 66.5% |
+| `:moments` on the floor | 4.7% | 2.4% | 0.2% | 0.0% | 0.0% | 0.0% |
+| `:mle` on the floor | 0.7% | 0.2% | 0.0% | 0.0% | 0.0% | 0.0% |
+
+The rmse improvement is the stable part: a third off at every size
+tested, and the MLE is the closer of the two on about two samples in
+three. Both estimators are consistent and the bias rows mostly restate
+that, but read the *median* rows rather than the mean ones — `α̂` is
+right-skewed, and the mean moves several points between seeds. At
+`N = 81`, across five independent 1000-replication runs, the moment
+estimate's mean bias ranged over −3.7% to −9.8% while its rmse stayed
+within 0.269–0.288. That is why finding 19's −10.1% at this `N` does not
+reproduce at a different seed, and why it is not evidence of much.
+
+Coverage of a nominal 95% slope interval at `N = 81`, on finding 19's
+design, over 6000 replications:
+
+| | β₁ | β₂ |
+|---|---|---|
+| Poisson | 93.1% | 93.2% |
+| logit | 94.5% | 94.7% |
+| `:mle` | **93.3%** | **92.6%** |
+| `:moments` | 92.2% | 91.6% |
+
+So the dispersion is no longer what holds the negative binomial back: on
+`:mle` it covers as well as the Poisson does on the same design. Two
+further notes on that. First, the 95.2% quoted for the Poisson in
+finding 19 was one slope at 250 replications; at 6000 the two slopes come
+out at 93.1% and 93.2%, so the target the negative binomial was short of
+was never 95.2% — it was 93%. The headline of finding 19, "91.6% against
+95.2% for the Poisson", overstated the gap for that reason, and the
+"91.6% toward 95.2%" the queue was holding this item for was not an
+attainable 3.6 points. The honest version is 1 point of coverage and a
+third off the dispersion's rmse. Second, what is still missing at 95% is
+the post-selection effect of finding 18's docstring note, which every
+family pays: the mean standard error is 0.92 of `β̂`'s actual sampling
+standard deviation for the Poisson, the logit, `:moments` and `:mle`
+alike.
+
+**Where the coverage gain comes from.** Running both schemes on each of
+the 6000 replications and splitting on whether the moment estimate landed
+on the positivity floor — where the working weights revert to the
+Poisson's `μ` and the standard errors are far too small:
+
+| | fits | `:moments` β₁ | `:mle` β₁ | `:moments` β₂ | `:mle` β₂ |
+|---|---|---|---|---|---|
+| all | 6000 | 92.2% | 93.3% | 91.6% | 92.6% |
+| `:moments` on the floor | 334 | 74.0% | 84.7% | 79.3% | 88.0% |
+| `:moments` not on the floor | 5666 | 93.2% | 93.8% | 92.3% | 92.9% |
+
+So it is about half and half, not mostly the floor. The floor subset
+carries 0.60 of the 1.15 points gained on β₁ (334 fits improving by 10.7
+points) and 0.48 of the 0.97 on β₂; the other half comes from the 5666
+ordinary fits improving by half a point each. The floor is still where
+the individual fits are worst — reporting
+`α̂ = 1e-6` against a true 0.5 costs 13 points of coverage on β₂ and 19
+on β₁, measured against the same scheme's own off-floor fits — and the
+MLE recovers 9 to 11 of those points without eliminating the problem,
+since it lands on the floor for 0.7% of these fits itself.
+
+Note also that the floor is much commoner inside `fit_esf` than the
+two-column table above suggests: 5.6% of fits here against 2.4% at the
+same `N`, because this design carries ten-odd columns and a weaker
+signal per column.
+
+Cost: 17% more time per negative-binomial `fit_esf` than the moment
+update — 144s against 123s over the same 6000 fits, draws included.
+Newton converges in a handful of iterations from the previous `α` as a
+start, so it does not change the cost class of the greedy selection loop.
+
 ## Queue
 
 Closed: the variance matrices, the panel diagnostics (all five functions
@@ -1069,15 +1196,12 @@ regimes, the tables and their exporters, the extension entry points and
 the Turing extension's likelihood, and — with finding 24 — the GS2SLS
 first-stage correction that finding 10 left open.
 
-Every module the audit set out to cover is now closed. What is left is
-one optional improvement, not a correction:
+Every module the audit set out to cover is now closed, and the one
+optional improvement the queue was holding — `fit_esf`'s
+negative-binomial dispersion — is done as finding 25. Nothing is
+outstanding.
 
-1. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
-   could use its own maximum likelihood estimate instead of method of
-   moments, which would lift its small-sample coverage from 91.6% toward
-   the 95.2% the Poisson achieves. See finding 19.
-
-Done: findings 1–24. Suite: 576 → 1086 passing, none failing.
+Done: findings 1–25. Suite: 576 → 1156 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point

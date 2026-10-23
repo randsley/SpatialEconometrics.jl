@@ -120,7 +120,16 @@ end
 mn = fit_esf(Xc, yn, W; family = :negbin, max_eigenvectors = 8,
              eigen_basis = se_scr, varnames = ["x1", "x2"])
 println(mn)
-println("dispersion alpha_hat = $(round(mn.alpha; digits=3))")
+# y is Poisson with a mean-1 gamma(shape 2) mixture, so Var(y) = mu + mu^2/2
+# and the true dispersion is alpha = 0.5. The default estimates it by its own
+# maximum likelihood; dispersion = :moments is the Chun et al. (2016) scheme.
+mn_mom = fit_esf(Xc, yn, W; family = :negbin, max_eigenvectors = 8,
+                 eigen_basis = se_scr, varnames = ["x1", "x2"],
+                 dispersion = :moments)
+println("dispersion alpha_hat = $(round(mn.alpha; digits=3))  (:mle, the default)")
+println("                     = $(round(mn_mom.alpha; digits=3))  (:moments)")
+println("true alpha = 0.5. The MLE is the more precise of the two in small")
+println("samples -- the fit_esf docstring has the measured comparison.")
 println("var/mean of y = $(round(var(yn) / mean(yn); digits=2))  (>1 means overdispersed)")
 println()
 
