@@ -302,6 +302,13 @@ lines up with the DGP's parameter ordering for all six DGPs.
 
 Replications whose estimator throws are excluded and reported rather than
 averaged in; `n_successful` records how many contributed.
+
+An estimator that reports *fewer* parameters than the DGP has — any
+non-spatial estimator, for instance — leaves the trailing rows as `NaN`
+rather than zero, with a warning. Zero would be read as an estimate: an
+OLS fit against `SAR_DGP(0.4, …)` otherwise reported `ρ` as
+`mean 0.0000  std 0.0000  bias -0.4000`, which looks like a measurement of
+ρ rather than its absence.
 """
 function monte_carlo_spatial(
     dgp::SpatialDGP,
@@ -321,6 +328,7 @@ function monte_carlo_spatial(
     param_store = zeros(T, config.n_replications, n_params)
     succeeded = falses(config.n_replications)
     n_diag = 0
+    n_short = 0
     moran_reject = 0
     lm_lag_reject = 0
     lm_err_reject = 0
@@ -332,9 +340,21 @@ function monte_carlo_spatial(
         try
             m = estimator(W, X_sim, y_sim)
             c = _coef_vector(m, n_params)
-            for j in 1:min(n_params, length(c))
+            n_got = min(n_params, length(c))
+            for j in 1:n_got
                 param_store[rep, j] = c[j]
             end
+            # Parameters the estimator never reported are not estimates of
+            # anything. Leaving them at zero publishes a mean of 0.0 with a
+            # standard deviation of 0.0 and a bias of exactly minus the true
+            # value, which reads as a finding rather than an absence — fit a
+            # non-spatial estimator to SAR data and the ρ row came out
+            # `mean 0.0000  std 0.0000  bias -0.4000`. NaN says “not
+            # estimated” and propagates into every summary.
+            for j in (n_got + 1):n_params
+                param_store[rep, j] = T(NaN)
+            end
+            n_short = max(n_short, n_params - n_got)
             succeeded[rep] = true
         catch
             continue
@@ -364,6 +384,10 @@ function monte_carlo_spatial(
     n_ok < config.n_replications &&
         @warn "monte_carlo_spatial: $(config.n_replications - n_ok) of " *
               "$(config.n_replications) replications failed and were excluded"
+    n_short > 0 &&
+        @warn "monte_carlo_spatial: the estimator reported " *
+              "$(n_params - n_short) of the DGP's $n_params parameters; the " *
+              "trailing $n_short row(s) are NaN, not estimates"
 
     kept = @view param_store[succeeded, :]
     means = vec(mean(kept, dims=1))

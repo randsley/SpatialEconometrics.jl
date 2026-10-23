@@ -91,6 +91,8 @@ Each row was checked against an independent reference, not merely reviewed.
 | `_rho_logpost` | the dense `logabsdet(A) - 0.5*dot(r,r)` form, at six values of ρ | exact to 7e−15. No change needed |
 | `_sweep_latent!` | its untruncated stationary distribution against `N(μ, H⁻¹)` | correct: mean and covariance recovered to 1.4% and 1.5% over 40000 sweeps. No change needed |
 | `_rand_truncnorm` | `Distributions.truncated(Normal(…))` in four configurations | exact, including μ two SD outside the kept region. No change needed |
+| the six `simulate_spatial` DGPs | closed-form mean and covariance of `y` with `X` fixed, 60000 draws | all six correct: means within 1.8 Monte Carlo se, covariances within 1.3%. No change needed |
+| `monte_carlo_spatial` summaries | the bias and RMSE identities, and seed reproducibility | correct, and the OLS diagnostics it reports are sized (0.053/0.048/0.057 at ρ = 0) with power 0.84 for `lm_lag` at ρ = 0.4. **But an estimator reporting too few parameters was zero-filled** — finding 22 |
 | Gibbs β and cutpoint conditionals | the conjugate posterior, and Albert–Chib's order-statistic bounds | both as stated; `τ_1 = 0` and no intercept is the right identification. **But the accuracy claim in the docstring was wrong** — finding 21 |
 
 ## Open findings
@@ -803,21 +805,77 @@ Why it matters beyond the wording: a user reading "centred correctly" would
 take ρ̂ = 0.26 at `N = 64` as noise around 0.4 and lengthen the chain. The
 chain was never the problem.
 
+### 22. A short coefficient vector was reported as zero — FIXED
+
+`monte_carlo_spatial` compares an estimator's coefficients against the
+DGP's true parameters row by row. It copied what the estimator gave it:
+
+```julia
+for j in 1:min(n_params, length(c))
+    param_store[rep, j] = c[j]
+end
+succeeded[rep] = true
+```
+
+`param_store` starts as `zeros`, so when the estimator reports fewer
+parameters than the DGP has, the trailing slots keep their zeros and the
+replication is still marked successful. Nothing warns. Fit any
+non-spatial estimator to spatial data — OLS against `SAR_DGP(0.4, …)`,
+which is exactly the comparison a user runs to show what ignoring
+dependence costs — and the table came back:
+
+```
+  β1   mean   1.05854  std   0.14312  bias   0.05854  rmse   0.15463
+  β2   mean  -0.52242  std   0.14583  bias  -0.02242  rmse   0.14754
+  ρ    mean   0.00000  std   0.00000  bias  -0.40000  rmse   0.40000
+```
+
+That last row is not a measurement of ρ. It is the absence of one, printed
+in the same format as the two rows above it, with a bias of exactly
+`-ρ_true` and a standard deviation of exactly zero. A reader could take it
+for a finding about OLS — and it is even a *plausible-looking* one, since
+“OLS estimates ρ as 0” sounds right until you notice no estimate was ever
+made and the zero would be identical for any true ρ.
+
+Unestimated rows are now `NaN`, which propagates into mean, std, bias and
+RMSE alike, and the call warns once naming how many rows are affected.
+The β rows are unchanged. Same class of error as finding 16's ridge: a
+quantity that does not exist was given a numeric value instead of being
+marked missing.
+
+### Verified with no change: the rest of the simulation module
+
+All six DGPs match their closed-form first and second moments with `X`
+held fixed — `SAR` and `SDM` filtered by `A⁻¹` with covariance
+`σ²(A′A)⁻¹`, `SEM` and `SDEM` by `B⁻¹` on the errors only, `SAC` by both
+(`σ² A⁻¹B⁻¹B⁻′A⁻′`), `SLX` unfiltered — over 60000 draws, means within
+1.8 Monte Carlo standard errors and covariances within 1.3% of the
+largest entry. `σ` scales the standard deviation, not the variance.
+
+`monte_carlo_spatial`'s own arithmetic is right: `bias = mean - truth`
+exactly, `rmse = √(bias² + std²)`, a fixed seed reproduces the experiment,
+and all-replications-failed raises rather than returning an empty table.
+The three OLS diagnostics it reports are correctly sized — 0.053, 0.048
+and 0.057 against a nominal 0.05 over 600 replications at ρ = 0 — with
+power 0.695, 0.840 and 0.580 at ρ = 0.4, `lm_lag` strongest against a lag
+alternative as it should be. That calibration matters more than usual
+after findings 13–16, which were all mis-sized tests.
+
 ## Queue
 
 Closed so far: the variance matrices, the panel diagnostics (all five
 functions in testset 14), spatial filtering (all five functions, all four
 families), dynamic GMM, and the discrete-choice samplers. What is left:
 
-1. Simulation (17), regimes (16) beyond the variance, tables (18),
-   extension entry points (24).
+1. Regimes (16) beyond the variance, tables (18), extension entry
+   points (24).
 2. The GS2SLS first-stage correction left open in finding 10.
 3. Optional, not a correction: `fit_esf`'s negative-binomial dispersion
    could use its own maximum likelihood estimate instead of method of
    moments, which would lift its small-sample coverage from 91.6% toward
    the 95.2% the Poisson achieves. See finding 19.
 
-Done: findings 1–21. Suite: 576 → 994 passing, none failing.
+Done: findings 1–22. Suite: 576 → 1034 passing, none failing.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
