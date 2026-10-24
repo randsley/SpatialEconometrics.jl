@@ -2,7 +2,7 @@
 
 > **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,274 test assertions in 53 testsets with both package
+> 22 submodules, 1,270 test assertions in 53 testsets with both package
 > extensions installed, 20 examples, 9 notebooks, 2 package extensions,
 > CI/CD and 21 Documenter.jl pages. **Phases 4, 5 and 6
 > are complete except item #10 (Performance)**, which is the next piece of work.
@@ -717,20 +717,21 @@ Rows above the rule are measured; rows below are estimates.
 |---|---|---|---|
 | **v0.3.0** (registered) | 13 | 54 | ~6,500 |
 | **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
-| **master** (+ Phase 6B items 1–2) | 22 | 1,274 | 13,970 |
+| **master** (+ Phase 6B items 1–2) | 22 | 1,270 | 13,995 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 13,970 lines of
-`src/`, 4,047 lines of tests (1,274 assertions in 53 testsets with both
-package extensions installed), 2,492 lines of examples across 20 scripts,
+Measured on master: 22 submodules plus the umbrella across 13,995 lines of
+`src/`, 4,083 lines of tests (1,270 assertions in 53 testsets with both
+package extensions installed; 1,229 on Julia 1.10, where the two extension
+testsets skip), 2,492 lines of examples across 20 scripts,
 398 lines of package extensions, 21 documentation pages and 9 notebooks
 (3 Jupyter, 6 Pluto).
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed
-form, a published number or an independently written reference. The 118 on
+form, a published number or an independently written reference. The 114 on
 top of that are Phase 6B's first two items, which came in under the same
 rule.
 

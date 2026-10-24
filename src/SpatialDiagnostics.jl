@@ -842,10 +842,33 @@ end
 # which W*X_d lands in span(X). That is a statement about the design, not a
 # numerical hiccup, so it is thrown rather than ridged away: a silently
 # regularised statistic is the failure mode finding 16 recorded.
+# Is this information matrix safe to invert?
+#
+# `issuccess` on a `check = false` Cholesky is NOT a rank test. For an
+# exactly rank-deficient Gram matrix -- a repeated column in X, or a W for
+# which W*X lands in span(X) -- whether the final pivot comes out slightly
+# positive or slightly negative is down to the rounding of the particular
+# LAPACK build. It came out positive on macOS/aarch64 and on the Julia 1.10
+# dependency set, so the factorisation "succeeded" and the inverse returned
+# large meaningless numbers: finding 16's failure mode arrived by a different
+# route, and the first version of this code did not catch it.
+#
+# The Cholesky pivots are a usable conditioning estimate, so gate on their
+# ratio. A pivot ratio at or below sqrt(eps) means a condition number around
+# 1/eps, which is singular by any standard a score test cares about, while a
+# well-conditioned block sits near 1.
+function _chol_or_nothing(J::AbstractMatrix{T}) where {T<:AbstractFloat}
+    F = cholesky(Symmetric(J); check = false)
+    issuccess(F) || return nothing
+    piv = diag(F.U)
+    lo, hi = extrema(abs, piv)
+    hi > zero(T) && lo > sqrt(eps(T)) * hi ? F : nothing
+end
+
 function _score_quadform(d::AbstractVector{T}, J::AbstractMatrix{T},
                          what::AbstractString) where {T<:AbstractFloat}
-    F = cholesky(Symmetric(J); check = false)
-    issuccess(F) || throw(ArgumentError(
+    F = _chol_or_nothing(J)
+    F === nothing && throw(ArgumentError(
         "the information matrix for $what is singular, so the score " *
         "statistic is not defined. The usual cause is a Durbin block " *
         "collinear with X: a repeated column in X, or a W for which W*X " *
@@ -1007,10 +1030,11 @@ Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56.
 function lm_test_durbin_terms(y::AbstractVector{T}, X::AbstractMatrix{T},
                               W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
     c = _sdm_score_components(y, X, W)
-    F = cholesky(Symmetric(c.J); check = false)
-    issuccess(F) || throw(ArgumentError(
+    F = _chol_or_nothing(c.J)
+    F === nothing && throw(ArgumentError(
         "the information matrix for the Durbin terms is singular, so the " *
-        "per-term score statistics are not defined."))
+        "per-term score statistics are not defined. The usual cause is a " *
+        "repeated column in X, or a W for which W*X lies in the span of X."))
     Jinv = inv(F)
     u = Jinv * c.d
     out = Vector{ScoreTestResult{T}}(undef, c.k)

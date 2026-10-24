@@ -1203,7 +1203,8 @@ outstanding.
 
 Done: findings 1–25. Suite: 576 → 1156 passing, none failing.
 
-Post-audit, under the standing rule in the last section: 1274 passing.
+Post-audit, under the standing rule below: 1270 passing on Julia 1.13 with
+both extensions, 1229 on Julia 1.10 where the extensions are absent.
 
 A pattern worth naming. Findings 1–7 all lived in *second-order* quantities
 — a variance, a trace, a test statistic's scale factor — and the point
@@ -1314,4 +1315,66 @@ the variant and `X` held fixed the parameter count does not vary with `k`,
 so AIC, BIC and the raw log-likelihood rank the candidates identically here
 — the test pins that too, so the `criterion` keyword is not mistaken for
 doing work it does not do in this search.
+
+## A whole class of fragile assertion: pinning a random draw
+
+CI went red on Julia 1.10 and on macOS/aarch64 while passing on Julia 1
+under Linux and Windows and on nightly. Eight assertions failed, and all but
+one had a single cause.
+
+**`randn(::MersenneTwister, n)` is not reproducible across Julia minor
+versions.** Julia guarantees a stream only within a minor release. The same
+`MersenneTwister(1_300_014)` and the same calls give `sum(X) = −19.63` on
+1.13 and `−32.82` on 1.10. Every assertion that pins a number which a
+particular stream produced is therefore version-fragile by construction,
+however carefully the number was measured.
+
+Four assertions were of that kind, and two of them were already unsound on
+the version they were written on:
+
+| Assertion | What was wrong |
+|---|---|
+| `13c` `vt.stat ≈ 1.87685263` | The literal is one stream's value; the statistic came out 0.114 on 1.10. The test also recomputes `z_ref` independently and checks against it at `rtol = 1e-10`, which passed on **both** versions. That is the assertion carrying the finding; the literal added fragility and no coverage. Removed. |
+| `19b` `0.15 < accept < 0.6` | Not only version-fragile but seed-fragile on 1.13 itself, which reaches 0.630 at seed 4202 and 0.623 at 4203. Measured range over ten seeds on both versions is 0.200–0.664, so the band is now 0.15–0.75 and is applied to every chain. |
+| `19b` `e_large < e_small` | Holds in 8 of 10 seeds on 1.13 and 6 of 10 on 1.10 — it passed on seed 4200 by luck. "Bias shrinks with `N`" is a claim about the sampling distribution, so it is now the median over ten seeds: 0.911 → 0.153 on 1.13, 0.198 → 0.127 on 1.10. |
+| `21c` NB2 Hessian gap `> 0.1` | The claim is the contrast with the `< 1e-10` asserted for the canonical links. Measured over five seeds on two versions the gap runs 0.026–0.616, so `0.1` sat inside its own spread and failed at 0.076. Now `> 1e-3`, twelve orders clear of the canonical case. |
+
+Two more were mine, from the Durbin and knn work in this same session, and
+show the rule is easy to break while writing a careful test:
+
+- `28b` asserted `best_k == 6` on one draw, when `28c` three screens away
+  measures that at 57% of draws. The assertion contradicted its own
+  neighbouring measurement. Removed: a recovery claim belongs to a rate.
+- `28d` asserted `rho_hat(k=20) > 0.55`, which is a statement about where one
+  draw's sequence happens to sit. The ordering `rho(2) < rho(6) < rho(20)` is
+  the actual property and is scale-free, so that is what is asserted now.
+
+**The rule this yields.** An assertion may pin a closed form, an algebraic
+identity, a structural reference recomputed in the test, or a *rate* with a
+margin wide enough for its own sampling error. It may not pin a value that
+came out of a random stream, and a margin must be set from a measured spread
+across seeds, not from one run. The null-distribution gate already follows
+this; these four did not.
+
+A corollary for the CI matrix: the suite must pass on the oldest supported
+Julia as well as the newest, and the two have different random streams, so
+the matrix is what enforces the rule. Running the suite only on the
+development version cannot catch this class.
+
+## One real defect, found the same way
+
+`27a` was not a fragile assertion. `lm_test_durbin_terms` gated singularity
+on `issuccess(cholesky(Symmetric(J); check = false))`, which is **not a rank
+test**: for an exactly rank-deficient Gram matrix — a repeated column in `X`,
+or a `W` for which `W*X` lands in `span(X)` — whether the final pivot comes
+out slightly positive or slightly negative is decided by the rounding of the
+particular LAPACK build. It came out positive on macOS/aarch64 and on the
+1.10 dependency set, so the factorisation reported success and the inverse
+returned large meaningless numbers. Finding 16's failure mode, reached by a
+new route, in code written to prevent it.
+
+Replaced by a gate on the ratio of the Cholesky pivots: a ratio at or below
+`sqrt(eps)` means a condition number near `1/eps`, which is singular by any
+standard a score test cares about, while a sound block sits near 1. All three
+entry points now throw on the duplicated-column design on both versions.
 
