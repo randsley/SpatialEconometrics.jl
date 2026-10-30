@@ -164,6 +164,19 @@ m = fit_dynamic_spatial_panel(SAR(), IndivFE(), W, X, y, N, T_total;
 dynamic_spatial_effects(m)
 ```
 
+!!! note "Identification"
+    The design has to have full column rank, and the matrix checked is the
+    **within-transformed** one, since that is what gets solved. Under
+    `IndivFE` a regressor that does not vary over time is swept out
+    entirely, and under `TimeFE` one that does not vary across units is;
+    neither coefficient can be estimated from the within variation, and
+    both now throw an `ArgumentError` naming the column instead of
+    returning a number. The same applies to any covariate that is a linear
+    combination of the others.
+
+    The checked design carries the lagged response and its spatial lag
+    beside the covariates.
+
 # References
 Yu, J., de Jong, R. & Lee, L.-F. (2008). *Journal of Econometrics*, 146(1).
 """

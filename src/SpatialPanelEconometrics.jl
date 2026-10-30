@@ -209,6 +209,16 @@ robust_coeftable(m, DriscollKraayVCOV())
 See also `fit_dynamic_spatial_panel`, `panel_lm_tests`,
 `spatial_hausman_test`.
 
+!!! note "Identification"
+    The design has to have full column rank, and the matrix checked is the
+    **within-transformed** one, since that is what gets solved. Under
+    `IndivFE` a regressor that does not vary over time is swept out
+    entirely, and under `TimeFE` one that does not vary across units is;
+    neither coefficient can be estimated from the within variation, and
+    both now throw an `ArgumentError` naming the column instead of
+    returning a number. The same applies to any covariate that is a linear
+    combination of the others.
+
 # References
 Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).
 """

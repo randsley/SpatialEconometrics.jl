@@ -250,6 +250,19 @@ Fit a spatial regime model where coefficients vary across regimes:
 
 Each regime gets its own intercept and slope coefficients.
 Anselin (1988, 1990).
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
+    The design is block diagonal in the regimes, so a covariate that is
+    constant inside one regime collides with that regime's intercept even
+    when it varies across the sample as a whole.
+
 """
 function fit_spatial_regime(
     W::M,

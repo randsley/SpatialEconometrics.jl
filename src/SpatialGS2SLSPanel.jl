@@ -396,6 +396,19 @@ fit_gs2sls_panel(
 
 See also `endo`, `extract_panel_permutation`.
 
+!!! note "Identification"
+    The design has to have full column rank, and the matrix checked is the
+    **within-transformed** one, since that is what gets solved. Under
+    `IndivFE` a regressor that does not vary over time is swept out
+    entirely, and under `TimeFE` one that does not vary across units is;
+    neither coefficient can be estimated from the within variation, and
+    both now throw an `ArgumentError` naming the column instead of
+    returning a number. The same applies to any covariate that is a linear
+    combination of the others.
+
+    The excluded instruments are checked the same way, and before `H` is
+    assembled — `inv(H'H)` comes first and would otherwise fail there.
+
 # References
 Kelejian, H. & Prucha, I. (1998). *Journal of Real Estate Finance and
 Economics*, 17(1).

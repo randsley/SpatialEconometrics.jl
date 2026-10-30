@@ -252,6 +252,12 @@ A [`SystemGMMModel`](@ref).
     Note the data layout: `Y_mat` is `N x T` and `X_ten` is `N x T x K`,
     unlike the stacked vectors the spatial panel estimators take.
 
+!!! note "Identification"
+    The stacked differenced regressors, together with the lagged response,
+    have to have full column rank: the moment matrix `S_ZX' W S_ZX`
+    inherits that rank and inverting it is what would otherwise fail. A
+    deficient design throws an `ArgumentError` naming the column.
+
 # References
 Roodman, D. (2009). How to do xtabond2. *Stata Journal*, 9(1).
 """

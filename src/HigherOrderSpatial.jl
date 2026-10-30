@@ -61,6 +61,18 @@ Fit the SLX (Spatial Lag of X) model by OLS:
 
 No spatial lag of y and no spatial error structure.
 Recommended as a starting point before SAR/SDM (Halleck Vega & Elhorst, 2015).
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
+    The design also carries `W*X`, so a `W` for which `W*X` lies in the
+    span of `X` is rank deficient too.
+
 """
 function fit_slx(
     W::M,
@@ -154,6 +166,15 @@ Fit the SAC (Spatial Autoregressive Combined) model via concentrated ML:
 
 Also known as SARAR when W₁ = W₂.
 Kelejian & Prucha (1998).
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
 """
 function fit_sac(
     W_lag::M,
@@ -424,6 +445,18 @@ Fit the SDEM (Spatial Durbin Error Model) via concentrated ML:
 
 Combines the SDM covariate structure with SEM error structure.
 LeSage & Pace (2009).
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
+    The design also carries `W*X`, so a `W` for which `W*X` lies in the
+    span of `X` is rank deficient too.
+
 """
 function fit_sdem(
     W::M,

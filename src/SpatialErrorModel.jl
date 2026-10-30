@@ -142,6 +142,19 @@ fit_spatial_error(TwoWayFE(), W, X, y, N, T_per)
 Use `lm_tests` to decide between this and `fit_spatial`
 before fitting either.
 
+!!! note "Identification"
+    The design has to have full column rank, and the matrix checked is the
+    **within-transformed** one, since that is what gets solved. Under
+    `IndivFE` a regressor that does not vary over time is swept out
+    entirely, and under `TimeFE` one that does not vary across units is;
+    neither coefficient can be estimated from the within variation, and
+    both now throw an `ArgumentError` naming the column instead of
+    returning a number. The same applies to any covariate that is a linear
+    combination of the others.
+
+    In the cross-sectional method there is no transform, and the check is
+    on `[1 X]` as passed.
+
 # References
 Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
 """

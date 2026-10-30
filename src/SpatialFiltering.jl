@@ -603,6 +603,15 @@ described above under *Inference after selection* — the mean standard
 error is 0.92 of `β̂`'s actual sampling standard deviation for every one
 of them, `:moments` and `:mle` alike — and that, not the dispersion, is
 what the last two points are.
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
 """
 function fit_esf(
     X::AbstractMatrix{T},
@@ -859,6 +868,15 @@ spatial autocorrelation, and `min_moran_ratio` screens them further to
     to or above `moran_reference` is the healthy case; one far below it suggests
     the random effects are absorbing noise, as does an `edf` (effective degrees
     of freedom, `P + Σ θλ/(1+θλ)`) approaching `N`.
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
 """
 function fit_re_esf(
     X::AbstractMatrix{T},

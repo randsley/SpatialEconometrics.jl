@@ -479,6 +479,18 @@ plot_gwr_coefficients(m, "income")        # needs a Makie backend
 See also [`fit_mgwr`](@ref), which lets each covariate have its own
 bandwidth.
 
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
+    This is a check on the global design. A local fit can still be rank
+    deficient at a narrow bandwidth with the global design full rank;
+    that case is not covered.
+
 # References
 Fotheringham, A. S., Brunsdon, C. & Charlton, M. (2002). *Geographically
 Weighted Regression*. Wiley.
@@ -871,6 +883,16 @@ m = fit_mgwr(X, y, coords; varnames = ["income", "density"])
 m.converged || @warn "back-fitting did not converge"
 m.bandwidths               # aligned with m.coefnames, intercept first
 ```
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
+    This is a check on the global design, as in `fit_gwr`.
 
 # References
 Fotheringham, A. S., Yang, W. & Kang, W. (2017). Multiscale

@@ -162,6 +162,15 @@ N = 196 and 0.18 at N = 400 — roughly 2.5× that of
 [`fit_bayesian_spatial_probit`](@ref) on the same data. It is approximately
 unbiased, so treat a single small-sample ρ̂ as a coarse reading and prefer the
 Gibbs sampler when precision on ρ matters.
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
 """
 function fit_spatial_probit(
     W::M,
@@ -469,6 +478,19 @@ Check `accept_rate` sits in 0.2–0.5. When `N` is small and ρ is the quantity 
 interest, [`fit_spatial_probit`](@ref) is the better choice: its ρ bias runs
 the other way and is smaller from `N = 64` up (+0.044 at 64, +0.008 at 144,
 against −0.112 and −0.058 here on the same data).
+
+!!! note "Identification"
+    The design has to have full column rank. `X` goes in without an
+    intercept, since one is added, and no covariate may be a linear
+    combination of the others. A design that fails this throws an
+    `ArgumentError` naming the offending column, rather than failing
+    inside the linear algebra or returning an arbitrary split of one
+    coefficient across two.
+
+    The sampler is the case where this matters most: nothing factorises and
+    fails, so a dependent column simply produces a posterior that splits one
+    coefficient across two columns.
+
 """
 function fit_bayesian_spatial_probit(
     W::M,
@@ -648,6 +670,14 @@ and the free cutpoints move with it. Over 80 replications at `N = 64`, `J = 3`,
 91.2%. `τ_2` came out +0.103 high, the same proportional inflation as ‖β‖,
 because cutpoints and coefficients share the latent scale. `τ_1` is exactly 0
 in every draw by construction.
+
+!!! note "Identification"
+    The design has to have full column rank. `X` carries no intercept
+    here — the cutpoints hold the level — so a constant column in `X` is
+    itself the rank-deficient case, as is any covariate that is a linear
+    combination of the others. Either throws an `ArgumentError` naming the
+    column.
+
 """
 function fit_spatial_ordered_probit(
     W::M,
