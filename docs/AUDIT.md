@@ -1258,6 +1258,7 @@ so the rule has somewhere to be satisfied.
 |---|---|---|---|
 | 2026-10-23 | `sdm_tests` — the five Koley & Bera Durbin score statistics | 20000 replications, `N = 81`: mean = df to within 2.6%, variance = 2df to within 1.9%, size 0.047–0.054 at the 5% level and 0.009–0.010 at the 1% | Verified correct |
 | 2026-10-24 | `select_knn_w` — choosing `k` for a knn `W` by AIC | not a test statistic, so the gate is the selection error rate: 300 draws generated at `k = 6`, `k` searched over `2:20`, exact recovery 42.3% / 57.3% / 77.0% at `N = 100 / 200 / 400` against 5.3% by chance, median `k̂ = 6` throughout | Verified correct |
+| 2026-10-30 | `bayes_spec_probs` / `sdem_roadmap` — posterior model probabilities over specifications and `W` | not a test statistic, so the gate is the selection error rate: 200 draws from each of six specifications, all six compared on the generating `W`, recovery 81.5–95.5% at `N = 100` and 92.5–100% at `N = 256` against 16.7% by chance; the global-versus-local reach right in 90.5–100% of draws | Verified correct |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -1315,6 +1316,116 @@ the variant and `X` held fixed the parameter count does not vary with `k`,
 so AIC, BIC and the raw log-likelihood rank the candidates identically here
 — the test pins that too, so the `criterion` keyword is not mistaken for
 doing work it does not do in this search.
+
+### `bayes_spec_probs` / `sdem_roadmap` — five checks, in testset 30
+
+A posterior model probability is not a test statistic, so the rule was read
+across to the error rate again, as it was for `select_knn_w`. The rates in
+the table above are the gate; the four checks under them are what makes the
+quantity being rated the right one.
+
+1. **The conditional marginal against 2-D quadrature.** With `β` and `σ²`
+   integrated analytically the marginal at a fixed `ρ` is
+
+   ```
+   p(y|ρ) = |A| · π^(-(n-k)/2) · |Z'Z|^(-1/2) · Γ((n-k)/2) · S(ρ)^(-(n-k)/2)
+   ```
+
+   which was checked against numerical integration of the full
+   `(β, σ²)` integrand at `n = 6`, `k = 1`: agreement to **5.3e-15**.
+
+   That check failed at 7.08e-5 first, and the failure is the useful part.
+   The discrepancy did not shrink as the grid was refined from 501 to 4001
+   nodes per axis — it converged to 7.081e-5 and stopped — which rules out
+   quadrature error and points at the domain. The marginal in `β` is a
+   `t` with `n - k = 5` degrees of freedom, and the brute-force grid ran
+   `±12` scale units, which leaves about 7e-5 of that distribution's mass
+   outside. Re-running with `β = β̂ + s·tan(u)` over `u ∈ (-π/2, π/2)`, which
+   covers the whole line, gives the 5.3e-15 above and is stable under
+   refinement. A heavy-tailed reference integrand needs a substitution, not
+   a wider box: `±12` sigma is ample for a Gaussian and not remotely enough
+   for a `t₅`.
+
+2. **An exact closed form, committed.** `30a` pins the same formula with the
+   gamma term written as a factorial: `N = 25` with `k = 3` makes it
+   `Γ(11) = 10!`, and with the Durbin block `k = 5` makes it `Γ(10) = 9!`.
+   `|Z'Z|` is taken by `det` rather than the implementation's QR. Both agree
+   to 1e-10. This is the check that would catch the normalising constants
+   being dropped as "constants" — they are constant in `ρ` and not in `k`,
+   so dropping them leaves a quantity that ranks two specifications of
+   equal width correctly and mis-ranks every comparison that crosses a `k`.
+
+3. **The error family against an independent integral.** `30b` rewrites the
+   `:sem` marginal from scratch in the test file — dense `logabsdet` for the
+   Jacobian, `det` of the filtered cross-product, the trapezoid written out
+   longhand — and gets the same number to 1e-9. The target is the `|Z'Z|`
+   term: for an error specification it is evaluated on `(I - λW)[y Z]` and
+   therefore moves with `λ`, while for a lag specification it is genuinely
+   constant. Dropping it is invisible in any lag-only comparison and biases
+   every global-against-local comparison toward the error specifications.
+
+4. **The flat specifications as limits.** `:ols` and `:slx` are the `λ = 0`
+   members of the families they belong to, and `30c` checks all four pairs
+   reproduce the closed form to 1e-8 when integrated over `(-1e-8, 1e-8)`.
+   This pins the prior's normalisation against the analytic branch: a prior
+   that did not integrate to one over `rho_bounds` would move one and not
+   the other.
+
+5. **What the quadrature actually does.** The trapezoid rule is
+   geometrically accurate on an integrand whose Euler–Maclaurin boundary
+   terms vanish, and that is the common case here: at `N = 256` with a
+   correctly specified lag model the integrand is 39 and 66 logs below its
+   peak at `ρ = ∓0.995`, and 100 nodes already agrees with 800 to better
+   than 1e-9. It is not the universal case, and the exception is worth
+   knowing: an **error** specification fitted to lag data wants its
+   parameter at the edge of the stationary interval, so the integrand is
+   only 8 logs down at `λ = 0.995`, the boundary term survives, and the rate
+   falls back to `O(h²)` — successive-error ratios of 3.08 and 3.32 against
+   the geometric case's 33.5. The same happens to every specification at
+   `N = 25`, where the posterior is wide enough to be truncated by the
+   prior's support. Both are harmless at the default 200 nodes, where the
+   absolute error stays under 1e-4 against gaps between specifications of
+   order 1, and `30d` pins the rate in both regimes rather than asserting
+   machine precision across the board.
+
+**Selection rates.** 200 draws from each of the six specifications on a rook
+lattice, `ρ = λ = 0.5`, `θ = (0.7, 0)`, `σ = 0.5`, all six compared on the
+generating `W` under the default uniform prior. Share of draws whose highest
+posterior probability lands on the generating specification:
+
+| `N` | `:ols` | `:slx` | `:sar` | `:sdm` | `:sem` | `:sdem` | reach right |
+|---|---|---|---|---|---|---|---|
+| 100 | 93.0% | 90.0% | 81.5% | 95.5% | 88.5% | 88.5% | 90.5–100% |
+| 256 | 92.5% | 96.0% | 94.0% | 100% | 96.5% | 96.0% | 96.0–100% |
+| 400 | 94.5% | 94.0% | 97.5% | 100% | 96.5% | 98.5% | 98.5–100% |
+
+Chance is 16.7%; mean posterior probability on the generating specification
+runs 0.589–0.916 at `N = 100` and 0.711–0.999 at `N = 256`. The last column
+is the share getting the *reach* right — global mass exceeding local mass
+when it should and the reverse otherwise — and it is higher than the six-way
+rate at every `N`, as a coarser question should be. Every confusion in the
+table is between specifications carrying the same Durbin block, including
+the crossings: `:sar` goes to `:sdem` in 10.0% of draws at `N = 100` and
+`:sdem` to `:sdm` in 9.0%, that pair being identical in design and differing
+only in where the dependence sits. At `N = 400` the worst crossing is 1.5%.
+
+**One methodological note, because it cost a test rewrite.** `30f` asserts
+the winner on a fixed sample, and the first version of it built the
+disturbances as `0.4·sin(5i) + 0.3·cos(11i)` — a deterministic stand-in for
+a draw, chosen because `randn(::MersenneTwister)` is not reproducible across
+Julia versions. On a lattice that is not noise. Consecutive indices are
+neighbours, so a smooth function of the index is strongly spatially
+autocorrelated, and the SLX sample built that way was not the
+independent-error case it was written to be: the comparison picked `:sdm`
+over `:slx`, correctly, because the errors really were spatially dependent.
+The same mistake in the covariates made `W*X` nearly collinear with `X` and
+turned an ordinary Durbin design into a hard one, which is what drove
+`P(:sdm)` down to 0.496 on a sample where the Monte Carlo average is 0.999.
+Both are now drawn from a small LCG with Box–Muller written into the test
+file: deterministic, identical on every version, and independent of the
+lattice. The general form of the trap is that on spatial data a
+"deterministic surrogate for randomness" has to be checked for spatial
+structure before it can stand in for an independent draw.
 
 ## A whole class of fragile assertion: pinning a random draw
 

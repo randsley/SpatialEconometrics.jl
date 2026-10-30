@@ -2,10 +2,11 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,270 test assertions in 53 testsets with both package
-> extensions installed, 20 examples, 9 notebooks, 2 package extensions,
-> CI/CD and 21 Documenter.jl pages. **Phases 4, 5 and 6
-> are complete except item #10 (Performance)**, which is the next piece of work.
+> 22 submodules, 1,374 test assertions in 46 top-level testsets on Julia
+> 1.13.2 and 1,368 on Julia 1.10.12, 21 examples, 12 notebooks, 2 package
+> extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5 and 6 are
+> complete except item #10 (Performance)**, and Phase 6B is one item from
+> done: only #15, the spatio-temporal Moran PCA, is left.
 > Tier 3 is untouched, and the correctness audit in `docs/AUDIT.md` is closed
 > — findings 1–25, nothing outstanding.
 >
@@ -204,7 +205,7 @@ SDM only, and is not involved here.
 | Common factor test | Tests whether the SDM simplifies to SEM (i.e., θ = -ρβ); rejection → SDM preferred over SEM | Burridge (1981); Elhorst (2010) |
 | Wald test | General linear hypothesis testing on spatial model parameters | — |
 
-**Status:** ✅ Implemented — `src/SpatialModelSelection.jl` (297 lines). Docs: `docs/src/diagnostics/model_selection.md`. Example: `examples/16_model_selection.jl`. Tests: 16 assertions in testset “Model Selection & Comparison”.
+**Status:** ✅ Implemented — `src/SpatialModelSelection.jl` (1,161 lines). Docs: `docs/src/diagnostics/model_selection.md`. Examples: `examples/16_model_selection.jl`, `examples/21_bayesian_specification.jl`. Tests: 16 assertions in testset “Model Selection & Comparison”, 25 in testset 28 (`select_knn_w`) and 88 in testset 30 (the Bayesian comparison and the roadmap).
 
 **Key functions:**
 - `spatial_aic(m)`, `spatial_bic(m)` → corrected information criteria
@@ -213,6 +214,9 @@ SDM only, and is not involved here.
 - `common_factor_test(m_sdm)` → `CommonFactorTestResult` (Wald-type)
 - `wald_test(m, R, r)` → `WaldTestResult` (Rβ = r)
 - `model_comparison_table(models...)` → formatted comparison table
+- `log_marginal_likelihood(spec, y, X, W)` → one specification's integrated likelihood
+- `bayes_spec_probs(y, X, Ws)` → `SpecEvidence`, the posterior over specifications and `W`
+- `sdem_roadmap(y, X, Ws)` → `SpecRoadmapResult`, the local-spillover search
 
 **Planned additions — the specification search itself:** the delivered tools
 compare two models the user has already fitted. The 2023 *Spatial Economic
@@ -222,8 +226,8 @@ spatial lags belong in the model, and which `W` to run it on.
 | Feature | Description | Reference |
 |---|---|---|
 | ~~Durbin score tests~~ — **delivered**, see `sdm_tests` | Five Rao score statistics for the spatial Durbin model: joint `ρ = 0, θ = 0`; `ρ = 0` with and without `θ ≠ 0`; `θ = 0` with and without `ρ ≠ 0`; plus significance of each individual Durbin term | Koley & Bera (2023); Bera & Yoon (1993) |
-| SDEM specification roadmap | Iterative search over {SDE, SLX, SE} × `W`, for the local-spillover case where the Durbin terms sit in the error | Sutton & Sutton (2023) |
-| Bayesian SD vs SDE comparison | Posterior model probabilities over global versus local spillovers, jointly with the `W` specification | LeSage (2014, 2015) |
+| ~~SDEM specification roadmap~~ — **delivered**, see `sdem_roadmap` | Iterative search over {SDE, SLX, SE} × `W`, for the local-spillover case where the Durbin terms sit in the error | Sutton & Sutton (2023) |
+| ~~Bayesian SD vs SDE comparison~~ — **delivered**, see `bayes_spec_probs` | Posterior model probabilities over global versus local spillovers, jointly with the `W` specification | LeSage (2014, 2015) |
 
 The score tests were the closest fit to what was already here, and are now
 delivered: `SpatialDiagnostics.jl` ships `lm_test_sdm`, `lm_test_durbin`,
@@ -233,7 +237,20 @@ delivered: `SpatialDiagnostics.jl` ships `lm_test_sdm`, `lm_test_durbin`,
 the same Rao score framework. Their measured null distribution and the
 robust-size property are in `docs/AUDIT.md`; `examples/20_specification_search.jl`
 runs the battery end to end. `W` selection by AIC is in
-[#6](#6-weight-matrix-construction) and is the next item.
+[#6](#6-weight-matrix-construction).
+
+The remaining two are now delivered as well, and answer a question the score
+battery cannot: `:sdm` and `:sdem` have the same design and the same number
+of parameters, so no likelihood-ratio test runs between them.
+`log_marginal_likelihood` integrates a specification's likelihood over its
+parameters — `β` and `σ²` analytically, the spatial parameter by quadrature —
+which puts designs of different width on one scale;
+`bayes_spec_probs` normalises that over a grid of specifications **and**
+weight matrices and reports both margins plus the global/local split;
+`sdem_roadmap` is the Sutton & Sutton search within the local case, with the
+margin to the runner-up on each `W`. Selection rates over 200 draws from
+each of six specifications are in `docs/AUDIT.md`;
+`examples/21_bayesian_specification.jl` runs the comparison end to end.
 
 **Dependencies:** None
 
@@ -679,7 +696,7 @@ Tier 3 builds rather than inside them.
 |---|---|---|---|
 | ~~12~~ | ✅ Durbin score tests (#5) | 350 | Delivered: `sdm_tests`, testset 27, null distribution in `docs/AUDIT.md` |
 | ~~13~~ | ✅ knn `W` selection by AIC (#6) | 210 | Delivered: `select_knn_w`, testset 28, recovery rates in `docs/AUDIT.md` |
-| 14 | SDEM roadmap + Bayesian SD/SDE (#5) | ~400 | Local vs global spillovers |
+| ~~14~~ | ✅ SDEM roadmap + Bayesian SD/SDE (#5) | 515 | Delivered: `log_marginal_likelihood`, `bayes_spec_probs`, `sdem_roadmap`, testset 30, selection rates in `docs/AUDIT.md` |
 | 15 | Spatio-temporal Moran PCA (#7) | ~300 | Reuses the eigenvector basis |
 | | **Phase 6B total** | **~1,200** | |
 
@@ -718,16 +735,22 @@ Rows above the rule are measured; rows below are estimates.
 | **v0.3.0** | 13 | 54 | ~6,500 |
 | **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
 | **master** (+ Phase 6B items 1–2) | 22 | 1,270 | 13,995 |
+| **master** (+ Phase 6B item 14, identification guards) | 22 | 1,374 | 14,843 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 13,995 lines of
-`src/`, 4,083 lines of tests (1,270 assertions in 53 testsets with both
-package extensions installed; 1,229 on Julia 1.10, where the two extension
-testsets skip), 2,492 lines of examples across 20 scripts,
-398 lines of package extensions, 21 documentation pages and 9 notebooks
-(3 Jupyter, 6 Pluto).
+Measured on master: 22 submodules plus the umbrella across 14,843 lines of
+`src/`, 4,650 lines of tests, 2,647 lines of examples across 21 scripts,
+398 lines of package extensions, 48 documentation pages and 12 notebooks
+(5 Jupyter, 7 Pluto).
+
+The assertion counts above are measured with Makie and Turing absent, so the
+two package-extension testsets skip: 1,374 on Julia 1.13.2 and 1,368 on
+Julia 1.10.12. The six-assertion difference is version-dependent testsets,
+not the change log — it predates Phase 6B and is unchanged by it. Rows
+measured before 2026-10-30 counted the extension testsets too, which is why
+the step from 1,270 to 1,374 is larger than the 88 assertions item 14 added.
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed

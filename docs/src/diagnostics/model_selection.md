@@ -54,6 +54,149 @@ tbl = model_comparison_table(m_sar, m_sdm, m_sem; names=["SAR","SDM","SEM"])
 println(tbl)
 ```
 
+## Bayesian specification comparison
+
+Everything above compares models you have already fitted, on a `W` you have
+already chosen. `bayes_spec_probs` compares the *specifications* — including
+ones of different width, and including the choice of `W` — by integrating
+each one's likelihood over its parameters instead of maximising it.
+
+```julia
+ev = bayes_spec_probs(y, X, [W_rook, W_queen]; w_names = ["rook", "queen"])
+println(ev)
+# ev.prob         — the posterior over the (specification, W) grid
+# ev.prob_spec    — its specification margin
+# ev.prob_w       — its weight-matrix margin
+# ev.prob_global  — mass on :sar and :sdm, spillovers running through y
+# ev.prob_local   — mass on :slx, :sem and :sdem, spillovers in the errors
+```
+
+The six specifications, their designs, and where each puts the dependence:
+
+| `spec` | Design | Spatial parameter | Spillovers |
+|---|---|---|---|
+| `:ols` | `[1 X]` | — | none |
+| `:slx` | `[1 X WX]` | — | local, through `W*X` |
+| `:sar` | `[1 X]` | `ρ` on `y` | global |
+| `:sdm` | `[1 X WX]` | `ρ` on `y` | global |
+| `:sem` | `[1 X]` | `λ` on `u` | local |
+| `:sdem` | `[1 X WX]` | `λ` on `u` | local |
+
+Global against local is the substantive question, and it is not a nesting
+question: `:sdm` and `:sdem` have the same design and the same number of
+parameters, and no likelihood-ratio test runs between them. `prob_global`
+and `prob_local` answer it directly.
+
+### What is integrated, and what is not
+
+Under the improper prior `p(β, σ²) ∝ 1/σ²` the inner integral is exact,
+leaving one dimension to quadrature:
+
+```math
+p(y \mid \rho) = |A(\rho)| \; \pi^{-(n-k)/2} \; |Z'Z|^{-1/2} \;
+                 \Gamma\!\left(\tfrac{n-k}{2}\right) \; S(\rho)^{-(n-k)/2}
+```
+
+`A(ρ)` is `I - ρW` for a lag specification and `I - λW` for an error one,
+`Z` is the design, and `S` is the residual sum of squares at that value of
+the parameter. The `|Z'Z|^{-1/2}` and `Γ((n-k)/2)` factors are what make a
+wider design pay for its width, so they are kept rather than dropped as
+constants: dropping them still ranks `:sar` against `:sem` correctly and
+mis-ranks every comparison that crosses a `k`.
+
+For an error specification both `S` and `|Z'Z|` are evaluated on the filtered
+data `(I - λW)[y Z]`, so the determinant term moves with `λ`. It is constant
+for a lag specification, which is why leaving it out is an easy mistake and a
+silent one — it biases the comparison toward the error specifications, by an
+amount that grows with `|λ̂|`.
+
+The outer integral is a trapezoid rule over `rho_bounds`, evaluated by
+log-sum-exp because the integrand spans hundreds of orders of magnitude.
+Where the posterior rises and falls away inside the support the rule is
+geometrically accurate and 100 nodes is already at machine precision; where
+it is still appreciable at the edge — a misspecified error model wanting
+`λ → 1`, or any specification at very small `N` — the rate drops to the
+generic `O(h²)` and the error at the default 200 nodes is around `1e-4`,
+three orders below the gaps that separate specifications.
+
+!!! warning "The prior does not wash out"
+    A marginal likelihood is not a likelihood ratio. The prior sits on a
+    parameter that `:ols` and `:slx` do not have, so widening `rho_bounds`
+    spreads it thinner and penalises every spatial specification by exactly
+    the width ratio. Report the setting next to the probabilities, and if a
+    comparison is close, run it under `prior = :beta` as well. Nothing about
+    increasing `N` removes this.
+
+### How often it finds the generating specification
+
+A selection procedure's gate is its error rate, so: 200 draws from each of
+the six specifications on a rook lattice, `ρ = λ = 0.5`, `θ = (0.7, 0)`,
+`σ = 0.5`, with all six compared on the generating `W` under the default
+uniform prior. The entry is the share of draws whose highest posterior
+probability lands on the generating specification.
+
+| `N` | `:ols` | `:slx` | `:sar` | `:sdm` | `:sem` | `:sdem` | reach right |
+|---|---|---|---|---|---|---|---|
+| 100 | 93.0% | 90.0% | 81.5% | 95.5% | 88.5% | 88.5% | 90.5–100% |
+| 256 | 92.5% | 96.0% | 94.0% | 100% | 96.5% | 96.0% | 96.0–100% |
+| 400 | 94.5% | 94.0% | 97.5% | 100% | 96.5% | 98.5% | 98.5–100% |
+
+Chance is 16.7%. The mean posterior probability assigned to the generating
+specification runs 0.589–0.916 at `N = 100` and 0.711–0.999 at `N = 256`, so
+the procedure is not merely picking the right winner — it is reasonably
+confident about it, and more so as `N` grows.
+
+The last column is the share of draws that get the *reach* right — mass on
+global exceeding mass on local when the data are `:sar` or `:sdm`, and the
+other way round for `:slx`, `:sem` and `:sdem`. That coarser question is
+answered more reliably than the full six-way choice at every `N`, which is
+what you would expect, and it is usually the question the application is
+actually asking.
+
+The confusions are the ones the structure predicts, and they are not all
+inside one reach. `:ols` loses draws to `:sem`, which nests it at `λ = 0`,
+and to `:slx`, which nests it at `θ = 0`. `:sar` loses them to `:sdm` — the
+same reach, one Durbin block apart — and, at `N = 100`, to `:sdem` in 10.0%
+of draws, which is a crossing. `:sdem` loses 9.0% to `:sdm` at `N = 100`, the
+mirror image: the two have identical designs and differ only in where the
+dependence sits, so they are the hardest pair in the grid and the one the
+reach columns are measuring. Every crossing in the table is between
+specifications carrying the same Durbin block; at `N = 400` the worst of them
+is down to 1.5%.
+
+## The SDEM roadmap
+
+`sdem_roadmap` is the local-spillover search of Sutton & Sutton (2023): for
+each candidate `W`, decide which of `:sdem`, `:slx` and `:sem` fits best,
+then read the winner across the candidates.
+
+```julia
+rm = sdem_roadmap(y, X, [W_rook, W_queen, W_knn4];
+                  w_names = ["rook", "queen", "knn4"])
+println(rm)
+# rm.best_spec — the winner on each W
+# rm.margin    — the gap to the runner-up on that W
+# rm.best_w, rm.best_overall — the winning cell of the grid
+```
+
+The default criterion is the log marginal likelihood, because it is the only
+one of the three on offer that integrates over the spatial parameter rather
+than plugging in an estimate, and the specifications being compared differ in
+whether they *have* that parameter. `:aic` and `:bic` are available and are
+minimised rather than maximised; `sdem_roadmap` reads them in the right
+direction, and the three need not agree.
+
+`margin` is the point of returning a table rather than a winner. The choice
+of `W` and the choice of specification are decided together, and a margin
+near zero says the data do not separate them — which is a result to report,
+not a tie to break by taking the maximum.
+
+!!! note "The roadmap is the local case"
+    `:sar` and `:sdm` put the dependence on `y`. Pass them through `specs` if
+    you want them in the same table, but the global-versus-local comparison
+    is what `bayes_spec_probs` is for; the roadmap holds the reach fixed and
+    searches within it.
+
 ## Choosing `k` for a knn `W`
 
 Everything above compares specifications on a `W` you have already chosen.
