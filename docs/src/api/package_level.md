@@ -25,13 +25,20 @@ spatial_effects
 
 ## Internal numerics
 
-These two are exported by the `SpatialUtils` submodule but not re-exported
-by the package, so they are reached as
+These are exported by the `SpatialUtils` submodule but not re-exported by
+the package, so they are reached as
 `SpatialEconometrics.SpatialUtils.spatial_trace_powers`. They are the trace
 machinery the asymptotic covariances and the log-determinant approximations
 are built on, and they are listed here because they carry docstrings: the
 docs build checks that every documented name a module exports reaches the
 manual, so an undocumented-but-exported function cannot hide.
+
+`precompute_neumann_traces` and `precompute_chebyshev_traces` are the
+stochastic estimators behind the approximate log-determinant paths. Both
+were exported and undocumented until the performance work of Phase 6
+rewrote their kernels; the docstrings record what each one's accuracy
+depends on and, for the Chebyshev form, the memory ceiling that keeps a
+densifying recurrence from exhausting the machine.
 
 ```@meta
 CurrentModule = SpatialEconometrics.SpatialUtils
@@ -40,4 +47,6 @@ CurrentModule = SpatialEconometrics.SpatialUtils
 ```@docs
 g_traces
 spatial_trace_powers
+precompute_neumann_traces
+precompute_chebyshev_traces
 ```

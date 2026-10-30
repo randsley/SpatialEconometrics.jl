@@ -1807,6 +1807,108 @@ default is not the same as changing it.
 Suite 1,600 → 1,691 on Julia 1.13.2 and 1,594 → 1,685 on 1.10.12, every
 pinned value intact.
 
+### 32. GWR built a dense design to use a fraction of it — FIXED
+
+Phase 6C, and the one optimisation carried forward when item #10 closed
+rather than parked with the rest, because the measurements supported it.
+
+Every local regression in `fit_gwr` built `Xw = Diagonal(sqrt.(w)) * X`, an
+`N × K` matrix, and factorised it. But `w` is zero outside the kernel's
+support, so only `b` of those rows carried anything, and `b` is set by the
+bandwidth rather than by `N`. The cost was `Θ(N² K)` where `Θ(N · b · K)`
+does, with a dense `zeros(T, N)` per call on top. The support ratio,
+measured on a square grid:
+
+| | `N = 400` | `N = 900` | `N = 1600` |
+|---|---|---|---|
+| `FixedBandwidth(4.0)` | b/N 0.103 | 0.049 | 0.028 |
+| `FixedBandwidth(8.0)` | 0.340 | 0.172 | 0.103 |
+| `AdaptiveBandwidth(20)` | 0.054 | 0.024 | 0.013 |
+| `AdaptiveBandwidth(500)` | 1.000 | 0.558 | 0.315 |
+
+Single-threaded, against the threaded code of finding 31, so this isolates
+the compact design from the parallelism already in place:
+
+| `N = 900` | b/N | before | after | | allocation |
+|---|---|---|---|---|---|
+| `FixedBandwidth(4.0)` | 0.05 | 47.5 ms | **7.3 ms** | 6.46× | 107 MiB → 4.4 MiB |
+| `AdaptiveBandwidth(20)` | 0.024 | 45.6 ms | **8.2 ms** | 5.57× | 106 MiB → 3.4 MiB |
+| `FixedBandwidth(8.0)` | 0.17 | 53.7 ms | **14.6 ms** | 3.69× | 115 MiB → 7.2 MiB |
+| `AdaptiveBandwidth(500)` | 0.56 | 157 ms | 96.4 ms | 1.63× | 140 MiB → 14.4 MiB |
+| MGWR | — | 18.7 s | 15.3 s | 1.22× | 21.6 GiB → 2.66 GiB |
+
+The speedup tracks `1 / (b/N)` as it should, which is the evidence that the
+change did what it was meant to and not something else. On sixteen threads
+the same cases are 2.3–5.0× further on, and cumulatively — against the
+unthreaded code this session started from — `FixedBandwidth(8.0)` at
+`N = 900` went from **105.4 ms to 6.68 ms, 15.8×**.
+
+**What it changes in the output, stated precisely.** Not bit-identical, and
+that was known before a line was written. A Householder QR on a `b × K`
+matrix is not the same arithmetic as on the same matrix padded with `N − b`
+zero rows, so coefficients move. Measured against the dense form across
+three kernels, four bandwidths and three sizes: **3e-14** worst relative
+difference on `coef_local`, and `tr_S` agrees to **1.7e-16** — effectively
+exact, because the rows outside the support contribute exactly zero to
+`X'W_i X` and so to `R'R`.
+
+Bit-identical where it could be: `w_self` is the kernel evaluated at
+distance zero rather than looked up in the support, `_euclid` is unchanged,
+and scattering a support back into a dense vector reproduces the old
+`_get_weights` output exactly, which testset 33a asserts with `==`.
+
+**The one discrete risk was measured, not assumed.**
+`_select_bandwidth_aicc` compares AICc values with `<`, so a near-tie could
+flip the selected bandwidth — a visible, integer change, not a last-bit
+one. The margin to the runner-up is **0.04–0.07 AICc units**, around `1e11`
+eps, which no roundoff can cross. Testset 33c rebuilds the AICc curve from
+the dense arithmetic and asserts the argmin agrees exactly.
+
+**Row order is a contract.** `inrange` returns indices in KD-tree order, so
+the compact design's rows would otherwise be ordered by tree internals.
+Passing `sortres = true` gives ascending index order, which is both
+reproducible across versions of `NearestNeighbors` and the order the dense
+path accumulated in — the reason the difference above is 3e-14 rather than
+merely small.
+
+**Allocation, and why `Project.toml` tightened.** The dense weight vector
+was the largest allocation but not the only one: `inrange` and `knn`
+allocate their results, and `knn` at `k = 500` costs 8 KiB per observation
+to return one number. `inrange!` and `knn!` write into buffers the task
+already owns. They are present in `NearestNeighbors` 0.4.29, and which
+earlier `0.4.x` first offered them could not be established, so the compat
+bound moved from `"0.4"` to `"0.4.29"`. That is a tightening in name only:
+nothing had ever been run against `0.4.0`, so the old bound described a
+range no test had visited.
+
+**Threading reworked to suit it.** `Threads.@threads` cannot hold per-task
+scratch, and indexing scratch by `Threads.threadid()` is unsound once tasks
+migrate. `_tforeach_chunks` spawns one task per contiguous chunk so each
+allocates its buffers once and reuses them. Determinism is unchanged and
+verified the same way: `coef_local`, `se_local`, `hat_trace` and the
+auto-selected bandwidth hash identically at 1, 4 and 16 threads.
+
+**Two pieces of duplication removed on the way.** `_local_regression` was
+defined and never called, and embodied the dense pattern being replaced.
+The two MGWR `se_local` blocks were byte-identical, one on each side of the
+`inference` branch, and both rebuilt `AdaptiveBandwidth(bandwidths[k])` on
+each of their `N · K` iterations although it depends only on `k`; they are
+now one function, `_mgwr_se_approx`. In `fit_gwr` the standard-error and
+local-R² loops each computed the same support, so there were two KD-tree
+queries per observation for one neighbourhood; they are now one pass.
+
+**What it did not fix.** MGWR gains only 1.22×, and the reason is not the
+local designs — it is `_select_bandwidth_aicc`, called per column per
+back-fitting sweep and re-scanning about 26 bandwidths each time, many of
+them wide enough that `b/N` is near 1. Allocation still fell 8.1×, from
+21.6 GiB to 2.66 GiB. Making the scan cheaper means not re-scanning a
+bandwidth that has stopped moving, which would change which fixed point the
+back-fitting reaches, so it is a separate decision and not a tidy-up.
+
+Suite 1,691 → 2,036 on Julia 1.13.2 and 1,685 → 2,030 on 1.10.12, every
+pinned GWR value intact — which is the real evidence that 3e-14 is the true
+magnitude and not an artefact of the cases chosen to measure it.
+
 ## Post-audit defects: identification guards
 
 The audit closed on the numbers an estimator reports. These two are about

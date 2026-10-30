@@ -329,21 +329,31 @@ end
     precompute_chebyshev_traces(W, method; max_fill_bytes)
 
 The Chebyshev trace moments `τ[k + 1] = tr(T_k(W))` that
-[`chebyshev_logdet`](@ref) needs, computed once per `W`.
+`chebyshev_logdet` needs, computed once per `W`.
 
 With `method.n_probes == 0` these are exact, from the three-term
 recursion `T_{k+1} = 2 W T_k - T_{k-1}` carried on sparse matrices. That
 is the fast path and it is the default, but `T_k(W)` fills in as `k`
-grows and has no bound below `N²`: at `N = 8100` and order 12 a rook
-lattice reaches 461 MiB, and for knn weights with `k = 24` the twelfth
-Chebyshev matrix holds 97.8% of `N²` nonzeros at `N = 900`.
+grows, and the fill per row saturates at `N`, so peak memory is `Θ(N²)`
+on a dense enough `W`. How soon that bites depends entirely on the
+weights: a rook lattice at `N = 8100` and order 12 peaks at only 18.9
+MiB, while knn weights with `k = 24` are already at 90 MiB by
+`N = 3600`.
 
 `max_fill_bytes` is the ceiling on that, 128 MiB by default. When the
-recursion is about to cross it the remaining orders are finished by
-[`_cheb_traces_blocked!`](@ref), which gets the same traces to roundoff
-from a bounded buffer. Nothing already computed is discarded. Order 6,
-which is what `fit_spatial` uses, stays on the fast path at every size
-benchmarked.
+recursion is about to cross it the remaining orders finish one column
+block at a time in `_cheb_traces_blocked!`, seeded from the two sparse
+matrices already computed, so nothing is discarded; a trace is a sum
+over columns, which is what makes that possible without ever forming
+`T_k(W)`. The traces agree to roundoff.
+
+The ceiling is not a better algorithm, only a bounded one: on a rook
+lattice the blocked path is 4× to 25× slower, because the sparse
+recursion touches only the fill that exists while the blocked path pays
+`N · b` per level whatever the density. It is faster where it is needed
+— knn `k = 24, N = 3600`, order 12 goes from 1118 ms to 576 ms. At the
+default every case benchmarked stays on the fast path and is
+bit-identical, order 6, which is what `fit_spatial` uses, included.
 
 With `method.n_probes > 0` the traces are Hutchinson estimates instead
 and the question does not arise: that path has never held more than the

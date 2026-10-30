@@ -111,7 +111,11 @@ for side in SIDES
 end
 
 # ─── GWR ──────────────────────────────────────────────────────────────
-# N local regressions, independent of each other and currently sequential.
+# N local regressions, independent of each other. Several bandwidths, not
+# one: the cost of a local fit is set by the size of the kernel's support
+# `b`, and `b / N` is what any compact-design work has to beat. On a square
+# grid that ratio spans 0.02 to 1.0 across the cases below, so a single
+# bandwidth would tell you almost nothing about the shape of the curve.
 SUITE["gwr"] = BenchmarkGroup()
 for side in (LARGE ? (20, 30, 40) : (20, 30))
     c = knn_case(side, 4)
@@ -121,6 +125,22 @@ for side in (LARGE ? (20, 30, 40) : (20, 30))
     SUITE["gwr"]["fixed_bw"]["N=$(c.N)"] =
         @benchmarkable fit_gwr($X, $y, $(c.coords);
                                bandwidth = FixedBandwidth(8.0), kernel = GaussianKernel())
+    # b/N about 0.05 at N = 900: the regime where a compact design should
+    # pay, and the one the suite previously had no case for.
+    SUITE["gwr"]["fixed_narrow"]["N=$(c.N)"] =
+        @benchmarkable fit_gwr($X, $y, $(c.coords);
+                               bandwidth = FixedBandwidth(4.0), kernel = GaussianKernel())
+    SUITE["gwr"]["adaptive_k20"]["N=$(c.N)"] =
+        @benchmarkable fit_gwr($X, $y, $(c.coords);
+                               bandwidth = AdaptiveBandwidth(20), kernel = BisquareKernel())
+    # b/N about 0.56 at N = 900: near the other end, and near where the
+    # AICc search tends to land, so it bounds the gain from below.
+    SUITE["gwr"]["adaptive_k500"]["N=$(c.N)"] =
+        @benchmarkable fit_gwr($X, $y, $(c.coords);
+                               bandwidth = AdaptiveBandwidth(500), kernel = BisquareKernel())
+    # MGWR back-fits K bandwidths and has its own N x K `se_local` loop.
+    SUITE["gwr"]["mgwr"]["N=$(c.N)"] =
+        @benchmarkable fit_mgwr($X, $y, $(c.coords); inference = false, max_iter = 12)
 end
 
 # ─── weights ──────────────────────────────────────────────────────────

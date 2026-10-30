@@ -2,12 +2,12 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,691 test assertions in 48 top-level testsets on Julia
-> 1.13.2 and 1,685 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
+> 22 submodules, 2,036 test assertions in 49 top-level testsets on Julia
+> 1.13.2 and 2,030 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
 > extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5, 6 and 6B are
 > complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
-> reduced on measured grounds and may be revisited; the next piece of work
-> is the GWR compact local design, then Phase 7A. Tier 3 is untouched, and
+> reduced on measured grounds and may be revisited. Phase 6C, the GWR
+> compact local design, is delivered; the next piece of work is Phase 7A. Tier 3 is untouched, and
 > the correctness audit in `docs/AUDIT.md` is closed — findings 1–25, with
 > 29–31 added afterwards from the benchmark suite.
 >
@@ -818,16 +818,34 @@ Tier 3 builds rather than inside them.
 | ~~15~~ | ✅ Spatio-temporal principal components (#7) | 400 | Delivered: `stpca` under Moran's I and Geary's C, testset 31, recovery rates in `docs/AUDIT.md` |
 | | **Phase 6B total** | **~1,200** | |
 
-### Phase 6C — ⬜ GWR compact local design
+### Phase 6C — ✅ Complete
 
 One optimisation carried forward out of #10 rather than parked with the
-rest, because it is the one the measurements support. It sits on its own
+rest, because it is the one the measurements supported. It sat on its own
 because it changes reported numbers, which a closure note should not.
 
-| Priority | Item | Est. Lines | Rationale |
-|---|---|---|---|
-| 12 | GWR compact local design (#10) | ~250 | `fit_gwr` and `fit_mgwr` build a dense `N × K` weighted design per observation when only `bw` rows are nonzero — about 4.5× wasted arithmetic at `FixedBandwidth(8.0)` on a 30×30 grid, compounding with the threading already delivered. A compact design reorders the QR's rows, so coefficients move in their last bits: same trade as findings 30 and 31, and it needs the same treatment — a stated standard, a reference implementation to check against, and a ledger entry |
-| | **Phase 6C total** | **~250** | |
+| Priority | Item | Est. | Actual | Status |
+|---|---|---|---|---|
+| 12 | GWR compact local design (#10) | ~250 | 251 | ✅ **1.6–6.5× single-threaded, 2.3–5.0× on 16**, allocation down 8–24×, finding 32, testset 33 |
+| | **Phase 6C total** | **~250** | | |
+
+`fit_gwr` and `fit_mgwr` built a dense `N × K` weighted design per
+observation when only the `b` rows inside the kernel's support carried
+anything, making the cost `Θ(N² K)` where `Θ(N · b · K)` does. The gain
+tracks `1 / (b/N)`, so it grows with `N` at a fixed bandwidth rather than
+being a constant factor — cumulatively, `FixedBandwidth(8.0)` at `N = 900`
+went from 105.4 ms to 6.68 ms across #10 and 6C together, **15.8×**.
+
+Coefficients move by 3e-14 and `tr_S` by 1.7e-16, the stated standard being
+roundoff rather than equality; the AICc margin that decides a bandwidth is
+`1e11` eps, so no selected bandwidth changes. Both are checked against the
+dense form, which is kept in `_get_weights` for that purpose.
+
+Not fixed, and recorded rather than quietly left: MGWR gains only 1.22×,
+because its cost is `_select_bandwidth_aicc` re-scanning ~26 bandwidths per
+column per sweep rather than the local designs. Cheapening that means not
+re-scanning a bandwidth that has stopped moving, which changes which fixed
+point the back-fitting reaches — a decision, not a tidy-up.
 
 ### Phase 7A — ⬜ Networks & causal policy evaluation
 
@@ -872,17 +890,18 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #10 benchmarks, finding 29) | 22 | 1,576 | 15,269 |
 | **master** (+ #10 trace kernel, finding 30) | 22 | 1,600 | 15,367 |
 | **master** (+ #10 GWR, knn, logdet, Chebyshev; finding 31) | 22 | 1,691 | 15,653 |
-| **v0.4.0** (= master today, unreleased) | 22 | 1,691 | 15,653 |
+| **master** (+ Phase 6C, finding 32) | 22 | 2,036 | 15,904 |
+| **v0.4.0** (= master today, unreleased) | 22 | 2,036 | 15,904 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 27–29 | ~2,400 | ~21,000 |
 
-Measured on master: 22 submodules plus the umbrella across 15,653 lines of
-`src/`, 5,215 lines of tests, 2,884 lines of examples across 22 scripts,
+Measured on master: 22 submodules plus the umbrella across 15,904 lines of
+`src/`, 5,467 lines of tests, 2,884 lines of examples across 22 scripts,
 398 lines of package extensions, 48 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 The assertion counts above are measured with Makie and Turing absent, so the
-two package-extension testsets skip: 1,691 on Julia 1.13.2 and 1,685 on
+two package-extension testsets skip: 2,036 on Julia 1.13.2 and 2,030 on
 Julia 1.10.12. The six-assertion difference is version-dependent testsets,
 not the change log — it predates Phase 6B and is unchanged by it: items 14
 and 15 added 88 and 192 assertions, every one of which passes identically on

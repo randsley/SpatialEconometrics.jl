@@ -264,47 +264,194 @@ adds `v[1] + v[2]`, and so does this.
     return sqrt(acc)
 end
 
-function _get_bandwidth_distance(tree::KDTree, coords::AbstractMatrix{T}, i::Int, bw::AdaptiveBandwidth) where {T}
+function _get_bandwidth_distance(tree::KDTree, coords::AbstractMatrix{T}, i::Int,
+                                 bw::AdaptiveBandwidth,
+                                 nidx::Union{Nothing,Vector{Int}}=nothing,
+                                 ndist::Union{Nothing,Vector{Float64}}=nothing) where {T}
     point = @view coords[i, :]
     # +1 includes self, but never ask the tree for more neighbours than it
     # holds: knn throws on k > N, so AdaptiveBandwidth(N) -- which the
     # bandwidth search used to put in range -- was an error rather than the
     # natural 'every point' case.
     nq = min(bw.k + 1, size(coords, 1))
-    idxs, dists = knn(tree, point, nq, true)
-    return T(dists[end])
+    # `knn` allocates its two result vectors; at k = 500 that is 8 KiB per
+    # observation, for one number. `knn!` writes into buffers the caller
+    # already owns, which is why they are threaded this far down.
+    if nidx === nothing || ndist === nothing
+        _, dists = knn(tree, point, nq, true)
+        return T(dists[end])
+    end
+    length(nidx) == nq || resize!(nidx, nq)
+    length(ndist) == nq || resize!(ndist, nq)
+    knn!(nidx, ndist, tree, point, nq, true)
+    return T(ndist[nq])
 end
 
-function _get_weights(tree::KDTree, coords::AbstractMatrix{T}, i::Int, bw::FixedBandwidth{T}, kernel::KernelFunction) where {T}
-    N = size(coords, 1)
-    point = @view coords[i, :]
-    idxs = inrange(tree, point, bw.h)
-    w = zeros(T, N)
-    @inbounds for j in idxs
-        w[j] = kernel_weight(kernel, _euclid(coords, i, j), bw.h)
+"""
+    _local_bandwidth(tree, coords, i, bw)
+
+The bandwidth at observation `i` in distance units: `bw.h` for a fixed
+bandwidth, the distance to the `k`-th neighbour for an adaptive one. Two
+methods rather than a branch, so the return type does not depend on a
+runtime test.
+"""
+_local_bandwidth(::KDTree, ::AbstractMatrix{T}, ::Int, bw::FixedBandwidth, sc) where {T} = T(bw.h)
+
+_local_bandwidth(tree::KDTree, coords::AbstractMatrix{T}, i::Int,
+                 bw::AdaptiveBandwidth, sc) where {T} =
+    _get_bandwidth_distance(tree, coords, i, bw, sc.nidx, sc.ndist)
+
+"""
+    _local_support!(idx, wv, tree, coords, i, bw, kernel)
+
+The kernel's support at observation `i`, written into caller-owned buffers.
+
+Returns `(n, h_i, w_self)`: `idx[1:n]` are the neighbour indices in
+**ascending order** and `wv[1:n]` their kernel weights, `h_i` is the
+bandwidth in distance units, and `w_self` is the weight `i` gives itself.
+
+This replaces a dense length-`N` weight vector allocated per call. The
+kernel vanishes outside its support, so of those `N` entries only `b` were
+ever nonzero -- on a square grid `b / N` runs from 0.02 to 0.56 across
+plausible bandwidths -- and every caller then multiplied an `N x K` design
+by a diagonal that was mostly zero. Both the arithmetic and the allocation
+were `Θ(N²)` where `Θ(N · b)` does.
+
+Two details are load-bearing:
+
+  - `sortres = true`. `inrange` otherwise returns indices in tree order,
+    and the compact design's row order would be whatever the KD-tree
+    internals happen to give. Ascending index order is both reproducible
+    and the order the dense path accumulated in, which keeps the
+    difference between the two at roundoff rather than merely small.
+  - `w_self` is the kernel at distance zero, computed rather than looked
+    up. `_euclid(coords, i, i)` is exactly zero, so this is bit-identical
+    to the `w[i]` the dense path produced, and needs no search through
+    `idx`.
+
+`inrange` allocates the index vector it returns, `O(b)` against the `O(N)`
+this removes. `NearestNeighbors` 0.4.29 offers `inrange!`, which would
+write into `idx` and remove that too, but it is not in every `0.4` and
+using it would mean tightening the compat bound; worth revisiting if
+allocation still shows up in a profile.
+"""
+function _local_support!(sc, tree::KDTree, coords::AbstractMatrix{T}, i::Int,
+                         bw::BandwidthType, kernel::KernelFunction) where {T}
+    idx = sc.idx
+    wv = sc.wv
+    h_i = _local_bandwidth(tree, coords, i, bw, sc)
+    empty!(idx)
+    inrange!(idx, tree, @view(coords[i, :]), h_i, true)
+    n = length(idx)
+    length(wv) < n && resize!(wv, n)
+    @inbounds for t in 1:n
+        wv[t] = kernel_weight(kernel, _euclid(coords, i, idx[t]), h_i)
+    end
+    return n, h_i, kernel_weight(kernel, zero(T), h_i)
+end
+
+"""
+    _get_weights(tree, coords, i, bw, kernel)
+
+The dense length-`N` weight vector at observation `i`: zero outside the
+kernel's support.
+
+Kept as the reference form that [`_local_support!`](@ref) replaced. The
+estimators no longer call it -- it allocates `N` doubles to carry `b` of
+them -- but the tests do, to check the compact path against the dense
+arithmetic it was derived from.
+"""
+function _get_weights(tree::KDTree, coords::AbstractMatrix{T}, i::Int,
+                      bw::BandwidthType, kernel::KernelFunction) where {T}
+    sc = _support_scratch(T)
+    n, _, _ = _local_support!(sc, tree, coords, i, bw, kernel)
+    w = zeros(T, size(coords, 1))
+    @inbounds for t in 1:n
+        w[sc.idx[t]] = sc.wv[t]
     end
     return w
 end
 
-function _get_weights(tree::KDTree, coords::AbstractMatrix{T}, i::Int, bw::AdaptiveBandwidth, kernel::KernelFunction) where {T}
-    N = size(coords, 1)
-    h_i = _get_bandwidth_distance(tree, coords, i, bw)
-    point = @view coords[i, :]
-    idxs = inrange(tree, point, h_i)
-    w = zeros(T, N)
-    @inbounds for j in idxs
-        w[j] = kernel_weight(kernel, _euclid(coords, i, j), h_i)
-    end
-    return w
+"""
+    _support_scratch(T)
+
+Buffers for one task's support queries: neighbour indices and weights, plus
+the two the `k`-nearest query writes into. All grow to what they need and
+are then reused, so a task pays for them once rather than once per
+observation.
+"""
+_support_scratch(::Type{T}) where {T} =
+    (idx = Int[], wv = T[], nidx = Int[], ndist = Float64[])
+
+"""
+    _local_scratch(T, N, K)
+
+The scratch one task needs to run local regressions: neighbour indices,
+their weights, a compact design and a compact response.
+
+Sized for the worst case -- a support of every observation -- and
+allocated once per task rather than once per observation. The design and
+response are over-allocated and used through `view`s, since `b` varies
+with `i`.
+"""
+function _local_scratch(::Type{T}, N::Int, K::Int) where {T}
+    return (idx = Int[], wv = T[], nidx = Int[], ndist = Float64[],
+            Xc = Matrix{T}(undef, N, K), yc = Vector{T}(undef, N))
 end
 
-function _local_regression(X::Matrix{T}, y::Vector{T}, w::Vector{T}) where {T}
-    W_diag = Diagonal(sqrt.(w))
-    Xw = W_diag * X
-    yw = W_diag * y
-    qr_Xw = qr(Xw)
-    β = qr_Xw \ yw
-    return β
+"""
+    _fill_local!(sc, X, y, idx, wv, n)
+
+Write the compact weighted design and response for one observation into
+`sc`, and return views of the live parts.
+
+Row `t` is `sqrt(wv[t])` times row `idx[t]` of `X`, which is what
+`Diagonal(sqrt.(w)) * X` produced in the rows that were not zero.
+"""
+function _fill_local!(sc, X::AbstractMatrix{T}, y::AbstractVector{T},
+                      idx::Vector{Int}, wv::Vector{T}, n::Int) where {T}
+    K = size(X, 2)
+    Xc = sc.Xc
+    yc = sc.yc
+    @inbounds for t in 1:n
+        j = idx[t]
+        sw = sqrt(wv[t])
+        for k in 1:K
+            Xc[t, k] = sw * X[j, k]
+        end
+        yc[t] = sw * y[j]
+    end
+    return view(Xc, 1:n, :), view(yc, 1:n)
+end
+
+"""
+    _tforeach_chunks(f, N; nchunks)
+
+Run `f(range)` over `nchunks` contiguous pieces of `1:N`, one task each.
+
+`Threads.@threads` cannot hold per-task scratch, and indexing scratch by
+`Threads.threadid()` is unsound once tasks migrate between threads. One
+task per chunk lets `f` allocate its scratch once at entry and reuse it
+across the whole chunk.
+
+Determinism does not depend on `nchunks`: the chunks are disjoint, `f`
+writes only rows in its own range, and every reduction is left to a serial
+pass afterwards.
+"""
+function _tforeach_chunks(f::F, N::Int; nchunks::Int=Threads.nthreads()) where {F}
+    N <= 0 && return nothing
+    nc = clamp(nchunks, 1, N)
+    if nc == 1
+        f(1:N)
+        return nothing
+    end
+    @sync for c in 1:nc
+        lo = div(N * (c - 1), nc) + 1
+        hi = div(N * c, nc)
+        lo > hi && continue
+        Threads.@spawn f(lo:hi)
+    end
+    return nothing
 end
 
 function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tree::KDTree,
@@ -319,29 +466,53 @@ function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tr
     # data and writing only its own row. Threading is therefore exact rather
     # than approximate: the arithmetic of iteration `i` is untouched, and the
     # two reductions that follow -- `tr_S` and `RSS` -- are serial passes in
-    # index order, so the result does not depend on the thread count. Unlike
-    # the probe loop in `precompute_neumann_traces`, this one is compute-bound
-    # (a QR per observation), which is why it scales with cores.
-    Threads.@threads for i in 1:N
-        w = _get_weights(tree, coords, i, bw, kernel)
-        W_sqrt = Diagonal(sqrt.(w))
-        Xw = W_sqrt * X
-        yw = W_sqrt * y
+    # index order, so the result does not depend on the thread count.
+    #
+    # The design handed to the QR is the compact one: `b x K`, holding only
+    # the rows inside the kernel's support, instead of `N x K` with `N - b`
+    # rows of zeros. That is where the cost of GWR lives -- `b` is set by
+    # the bandwidth and not by `N`, so a fixed bandwidth makes this
+    # `Θ(N · b · K)` rather than `Θ(N² K)`.
+    _tforeach_chunks(N) do rows
+        sc = _local_scratch(T, N, K)
+        xi = Vector{T}(undef, K)
+        for i in rows
+            n, _, w_self = _local_support!(sc, tree, coords, i, bw, kernel)
+            Xc, yc = _fill_local!(sc, X, y, sc.idx, sc.wv, n)
 
-        F = qr(Xw)
-        β_i = F \ yw
-        coef_local[i, :] = β_i
-        fitted[i] = dot(X[i, :], β_i)
-        residuals[i] = y[i] - fitted[i]
+            # `qr!` and not `qr`: the compact design lives in task-owned
+            # scratch that is overwritten at the next observation anyway, so
+            # there is nothing to preserve and a copy per observation is a
+            # copy too many.
+            F = qr!(Xc)
+            β_i = F \ yc
+            @inbounds for k in 1:K
+                coef_local[i, k] = β_i[k]
+            end
+            f_i = zero(T)
+            @inbounds for k in 1:K
+                f_i += X[i, k] * β_i[k]
+            end
+            fitted[i] = f_i
+            residuals[i] = y[i] - f_i
 
-        # Hat matrix diagonal: S[i,i] = w_i * x_i' (X'W_i X)^{-1} x_i.
-        # With Xw = W^{1/2}X and R from its QR, X'W_i X = R'R, so
-        # (X'W_i X)^{-1} = R^{-1}R^{-T} and S_ii = ||R^{-T} x_i sqrt(w_i)||².
-        # That is R' \ xi_w, NOT R \ xi_w: the latter forms (RR')^{-1} and
-        # inflates tr(S) past N on a badly scaled X, which then collapses
-        # the N - tr(S) divisor below to its floor of 1.
-        xi_w = X[i, :] .* sqrt(w[i])
-        hat_diag[i] = sum(abs2, F.R' \ xi_w)
+            # Hat matrix diagonal: S[i,i] = w_i * x_i' (X'W_i X)^{-1} x_i.
+            # With Xw = W^{1/2}X and R from its QR, X'W_i X = R'R, so
+            # (X'W_i X)^{-1} = R^{-1}R^{-T} and S_ii = ||R^{-T} x_i sqrt(w_i)||².
+            # That is R' \ xi_w, NOT R \ xi_w: the latter forms (RR')^{-1} and
+            # inflates tr(S) past N on a badly scaled X, which then collapses
+            # the N - tr(S) divisor below to its floor of 1.
+            #
+            # `R` is the same here as it was from the dense design, up to
+            # column signs: both satisfy R'R = X'W_i X, the rows outside the
+            # support contributing exactly nothing to that product. And
+            # `sum(abs2, ·)` does not see a sign.
+            sws = sqrt(w_self)
+            @inbounds for k in 1:K
+                xi[k] = X[i, k] * sws
+            end
+            hat_diag[i] = sum(abs2, F.R' \ xi)
+        end
     end
 
     tr_S = sum(hat_diag)
@@ -549,33 +720,44 @@ function fit_gwr(
         bw = bandwidth
     end
 
+    yv = Vector{T}(y)
     coef_local, residuals, fitted, tr_S, RSS, R2, sigma2, AICc =
-        _gwr_fit_at_bandwidth(X_aug, Vector{T}(y), coords_mat, tree, bw, kernel)
+        _gwr_fit_at_bandwidth(X_aug, yv, coords_mat, tree, bw, kernel)
 
-    # Local standard errors
+    # Local standard errors and local R², in one pass over the observations.
+    # Both need the kernel's support at `i`, and finding it twice meant two
+    # KD-tree queries per observation for one neighbourhood.
     se_local = zeros(T, N, K)
-    Threads.@threads for i in 1:N
-        w = _get_weights(tree, coords_mat, i, bw, kernel)
-        W_sqrt = Diagonal(sqrt.(w))
-        Xw = W_sqrt * X_aug
-        XwXw_inv = inv(Symmetric(Xw' * Xw))
-        for k in 1:K
-            se_local[i, k] = sqrt(max(zero(T), sigma2 * XwXw_inv[k, k]))
-        end
-    end
-
-    # Local R²
     local_R2 = zeros(T, N)
     ȳ = mean(y)
-    # Both of these are the same vector for every `i`, and were being rebuilt
-    # inside the loop -- N allocations of length N each, for one dot product.
+    # Invariant in `i`: these were once rebuilt inside the loop, N vectors of
+    # length N for two dot products.
     dev2 = (y .- ȳ) .^ 2
     res2 = residuals .^ 2
-    Threads.@threads for i in 1:N
-        w = _get_weights(tree, coords_mat, i, bw, kernel)
-        tss_i = dot(w, dev2)
-        rss_i = dot(w, res2)
-        local_R2[i] = tss_i > zero(T) ? one(T) - rss_i / tss_i : zero(T)
+    _tforeach_chunks(N) do rows
+        sc = _local_scratch(T, N, K)
+        for i in rows
+            n, _, _ = _local_support!(sc, tree, coords_mat, i, bw, kernel)
+            Xc, _ = _fill_local!(sc, X_aug, yv, sc.idx, sc.wv, n)
+
+            # Xc'Xc is X'W_i X: the rows outside the support contributed
+            # exactly zero to that product, so dropping them changes the
+            # matrix not at all beyond the order of the summation.
+            XwXw_inv = inv(Symmetric(Xc' * Xc))
+            @inbounds for k in 1:K
+                se_local[i, k] = sqrt(max(zero(T), sigma2 * XwXw_inv[k, k]))
+            end
+
+            tss_i = zero(T)
+            rss_i = zero(T)
+            @inbounds for t in 1:n
+                wt = sc.wv[t]
+                j = sc.idx[t]
+                tss_i += wt * dev2[j]
+                rss_i += wt * res2[j]
+            end
+            local_R2[i] = tss_i > zero(T) ? one(T) - rss_i / tss_i : zero(T)
+        end
     end
 
     coef_global = vec(mean(coef_local; dims=1))
@@ -583,7 +765,7 @@ function fit_gwr(
 
     return GWRModel{T}(
         coef_local, se_local, coef_global,
-        Vector{T}(y), X_aug, coords_mat,
+        yv, X_aug, coords_mat,
         residuals, fitted, local_R2,
         bw_val, bw, kernel,
         AICc, R2, sigma2, tr_S, vnames
@@ -591,6 +773,53 @@ function fit_gwr(
 end
 
 # ─── MGWR (Multiscale GWR via backfitting) ───────────────────────────
+
+"""
+    _mgwr_se_approx(X_aug, coords, tree, bandwidths, kernel, sigma2)
+
+The approximate MGWR local standard errors: for each `(i, k)`, the
+standard error `k` would have if it came from a single weighted regression
+of a known partial residual on column `k` alone.
+
+It is approximate because it ignores that the other `K - 1` components
+were estimated too, which is stated where it is used. There is no
+stochastic counterpart: it needs `‖B_k[i, :]‖²` for every `i`, which is
+`N` quantities rather than a trace.
+
+This was two byte-identical blocks in [`fit_mgwr`](@ref), one on each side
+of the `inference` branch, differing only in which `sigma2` reached them.
+Both looped `i` outside `k`, rebuilding `AdaptiveBandwidth(bandwidths[k])`
+on every one of the `N · K` iterations although it depends only on `k`,
+and taking a dense length-`N` weight vector to use `b` of its entries.
+"""
+function _mgwr_se_approx(X_aug::Matrix{T}, coords::Matrix{T}, tree::KDTree,
+                         bandwidths::Vector{Float64}, kernel::KernelFunction,
+                         sigma2::T) where {T}
+    N, K = size(X_aug)
+    se = zeros(T, N, K)
+    for k in 1:K
+        bw_k = AdaptiveBandwidth(round(Int, bandwidths[k]))
+        xk = @view X_aug[:, k]
+        _tforeach_chunks(N) do rows
+            sc = _support_scratch(T)
+            idx = sc.idx
+            wv = sc.wv
+            for i in rows
+                n, _, w_self = _local_support!(sc, tree, coords, i, bw_k, kernel)
+                # Written as the square of `x * sqrt(w)` rather than as
+                # `x^2 * w`, which is the same quantity but not the same
+                # rounding, and the dense form this replaced took the first.
+                denom = zero(T)
+                @inbounds for t in 1:n
+                    v = xk[idx[t]] * sqrt(wv[t])
+                    denom += v * v
+                end
+                se[i, k] = denom > T(1e-12) ? sqrt(sigma2 * w_self / denom) : zero(T)
+            end
+        end
+    end
+    return se
+end
 
 """
     _mgwr_weight_cache(X_aug, bandwidths, coords, tree, kernel)
@@ -615,17 +844,39 @@ function _mgwr_weight_cache(X_aug::Matrix{T}, bandwidths::Vector{Float64},
     for k in 1:K
         bw_k = AdaptiveBandwidth(round(Int, bandwidths[k]))
         xk = @view X_aug[:, k]
-        Threads.@threads for i in 1:N
-            w = _get_weights(tree, coords, i, bw_k, kernel)
-            nz = findall(!iszero, w)
-            idx[k][i] = nz
-            # Store w_ij * x_jk, which is the only combination used below.
-            val[k][i] = T[w[j] * xk[j] for j in nz]
-            d = zero(T)
-            @inbounds for j in nz
-                d += w[j] * xk[j]^2
+        _tforeach_chunks(N) do rows
+            sc = _support_scratch(T)
+            sidx = sc.idx
+            swv = sc.wv
+            for i in rows
+                n, _, _ = _local_support!(sc, tree, coords, i, bw_k, kernel)
+                # Entries of the support where the kernel evaluates to
+                # exactly zero are dropped, which `findall(!iszero, w)` also
+                # did: a Bisquare kernel is zero at `d == h`, and `inrange`
+                # returns that point. Keeping them would pad every cached
+                # row with entries that contribute nothing, and this cache
+                # is iterated once per back-fitting sweep.
+                nkeep = 0
+                @inbounds for t in 1:n
+                    iszero(swv[t]) || (nkeep += 1)
+                end
+                nzi = Vector{Int}(undef, nkeep)
+                vzi = Vector{T}(undef, nkeep)
+                d = zero(T)
+                m = 0
+                @inbounds for t in 1:n
+                    iszero(swv[t]) && continue
+                    m += 1
+                    j = sidx[t]
+                    nzi[m] = j
+                    # Store w_ij * x_jk, which is the only combination used below.
+                    vzi[m] = swv[t] * xk[j]
+                    d += swv[t] * xk[j]^2
+                end
+                idx[k][i] = nzi
+                val[k][i] = vzi
+                den[k][i] = d
             end
-            den[k][i] = d
         end
     end
     return idx, val, den
@@ -802,20 +1053,25 @@ function _mgwr_backfit_operator(X_aug::Matrix{T}, bandwidths::Vector{Float64},
 
             bw_k = AdaptiveBandwidth(round(Int, bandwidths[k]))
             xk = @view X_aug[:, k]
+            sc = _support_scratch(T)
+            sidx = sc.idx
+            swv = sc.wv
             for i in 1:N
-                w = _get_weights(tree, coords, i, bw_k, kernel)
+                n, _, _ = _local_support!(sc, tree, coords, i, bw_k, kernel)
                 denom = zero(T)
-                @inbounds for j in 1:N
-                    denom += w[j] * xk[j]^2
+                @inbounds for t in 1:n
+                    denom += swv[t] * xk[sidx[t]]^2
                 end
 
-                # Row i of B_k is row i of C_k times M. w vanishes outside
-                # the kernel's support, which keeps this O(N * bw) per row
-                # rather than O(N^2).
+                # Row i of B_k is row i of C_k times M. The weights vanish
+                # outside the kernel's support, which is what keeps this
+                # O(N * bw) per row rather than O(N^2) -- and now the loop
+                # visits only the support instead of testing all N for it.
                 fill!(brow, zero(T))
                 if denom > T(1e-12)
-                    @inbounds for j in 1:N
-                        c = w[j] * xk[j]
+                    @inbounds for t in 1:n
+                        j = sidx[t]
+                        c = swv[t] * xk[j]
                         iszero(c) && continue
                         cd = c / denom
                         @views brow .+= cd .* Mt[:, j]
@@ -1021,15 +1277,28 @@ function fit_mgwr(
                 bw_changed |= Float64(bw_k.k) != bandwidths[k]
             end
 
-            # Fit local regression for this variable
+            # Fit local regression for this variable. One scalar weighted
+            # regression per observation, so the compact support replaces two
+            # length-N broadcasts and two length-N dots with `b` terms.
             coef_k_old = coef_local[:, k]
-            for i in 1:N
-                w = _get_weights(tree, coords_mat, i, bw_k, kernel)
-                w_sqrt = sqrt.(w)
-                xw = x_k[:, 1] .* w_sqrt
-                yw = partial_y .* w_sqrt
-                denom = dot(xw, xw)
-                coef_local[i, k] = denom > T(1e-12) ? dot(xw, yw) / denom : zero(T)
+            xk1 = @view x_k[:, 1]
+            _tforeach_chunks(N) do rows
+                sc = _support_scratch(T)
+                sidx = sc.idx
+                swv = sc.wv
+                for i in rows
+                    n, _, _ = _local_support!(sc, tree, coords_mat, i, bw_k, kernel)
+                    denom = zero(T)
+                    num = zero(T)
+                    @inbounds for t in 1:n
+                        j = sidx[t]
+                        sw = sqrt(swv[t])
+                        xwj = xk1[j] * sw
+                        denom += xwj * xwj
+                        num += xwj * (partial_y[j] * sw)
+                    end
+                    coef_local[i, k] = denom > T(1e-12) ? num / denom : zero(T)
+                end
             end
 
             bandwidths[k] = Float64(bw_k.k)
@@ -1158,16 +1427,7 @@ function fit_mgwr(
         # se_local has no stochastic counterpart: it needs ||B_k[i, :]||^2
         # for every i, which is N quantities rather than a trace. So it keeps
         # the approximate form, now at least scaled by a real sigma2.
-        se_local = zeros(T, N, K)
-        for i in 1:N
-            for k in 1:K
-                bw_k = AdaptiveBandwidth(round(Int, bandwidths[k]))
-                w = _get_weights(tree, coords_mat, i, bw_k, kernel)
-                xw_k = X_aug[:, k] .* sqrt.(w)
-                denom = dot(xw_k, xw_k)
-                se_local[i, k] = denom > T(1e-12) ? sqrt(sigma2 * w[i] / denom) : zero(T)
-            end
-        end
+        se_local = _mgwr_se_approx(X_aug, coords_mat, tree, bandwidths, kernel, sigma2)
     else
         enp = fill(T(NaN), K)
         tr_S = T(NaN)
@@ -1179,16 +1439,7 @@ function fit_mgwr(
         # weighted regression on a known partial residual, ignoring that the
         # other components were estimated too. Reached with inference = false,
         # above max_inference_n, or when the bandwidths never settled.
-        se_local = zeros(T, N, K)
-        for i in 1:N
-            for k in 1:K
-                bw_k = AdaptiveBandwidth(round(Int, bandwidths[k]))
-                w = _get_weights(tree, coords_mat, i, bw_k, kernel)
-                xw_k = X_aug[:, k] .* sqrt.(w)
-                denom = dot(xw_k, xw_k)
-                se_local[i, k] = denom > T(1e-12) ? sqrt(sigma2 * w[i] / denom) : zero(T)
-            end
-        end
+        se_local = _mgwr_se_approx(X_aug, coords_mat, tree, bandwidths, kernel, sigma2)
     end
 
     return MGWRModel{T}(

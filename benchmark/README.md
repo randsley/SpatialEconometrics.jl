@@ -249,3 +249,38 @@ work the measurements justify is, in order:
    embarrassingly parallel and the package currently contains no `Threads`
    call at all;
 3. the `max_exact_n` policy, which picks the slower branch at its boundary.
+
+## Phase 6C: the GWR compact local design
+
+The `gwr` group now measures five cases rather than one, because the cost
+of a local fit is set by the size of the kernel's support `b`, and a single
+bandwidth says nothing about the shape of that curve. On a square grid
+`b / N` spans 0.02 to 1.0 across the cases below.
+
+Single-threaded, against the already-threaded code of the previous pass, so
+this isolates the compact design:
+
+| `N = 900` | b/N | before | after | | allocation |
+|---|---|---|---|---|---|
+| `fixed_narrow` | 0.05 | 47.5 ms | **7.3 ms** | 6.46x | 107 MiB -> 4.4 MiB |
+| `adaptive_k20` | 0.024 | 45.6 ms | **8.2 ms** | 5.57x | 106 MiB -> 3.4 MiB |
+| `fixed_bw` | 0.17 | 53.7 ms | **14.6 ms** | 3.69x | 115 MiB -> 7.2 MiB |
+| `adaptive_k500` | 0.56 | 157 ms | 96.4 ms | 1.63x | 140 MiB -> 14.4 MiB |
+| `mgwr` | - | 18.7 s | 15.3 s | 1.22x | 21.6 GiB -> 2.66 GiB |
+
+The speedup tracks `1 / (b/N)`, which is the check that the change did what
+it was meant to. On sixteen threads the same cases are a further 2.3-5.0x,
+and against the unthreaded code this work started from, `fixed_bw` at
+`N = 900` is **15.8x** faster end to end: 105.4 ms to 6.68 ms.
+
+`adaptive_k500` is the floor, at `b/N = 0.56`, and it is also roughly where
+the AICc search tends to land on smooth data -- so a caller who lets the
+bandwidth be chosen for them may see closer to 1.6x than to 6.5x. The
+search itself still gains, since it evaluates many narrow bandwidths on the
+way.
+
+MGWR is the one case where the compact design is not the binding
+constraint: 1.22x on time against 8.1x on allocation, because its cost is
+`_select_bandwidth_aicc` re-scanning about 26 bandwidths per column per
+back-fitting sweep. `docs/AUDIT.md` finding 32 says what fixing that would
+cost.
