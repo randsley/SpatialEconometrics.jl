@@ -13,7 +13,20 @@ makedocs(
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         canonical = "https://randsley.github.io/SpatialEconometrics.jl",
+        # The logo pair is picked up by name; the stylesheet and the
+        # favicon have to be listed, the latter so the link is emitted
+        # under the versioned docs path rather than looked for at /.
+        assets = [
+            "assets/custom.css",
+            Documenter.asset("assets/favicon.ico", class = :ico, islocal = true),
+        ],
+        # The sidebar carries 24 API pages. Collapsing to the top level
+        # keeps it readable; a section opens when you are inside it.
+        collapselevel = 1,
+        edit_link = "master",
+        repolink = "https://github.com/randsley/SpatialEconometrics.jl",
     ),
+    repo = "https://github.com/randsley/SpatialEconometrics.jl/blob/{commit}{path}#{line}",
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
@@ -45,34 +58,44 @@ makedocs(
         "Formula Interface" => "formula.md",
         "Output & Tables" => "tables.md",
         "Package Extensions" => "extensions.md",
-        "API Reference" => vcat(
-            ["Overview" => "api.md"],
-            [
-            "Variants & Specification Tags" => "api/tags.md",
-            "Cross-Sectional Models" => "api/cross_section.md",
-            "Static Spatial Panels" => "api/panel.md",
-            "Dynamic Spatial Panels" => "api/dynamic_panel.md",
-            "GS2SLS / SARAR Panels" => "api/gs2sls.md",
-            "Dynamic Panel GMM" => "api/gmm.md",
-            "Spatial Error Models" => "api/sem.md",
-            "Higher-Order Models" => "api/higher_order.md",
-            "Spatial Regime Models" => "api/regime.md",
-            "Spatial Discrete Choice" => "api/discrete_choice.md",
-            "Spatial Filtering" => "api/filtering.md",
-            "Geographically Weighted Regression" => "api/gwr.md",
-            "Gravity & Flow Models" => "api/gravity.md",
-            "Spatial Diagnostics" => "api/diagnostics.md",
-            "Panel Diagnostics" => "api/panel_diagnostics.md",
-            "Model Selection" => "api/model_selection.md",
-            "Weight Matrices" => "api/weights.md",
-            "Robust Inference" => "api/robust.md",
-            "Simulation & Power Analysis" => "api/simulation.md",
-            "Calibration & Input-Output" => "api/calibration.md",
-            "Formula Interface" => "api/formula.md",
-            "Output & Tables" => "api/tables.md",
-            "Package-Level & Extensions" => "api/package_level.md",
+        # Grouped rather than listed flat: 24 entries in one column is a
+        # wall, and the groups match how the manual is organised.
+        "API Reference" => [
+            "Overview" => "api.md",
+            "Cross-Section & Heterogeneity" => [
+                "Variants & Specification Tags" => "api/tags.md",
+                "Cross-Sectional Models" => "api/cross_section.md",
+                "Spatial Error Models" => "api/sem.md",
+                "Higher-Order Models" => "api/higher_order.md",
+                "Spatial Regime Models" => "api/regime.md",
+                "Spatial Discrete Choice" => "api/discrete_choice.md",
+                "Spatial Filtering" => "api/filtering.md",
+                "Geographically Weighted Regression" => "api/gwr.md",
             ],
-        ),
+            "Panels" => [
+                "Static Spatial Panels" => "api/panel.md",
+                "Dynamic Spatial Panels" => "api/dynamic_panel.md",
+                "GS2SLS / SARAR Panels" => "api/gs2sls.md",
+                "Dynamic Panel GMM" => "api/gmm.md",
+            ],
+            "Flows & Calibration" => [
+                "Gravity & Flow Models" => "api/gravity.md",
+                "Calibration & Input-Output" => "api/calibration.md",
+            ],
+            "Diagnostics & Selection" => [
+                "Spatial Diagnostics" => "api/diagnostics.md",
+                "Panel Diagnostics" => "api/panel_diagnostics.md",
+                "Model Selection" => "api/model_selection.md",
+            ],
+            "Infrastructure" => [
+                "Weight Matrices" => "api/weights.md",
+                "Robust Inference" => "api/robust.md",
+                "Simulation & Power Analysis" => "api/simulation.md",
+                "Formula Interface" => "api/formula.md",
+                "Output & Tables" => "api/tables.md",
+                "Package-Level & Extensions" => "api/package_level.md",
+            ],
+        ],
     ],
 )
 
