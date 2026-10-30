@@ -31,17 +31,36 @@ function knn_weights(
     N, D = size(coords)
     @assert k >= 1 && k < N "k must be in [1, N-1]"
 
-    tree = KDTree(permutedims(Float64.(coords)))
-    idxs, dists = knn(tree, permutedims(Float64.(coords)), k + 1, true)
+    pts = permutedims(Float64.(coords))     # built once, queried once
+    tree = KDTree(pts)
+    idxs, dists = knn(tree, pts, k + 1, true)
 
+    # `k + 1` neighbours are requested so that self can be dropped and `k`
+    # remain. The selection below used to re-derive, for every candidate,
+    # how many non-self neighbours the list holds and how many have been
+    # seen so far -- a `filter` that allocates and a `count` over a fresh
+    # slice, both inside the inner loop, so O(k²) work and O(k) allocations
+    # per observation to decide something a running counter decides in O(1).
+    # The rule is unchanged: keep the first `k` non-self neighbours, and if
+    # self is absent from the list (which happens when points coincide) keep
+    # `k` of the `k + 1` on offer.
     I_idx = Int[]; J_idx = Int[]; V_val = Float64[]
+    sizehint!(I_idx, N * k); sizehint!(J_idx, N * k); sizehint!(V_val, N * k)
     for i in 1:N
-        for m in 1:length(idxs[i])
-            j = idxs[i][m]
+        nbr = idxs[i]
+        dst = dists[i]
+        nonself = 0
+        @inbounds for x in nbr
+            x != i && (nonself += 1)
+        end
+        kept = 0
+        @inbounds for m in eachindex(nbr)
+            j = nbr[m]
             j == i && continue
-            length(filter(x -> x != i, idxs[i])) >= k && count(x -> x != i, idxs[i][1:m]) > k && continue
+            nonself >= k && kept >= k && continue
             push!(I_idx, i); push!(J_idx, j)
-            push!(V_val, binary ? 1.0 : 1.0 / max(dists[i][m], eps()))
+            push!(V_val, binary ? 1.0 : 1.0 / max(dst[m], eps()))
+            kept += 1
         end
     end
 

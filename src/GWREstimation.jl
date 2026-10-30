@@ -243,8 +243,29 @@ function _build_tree(coords::AbstractMatrix{T}) where {T}
     return KDTree(permutedims(coords))  # KDTree expects D×N
 end
 
+"""
+    _euclid(coords, i, j)
+
+Distance between rows `i` and `j` of `coords`, without building them.
+
+`sqrt(sum((coords[i, :] .- coords[j, :]) .^ 2))` is the same number and
+allocates three vectors to get it, once per candidate neighbour, which is
+`O(N * bw)` allocations across a GWR fit and was the reason threading the
+local regressions scaled to 3x rather than to the core count. Summation
+order is unchanged: for the two columns GWR asserts, `sum` over a pair
+adds `v[1] + v[2]`, and so does this.
+"""
+@inline function _euclid(coords::AbstractMatrix{T}, i::Int, j::Int) where {T}
+    acc = zero(T)
+    @inbounds for d in axes(coords, 2)
+        δ = coords[i, d] - coords[j, d]
+        acc += δ * δ
+    end
+    return sqrt(acc)
+end
+
 function _get_bandwidth_distance(tree::KDTree, coords::AbstractMatrix{T}, i::Int, bw::AdaptiveBandwidth) where {T}
-    point = coords[i, :]
+    point = @view coords[i, :]
     # +1 includes self, but never ask the tree for more neighbours than it
     # holds: knn throws on k > N, so AdaptiveBandwidth(N) -- which the
     # bandwidth search used to put in range -- was an error rather than the
@@ -256,12 +277,11 @@ end
 
 function _get_weights(tree::KDTree, coords::AbstractMatrix{T}, i::Int, bw::FixedBandwidth{T}, kernel::KernelFunction) where {T}
     N = size(coords, 1)
-    point = coords[i, :]
+    point = @view coords[i, :]
     idxs = inrange(tree, point, bw.h)
     w = zeros(T, N)
-    for j in idxs
-        d = sqrt(sum((coords[i, :] .- coords[j, :]).^2))
-        w[j] = kernel_weight(kernel, d, bw.h)
+    @inbounds for j in idxs
+        w[j] = kernel_weight(kernel, _euclid(coords, i, j), bw.h)
     end
     return w
 end
@@ -269,12 +289,11 @@ end
 function _get_weights(tree::KDTree, coords::AbstractMatrix{T}, i::Int, bw::AdaptiveBandwidth, kernel::KernelFunction) where {T}
     N = size(coords, 1)
     h_i = _get_bandwidth_distance(tree, coords, i, bw)
-    point = coords[i, :]
+    point = @view coords[i, :]
     idxs = inrange(tree, point, h_i)
     w = zeros(T, N)
-    for j in idxs
-        d = sqrt(sum((coords[i, :] .- coords[j, :]).^2))
-        w[j] = kernel_weight(kernel, d, h_i)
+    @inbounds for j in idxs
+        w[j] = kernel_weight(kernel, _euclid(coords, i, j), h_i)
     end
     return w
 end
@@ -296,7 +315,14 @@ function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tr
     residuals = zeros(T, N)
     fitted = zeros(T, N)
 
-    for i in 1:N
+    # One local regression per observation, each reading the KD-tree and the
+    # data and writing only its own row. Threading is therefore exact rather
+    # than approximate: the arithmetic of iteration `i` is untouched, and the
+    # two reductions that follow -- `tr_S` and `RSS` -- are serial passes in
+    # index order, so the result does not depend on the thread count. Unlike
+    # the probe loop in `precompute_neumann_traces`, this one is compute-bound
+    # (a QR per observation), which is why it scales with cores.
+    Threads.@threads for i in 1:N
         w = _get_weights(tree, coords, i, bw, kernel)
         W_sqrt = Diagonal(sqrt.(w))
         Xw = W_sqrt * X
@@ -528,7 +554,7 @@ function fit_gwr(
 
     # Local standard errors
     se_local = zeros(T, N, K)
-    for i in 1:N
+    Threads.@threads for i in 1:N
         w = _get_weights(tree, coords_mat, i, bw, kernel)
         W_sqrt = Diagonal(sqrt.(w))
         Xw = W_sqrt * X_aug
@@ -541,10 +567,14 @@ function fit_gwr(
     # Local R²
     local_R2 = zeros(T, N)
     ȳ = mean(y)
-    for i in 1:N
+    # Both of these are the same vector for every `i`, and were being rebuilt
+    # inside the loop -- N allocations of length N each, for one dot product.
+    dev2 = (y .- ȳ) .^ 2
+    res2 = residuals .^ 2
+    Threads.@threads for i in 1:N
         w = _get_weights(tree, coords_mat, i, bw, kernel)
-        tss_i = dot(w, (y .- ȳ).^2)
-        rss_i = dot(w, residuals.^2)
+        tss_i = dot(w, dev2)
+        rss_i = dot(w, res2)
         local_R2[i] = tss_i > zero(T) ? one(T) - rss_i / tss_i : zero(T)
     end
 
@@ -585,7 +615,7 @@ function _mgwr_weight_cache(X_aug::Matrix{T}, bandwidths::Vector{Float64},
     for k in 1:K
         bw_k = AdaptiveBandwidth(round(Int, bandwidths[k]))
         xk = @view X_aug[:, k]
-        for i in 1:N
+        Threads.@threads for i in 1:N
             w = _get_weights(tree, coords, i, bw_k, kernel)
             nz = findall(!iszero, w)
             idx[k][i] = nz

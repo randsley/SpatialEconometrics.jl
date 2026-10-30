@@ -2,8 +2,8 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,600 test assertions in 48 top-level testsets on Julia
-> 1.13.2 and 1,594 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
+> 22 submodules, 1,691 test assertions in 48 top-level testsets on Julia
+> 1.13.2 and 1,685 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
 > extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5, 6 and 6B are
 > complete except item #10 (Performance)**, which is the next piece of work.
 > Tier 3 is untouched, and the correctness audit in `docs/AUDIT.md` is closed
@@ -507,12 +507,12 @@ signature became the pair `regression_table` / `to_latex`.
 
 | Feature | Description |
 |---|---|
-| Multithreaded GWR | `Threads.@threads` over local regressions in `fit_gwr` — embarrassingly parallel, linear speedup |
-| Sparse Chebyshev | Maintain sparsity in Chebyshev polynomial recursion (currently densifies at high orders) |
+| Multithreaded GWR — ✅ **delivered** | `Threads.@threads` over local regressions in `fit_gwr`. Not a linear speedup: 4.0–6.3× on 16 cores, held back by an `O(N²)` allocation and a dense local design, both recorded in `benchmark/README.md` |
+| Sparse Chebyshev — ✅ **bounded, not replaced** | The recursion still densifies, because on a sparse `W` that is the fast path; `max_fill_bytes` now caps the peak and finishes the remaining orders a column block at a time. Keeping sparsity throughout would be 4–25× slower on a lattice |
 | GPU spatial lag | CUDA.jl kernel for `W * y` when N > 50,000 — weight matrix stays on GPU |
 | Out-of-core panels | Arrow.jl / DuckDB.jl streaming for `fit_spatial_panel` — process partitioned Parquet files without loading full NT matrix |
 | Precompiled sysimage | PackageCompiler.jl sysimage recipe for zero-latency interactive use |
-| Benchmark suite | BenchmarkTools.jl suite comparing across N sizes, W densities, and Chebyshev orders |
+| Benchmark suite — ✅ **delivered** | `benchmark/`: BenchmarkTools.jl suite across N sizes, W densities and Chebyshev orders, with `--compare` against a saved baseline |
 | Matrix-free log-determinant | Stochastic Lanczos quadrature for `log det(I − ρW)` when `N` is large enough that the Chebyshev path's error bound stops being the binding constraint — Aune et al. (2014); Barry & Pace (1999) |
 
 The GWR and MGWR degrees of freedom are **not** part of this item: the
@@ -522,7 +522,7 @@ already in `src/GWREstimation.jl` (`_mgwr_enp_hutchinson`, `df_method` of
 each `enp`. What remains here is the same idea applied to the spatial
 log-determinant, where only the Chebyshev approximation exists today.
 
-**Status:** 🚧 In progress — the benchmark suite and the trace-powers rewrite are delivered
+**Status:** 🚧 In progress — the benchmark suite, the trace-powers rewrite, threaded GWR, the `knn_weights` selection loop, the reused log-determinant factorisation and the Chebyshev memory ceiling are delivered
 (`benchmark/`, run with `julia --project=benchmark -t auto benchmark/run.jl`),
 and what it measured has re-ordered the rest of this item. See
 `benchmark/README.md` for the numbers and `docs/AUDIT.md` finding 29.
@@ -538,11 +538,11 @@ precompute nor the per-evaluation cost matters. 71–92% of a fit is
 |---|---|
 | `row_standardize!` was O(N · nnz), not O(nnz) — 1,677× at `N = 8100`, output bit-identical | ✅ Fixed, testset 32, finding 29 |
 | `spatial_trace_powers` is 71–92% of `fit_spatial` | ✅ Fixed, testset 32b — 3.4–12.2× on the probe branch, 1.8–2.7× on `fit_spatial` at `N ≥ 3600` |
-| `max_exact_n = 1000` picks the dense `eigvals` branch, now **51×** slower than probes at `N = 900` (0.3 s against 6.0 ms) and O(N³)/O(N²)-memory above it | ⬜ Next — a policy call, see below |
-| The default `ChebyshevApprox(n_probes = 0)` densifies: 461 MiB at `N = 8100, q = 12`, and 97.8% of `N²` nonzeros for a knn `W` with `k = 24` | ⬜ |
-| No `Threads` call anywhere in `src/` — GWR's local regressions are embarrassingly parallel; the probe loop is now threaded but is bandwidth-bound, so it gained 4% at `N = 14400` | ⬜ GWR only |
-| `log_marginal_likelihood` makes the same `max_exact_n` mistake: 200 exact LUs per call where the amortised path costs one precompute | ⬜ |
-| `knn_weights` is O(N²) — 820 ms at `N = 8100, k = 12` | ⬜ |
+| `max_exact_n = 1000` picks the dense `eigvals` branch, now **51×** slower than probes at `N = 900` (0.3 s against 6.0 ms) and O(N³)/O(N²)-memory above it | ✅ Decided — default kept, exactness preferred; the 51× is documented in the docstring |
+| ~~The default `ChebyshevApprox(n_probes = 0)` densifies: 461 MiB at `N = 8100, q = 12`~~ — **461 MiB was cumulative allocation; peak fill is 18.9 MiB.** The `Θ(N²)` ceiling is real but arrives later (90 MiB at knn `k = 24, N = 3600`) | ✅ Bounded by `max_fill_bytes`, 128 MiB default, blocked fallback, finding 31 |
+| No `Threads` call anywhere in `src/` — GWR's local regressions are embarrassingly parallel; the probe loop is now threaded but is bandwidth-bound, so it gained 4% at `N = 14400` | ✅ `fit_gwr` threaded: 4.0–6.3× at 16 threads, 1.6–2.0× at one, bit-identical, testset 32c |
+| ~~`log_marginal_likelihood` makes the same `max_exact_n` mistake~~ — the 200 LUs are 97–99% of the call, but the fix is not to drop exactness: the pattern of `I − ρW` is fixed, so the symbolic factorisation is reused | ✅ 1.4–1.5×, all 200 log-determinants bit-identical, testset 32e |
+| ~~`knn_weights` is O(N²) — 820 ms at `N = 8100, k = 12`~~ — **wrong on both counts.** It is O(N log N) via a KD-tree and takes 26 ms; the 820 ms was mostly the `row_standardize!` quadratic it calls by default | ✅ Corrected; its selection loop fixed anyway, 1.2–1.5× and 3× less allocation, testset 32d |
 
 The deprioritised three are not wrong, and the matrix-free log-determinant
 is still the right tool at the `N` where the Chebyshev fill-in binds. They
@@ -793,17 +793,18 @@ Rows above the rule are measured; rows below are estimates.
 | **master** (+ Phase 6B item 15, so 6B complete) | 22 | 1,566 | 15,271 |
 | **master** (+ #10 benchmarks, finding 29) | 22 | 1,576 | 15,269 |
 | **master** (+ #10 trace kernel, finding 30) | 22 | 1,600 | 15,367 |
+| **master** (+ #10 GWR, knn, logdet, Chebyshev; finding 31) | 22 | 1,691 | 15,653 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 15,367 lines of
-`src/`, 5,034 lines of tests, 2,884 lines of examples across 22 scripts,
+Measured on master: 22 submodules plus the umbrella across 15,653 lines of
+`src/`, 5,215 lines of tests, 2,884 lines of examples across 22 scripts,
 398 lines of package extensions, 48 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 The assertion counts above are measured with Makie and Turing absent, so the
-two package-extension testsets skip: 1,600 on Julia 1.13.2 and 1,594 on
+two package-extension testsets skip: 1,691 on Julia 1.13.2 and 1,685 on
 Julia 1.10.12. The six-assertion difference is version-dependent testsets,
 not the change log — it predates Phase 6B and is unchanged by it: items 14
 and 15 added 88 and 192 assertions, every one of which passes identically on

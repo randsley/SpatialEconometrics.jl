@@ -119,6 +119,122 @@ that is not a change in the answer. It is bit-identical across 1, 2, 7 and
 16 threads.
 
 
+## What the second pass did, and two figures it corrected
+
+Four more findings taken, measured the same way. Two of the numbers in
+the first pass above were wrong, and the corrections are the more useful
+part of this section.
+
+### `fit_gwr`: 4.0–6.3x
+
+`N` local regressions, each reading the KD-tree and writing only its own
+row, so threading them is exact rather than approximate.
+
+| | before | after, `-t 16` | after, `-t 1` |
+|---|---|---|---|
+| `N = 400` | 27.8 ms | **4.40 ms** (6.3x) | 17.0 ms (1.6x) |
+| `N = 900` | 105.4 ms | **26.5 ms** (4.0x) | 52.7 ms (2.0x) |
+
+The single-threaded half came from two things that had nothing to do with
+threading, and found only because 3x on sixteen cores was obviously wrong
+for an embarrassingly parallel loop. `_get_weights` computed each
+candidate distance as `sqrt(sum((coords[i, :] .- coords[j, :]) .^ 2))`,
+allocating three vectors per neighbour, `O(N · bw)` allocations per fit;
+and the local-R² loop rebuilt two loop-invariant length-`N` vectors on
+every one of its `N` iterations. Allocation per fit went from 224 MiB to
+115 MiB and scaling from 3.1x to 6.3x. Still short of sixteen: the
+remaining `zeros(T, N)` per call is an `O(N²)` allocation, and the local
+designs are dense `N x K` where only `bw` rows are nonzero. A compact
+local design would be the next step and would change the QR's row order,
+so it is not a free one.
+
+Bit-identical at 1, 4 and 16 threads, including the auto-bandwidth path,
+which calls the threaded fit repeatedly inside the AICc search.
+
+### `log_marginal_likelihood`: 1.4–1.5x, bit-identical
+
+The 200 exact sparse LUs are 97–99% of the call, which is what the first
+pass said. What it got wrong was the remedy: it listed this as "the same
+`max_exact_n` mistake", implying the fix was to stop being exact. It is
+not. The sparsity pattern of `I - ρW` is the same at every node, so the
+symbolic analysis is done once and each node reuses it through `lu!`,
+with the values written into the existing pattern instead of a fresh
+sparse matrix built per node. Same factorisation, fewer of them:
+
+| | before | after |
+|---|---|---|
+| 200 nodes, `N = 400` | 160 ms | 116 ms (1.38x) |
+| `N = 900` | 342 ms | 232 ms (1.47x) |
+| `N = 1600` | 664 ms | 463 ms (1.43x) |
+
+All 200 log-determinants bit-identical, on Julia 1.13.2 and 1.10.12, and
+every marginal likelihood and specification probability unchanged to the
+last digit across six specifications, three sizes, the Chebyshev branch
+and a non-default grid, prior and `ρ` interval.
+
+### Correction: `knn_weights` is not `O(N²)`
+
+The first pass recorded "`knn_weights` is O(N²) — 820 ms at `N = 8100,
+k = 12`". It is `O(N log N)`: it has used a KD-tree all along, and the
+measured time is **26 ms**, not 820. Scaling confirms it — multiplying
+`N` by 2.25 multiplies the time by 2.36–2.41, where quadratic would give
+5.06:
+
+| `N` | 900 | 3,600 | 8,100 | 14,400 | 32,400 |
+|---|---|---|---|---|---|
+| `k = 12` | 2.6 ms | 10.9 ms | 26.2 ms | 63.4 ms | 149 ms |
+
+Where 820 ms came from is the useful part: `knn_weights` calls
+`row_standardize!` by default, and that was the accidental quadratic of
+finding 29. The figure was mostly a measurement of a different function's
+defect, attributed to this one. A profile of a composite is not a profile
+of its parts.
+
+There was still something to fix, worth 1.2–1.5x: the neighbour selection
+re-derived, for every candidate, how many non-self neighbours the list
+held — an allocating `filter` plus a `count` over a fresh slice, inside
+the inner loop — to decide what a running counter decides in `O(1)`.
+Allocation at `N = 8100, k = 12` fell from 40.5 MiB to 13.2 MiB, and the
+output is identical across 144 configurations of size, `k`, `binary`,
+`row_standardize`, `symmetrize`, dimension and coincident points.
+
+### Correction: the Chebyshev 461 MiB was allocation, not a ceiling
+
+The first pass reported `precompute_chebyshev_traces` reaching "461 MiB
+at `N = 8100, q = 12`" and read it as a memory ceiling. That number is
+BenchmarkTools' **cumulative** allocation over the whole call — the sum
+of twelve intermediate matrices, nearly all collectable. The peak, which
+is what a ceiling is about, is `18.9 MiB`:
+
+| | peak fill | % of `N²` | cumulative |
+|---|---|---|---|
+| rook, `N = 8100`, `q = 12` | **18.9 MiB** | 1.9% | 90.8 MiB |
+| knn `k = 24`, `N = 900` | 12.1 MiB | 97.8% | 77.1 MiB |
+| knn `k = 24`, `N = 3600` | 89.9 MiB | 45.5% | 457 MiB |
+
+The 97.8%-of-`N²` density figure was right, but at `N = 900` that is
+12 MiB, so it was not evidence of a ceiling either. The ceiling is real
+and arrives later: the fill per row grows until it saturates at `N`, so
+peak memory is `Θ(N²)` on a `W` dense enough, and knn `k = 24` is already
+at 90 MiB by `N = 3600`.
+
+So the fix is a ceiling rather than a replacement. `max_fill_bytes`
+defaults to 128 MiB; when the recursion is about to cross it, the
+remaining orders are finished one column block at a time, in `3 · N · b`
+doubles, seeded from the two sparse matrices already computed so nothing
+is discarded. Measured on knn `k = 24, N = 3600, q = 12`: 1118 ms and
+2.5 GiB allocated becomes 576 ms and 1.1 GiB — **faster**, because that
+is the saturated regime where the sparse products have become dense ones
+with index overhead.
+
+Blocking is emphatically not a general win, which is why it is a fallback
+and not the default. On a rook lattice it is 4x to 25x **slower**, since
+the sparse recursion only touches the fill that exists while the blocked
+path pays `N · b` per level regardless. At the 128 MiB default every case
+in this suite stays on the fast path and is bit-identical, order 6 — what
+`fit_spatial` uses — included.
+
+
 ### What this implies for the item
 
 Three of the seven listed deliverables — sparse Chebyshev, GPU spatial lag,

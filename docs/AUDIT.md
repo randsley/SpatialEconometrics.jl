@@ -1593,12 +1593,14 @@ entry points now throw on the duplicated-column design on both versions.
 
 ## Post-audit: what the benchmark suite found
 
-Both of these came from the benchmark suite built for roadmap item #10 on
-2026-10-30, and neither could have come from the test suite, which had
-asserted the right answer about both functions for their whole lives. One
-is a defect in asymptotic cost; the other is an optimisation that moves
-reported numbers in the last few bits, which is why it is written down
-here rather than left in a commit message.
+These came from the benchmark suite built for roadmap item #10 on
+2026-10-30, and none of them could have come from the test suite, which
+had asserted the right answer about every one of these functions for its
+whole life. Some are defects in asymptotic cost, some are optimisations
+that move reported numbers in the last few bits -- which is why they are
+written down here rather than left in a commit message -- and some are
+corrections to earlier entries in this very section, because the first
+pass of measurement got three of its five findings wrong.
 
 ### 29. `row_standardize!` was O(N · nnz) — FIXED
 
@@ -1707,6 +1709,103 @@ recorded in `ROADMAP.md` as a decision rather than taken here. The
 symmetrisation that would make the exact branch fast and keep it exact is
 not available: it needs the unstandardised adjacency and its degrees, and
 `spatial_trace_powers` receives only the standardised `W`.
+
+### 31. Four more from the suite, two of them corrections — FIXED
+
+Taken together because they share a lesson: three of the five findings the
+first benchmark pass recorded were stated wrongly, and the benchmark suite
+is also what caught that.
+
+**`fit_gwr` threaded, 4.0–6.3×.** `N` local regressions, each writing only
+its own row of `coef_local`, `se_local`, `local_R2`, `residuals`, `fitted`
+and `hat_diag`; `tr(S)` and `RSS` are serial passes afterwards. Unlike the
+probe loop of finding 30 this one is compute-bound — a QR per observation
+— so it scales with cores. Bit-identical at 1, 4 and 16 threads, including
+the auto-bandwidth path, which calls the threaded fit repeatedly inside
+the AICc search.
+
+Threading alone gave only 3.1× on sixteen cores, which for an
+embarrassingly parallel loop was itself the finding. Two allocation faults
+accounted for the rest: `_get_weights` computed every candidate distance
+as `sqrt(sum((coords[i, :] .- coords[j, :]) .^ 2))`, three vectors per
+neighbour and `O(N · bw)` allocations per fit; and the local-R² loop
+rebuilt two loop-invariant length-`N` vectors on each of its `N`
+iterations. Allocation fell from 224 MiB to 115 MiB per fit and scaling
+rose to 6.3×. It is still short of sixteen, and the reason is recorded in
+`benchmark/README.md` rather than fixed: the per-call `zeros(T, N)` is an
+`O(N²)` allocation, and the local design is a dense `N × K` where only
+`bw` rows are nonzero. A compact local design would reorder the QR's rows
+and so would not be a free change.
+
+**`log_marginal_likelihood`, 1.4–1.5×, bit-identical.** The 200 exact
+sparse LUs are 97–99% of the call. The first pass called this "the same
+`max_exact_n` mistake", which framed the remedy as giving up exactness;
+that was wrong. The sparsity pattern of `I − ρW` does not depend on `ρ`,
+so the symbolic analysis is done once and every node reuses it through
+`lu!`, with values written into the existing pattern instead of a fresh
+sparse matrix per node. All 200 log-determinants are bit-identical on
+Julia 1.13.2 and 1.10.12, and every marginal likelihood and specification
+probability is unchanged to the last digit across six specifications,
+three sizes, the Chebyshev branch, and a non-default grid, prior and `ρ`
+interval. Testset 32e also pins `_affine_pattern` on a `W` with an entry
+equal to 1, where a pattern built from `I - W` would cancel structurally
+and lose that position at every other `ρ`.
+
+**Correction: `knn_weights` is not `O(N²)`.** The first pass recorded
+"O(N²) — 820 ms at `N = 8100, k = 12`". It has used a KD-tree all along
+and takes **26 ms**; multiplying `N` by 2.25 multiplies the time by
+2.36–2.41, against 5.06 for quadratic. The 820 ms came from
+`row_standardize!`, which `knn_weights` calls by default and which was the
+quadratic of finding 29 — a measurement of another function's defect,
+attributed to this one. **A profile of a composite is not a profile of its
+parts**, and the first pass did not separate them.
+
+Something real remained, worth 1.2–1.5×: the neighbour selection
+re-derived per candidate how many non-self neighbours the list held, an
+allocating `filter` plus a `count` over a fresh slice inside the inner
+loop, to decide what a running counter decides in `O(1)`. Allocation fell
+from 40.5 MiB to 13.2 MiB at `N = 8100, k = 12`, and the output is
+identical across 144 configurations of size, `k`, `binary`,
+`row_standardize`, `symmetrize`, dimension and coincident points — the
+last of these being the case the old guard existed to handle, where a
+point is absent from its own neighbour list.
+
+**Correction: the Chebyshev "461 MiB" was allocation, not a ceiling.** The
+first pass read BenchmarkTools' `alloc` column as a memory requirement. It
+is cumulative allocation over the call — twelve intermediate matrices,
+nearly all collectable. Peak fill, which is what a ceiling means, is
+**18.9 MiB** for a rook lattice at `N = 8100, q = 12`. The companion
+figure, 97.8% of `N²` nonzeros for knn `k = 24`, was correct but was
+quoted at `N = 900`, where it amounts to 12 MiB, so it was not evidence of
+a ceiling either.
+
+The ceiling is nonetheless real, and arrives later: the fill per row grows
+until it saturates at `N`, making peak memory `Θ(N²)` on a sufficiently
+dense `W`. knn `k = 24` is already at 90 MiB by `N = 3600`. So the fix is
+a ceiling rather than a replacement. `max_fill_bytes` defaults to 128 MiB;
+when the recursion is about to cross it, the remaining orders finish one
+column block at a time in `3 · N · b` doubles, seeded from the two sparse
+matrices already computed, so nothing is discarded. A trace is a sum over
+columns, which is what makes this possible without ever forming `T_k(W)`.
+
+Replacing the default outright would have been a regression, and
+measurement is the only reason that is known: on a rook lattice the
+blocked path is 4× to 25× **slower**, because the sparse recursion touches
+only the fill that exists while the blocked path pays `N · b` per level
+whatever the density. It is faster exactly where it is needed — knn
+`k = 24, N = 3600, q = 12` goes from 1118 ms to 576 ms. At the default
+every case in the suite stays on the fast path and is bit-identical, order
+6, which is what `fit_spatial` uses, included.
+
+**`max_exact_n` left alone, deliberately.** The 51× at the boundary
+(finding 30) is now stated in the `spatial_trace_powers` docstring,
+together with what buying it back would cost: `spatial_effects` and its
+standard errors would become seed-dependent for every `N ≤ 1000`. Callers
+who want the speed pass `max_exact_n = 0`. Recording the price of a
+default is not the same as changing it.
+
+Suite 1,600 → 1,691 on Julia 1.13.2 and 1,594 → 1,685 on 1.10.12, every
+pinned value intact.
 
 ## Post-audit defects: identification guards
 

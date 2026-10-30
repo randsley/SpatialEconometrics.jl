@@ -229,7 +229,128 @@ has_time_fe(::TwoWayFE)          = true
 
 # ─── Chebyshev log-determinant ────────────────────────────────────────
 
-function precompute_chebyshev_traces(W::AbstractSparseMatrix{T}, method::ChebyshevApprox) where {T<:AbstractFloat}
+"""
+    _spmm_block!(Pout, Wt, Pin, b)
+
+`Pout = W * Pin` where both are `b x N`, gathering from `Wt`, the same way
+[`_spmm_rows_dot!`](@ref) does and for the same reason: the `b` entries of
+one node are adjacent, and each output column is written by one thread.
+"""
+function _spmm_block!(Pout::Matrix{T}, Wt::SparseMatrixCSC{T}, Pin::Matrix{T},
+                      b::Int) where {T<:AbstractFloat}
+    rv = rowvals(Wt)
+    nz = nonzeros(Wt)
+    Threads.@threads for i in 1:size(Wt, 2)
+        base = (i - 1) * b
+        @inbounds for q in 1:b
+            Pout[base + q] = zero(T)
+        end
+        @inbounds for k in nzrange(Wt, i)
+            c = rv[k]
+            v = nz[k]
+            cb = (c - 1) * b
+            @simd for q in 1:b
+                Pout[base + q] += v * Pin[cb + q]
+            end
+        end
+    end
+    return Pout
+end
+
+"""
+    _cheb_traces_blocked!(τ, W, T_prev, T_curr, k0, q, bsize)
+
+Finish the exact Chebyshev trace recursion from order `k0` to `q` without
+ever holding a whole `T_k(W)`.
+
+Only the **trace** of `T_k(W)` is wanted, and a trace is a sum over
+columns, so the recursion can run on a block of `bsize` columns at a time
+and accumulate. Peak memory is `3 · N · bsize` doubles instead of the
+fill-in of `T_k(W)`, which has no bound below `N²`.
+
+`T_prev` and `T_curr` are orders `k0 - 2` and `k0 - 1` as the sparse
+recursion left them, so nothing already computed is thrown away: each
+block starts by densifying just its own columns of those two.
+
+This is slower than the sparse recursion whenever the fill-in is still
+modest — measured 4× to 25× slower on a rook lattice — and faster once it
+saturates, 3.7× at `N = 900, q = 12`. It is a fallback for the memory
+ceiling, not a replacement.
+"""
+function _cheb_traces_blocked!(τ::Vector{T}, W::SparseMatrixCSC{T},
+                               T_prev::SparseMatrixCSC{T},
+                               T_curr::SparseMatrixCSC{T},
+                               k0::Int, q::Int, bsize::Int) where {T<:AbstractFloat}
+    N = size(W, 1)
+    Wt = sparse(transpose(W))
+    Pprev = Matrix{T}(undef, bsize, N)
+    Pcurr = Matrix{T}(undef, bsize, N)
+    Pnext = Matrix{T}(undef, bsize, N)
+    for start in 1:bsize:N
+        cols = start:min(start + bsize - 1, N)
+        _densify_columns!(Pprev, T_prev, cols)
+        _densify_columns!(Pcurr, T_curr, cols)
+        for k in k0:q
+            _spmm_block!(Pnext, Wt, Pcurr, bsize)
+            @inbounds @simd for t in eachindex(Pnext)
+                Pnext[t] = T(2) * Pnext[t] - Pprev[t]
+            end
+            s = zero(T)
+            @inbounds for (lj, j) in enumerate(cols)
+                s += Pnext[lj, j]
+            end
+            τ[k + 1] += s
+            Pprev, Pcurr, Pnext = Pcurr, Pnext, Pprev
+        end
+    end
+    return τ
+end
+
+"""
+    _densify_columns!(P, A, cols)
+
+Write `A[:, cols]` transposed into the `b x N` buffer `P`, zeroing the rest.
+Row `lj` of `P` becomes column `cols[lj]` of `A`.
+"""
+function _densify_columns!(P::Matrix{T}, A::SparseMatrixCSC{T},
+                           cols::AbstractRange{Int}) where {T<:AbstractFloat}
+    fill!(P, zero(T))
+    rv = rowvals(A)
+    nz = nonzeros(A)
+    @inbounds for (lj, j) in enumerate(cols)
+        for t in nzrange(A, j)
+            P[lj, rv[t]] = nz[t]
+        end
+    end
+    return P
+end
+
+"""
+    precompute_chebyshev_traces(W, method; max_fill_bytes)
+
+The Chebyshev trace moments `τ[k + 1] = tr(T_k(W))` that
+[`chebyshev_logdet`](@ref) needs, computed once per `W`.
+
+With `method.n_probes == 0` these are exact, from the three-term
+recursion `T_{k+1} = 2 W T_k - T_{k-1}` carried on sparse matrices. That
+is the fast path and it is the default, but `T_k(W)` fills in as `k`
+grows and has no bound below `N²`: at `N = 8100` and order 12 a rook
+lattice reaches 461 MiB, and for knn weights with `k = 24` the twelfth
+Chebyshev matrix holds 97.8% of `N²` nonzeros at `N = 900`.
+
+`max_fill_bytes` is the ceiling on that, 128 MiB by default. When the
+recursion is about to cross it the remaining orders are finished by
+[`_cheb_traces_blocked!`](@ref), which gets the same traces to roundoff
+from a bounded buffer. Nothing already computed is discarded. Order 6,
+which is what `fit_spatial` uses, stays on the fast path at every size
+benchmarked.
+
+With `method.n_probes > 0` the traces are Hutchinson estimates instead
+and the question does not arise: that path has never held more than the
+probe block.
+"""
+function precompute_chebyshev_traces(W::AbstractSparseMatrix{T}, method::ChebyshevApprox;
+                                     max_fill_bytes::Int=128 * 1024 * 1024) where {T<:AbstractFloat}
     N = size(W, 1)
     q = method.order
     τ = zeros(T, q + 1)
@@ -237,10 +358,22 @@ function precompute_chebyshev_traces(W::AbstractSparseMatrix{T}, method::Chebysh
     τ[2] = tr(W)
 
     if method.n_probes == 0
+        Ws = SparseMatrixCSC{T,Int}(W)
         T_prev = sparse(one(T) * I, N, N)
-        T_curr = copy(W)
+        T_curr = copy(Ws)
+        # A stored entry costs a value and a row index. The check is on
+        # `T_curr` rather than on the `T_next` about to be built, because by
+        # the time `T_next` exists its memory is already committed; one
+        # level of the recursion multiplies the fill by roughly the mean
+        # degree, so leaving a factor of four of headroom keeps the peak
+        # inside the budget rather than one level past it.
+        per_entry = sizeof(T) + sizeof(Int)
         for k in 2:q
-            T_next = 2 .* (W * T_curr) .- T_prev
+            if 4 * per_entry * nnz(T_curr) > max_fill_bytes
+                bsize = _cheb_block_size(N, max_fill_bytes, T)
+                return _cheb_traces_blocked!(τ, Ws, T_prev, T_curr, k, q, bsize)
+            end
+            T_next = 2 .* (Ws * T_curr) .- T_prev
             τ[k + 1] = tr(T_next)
             T_prev = T_curr
             T_curr = T_next
@@ -261,6 +394,17 @@ function precompute_chebyshev_traces(W::AbstractSparseMatrix{T}, method::Chebysh
         end
     end
     return τ
+end
+
+"""
+    _cheb_block_size(N, max_fill_bytes, T)
+
+Columns per block: as many as three `N`-long dense buffers fit in the
+budget, at least 16 and never more than `N`.
+"""
+function _cheb_block_size(N::Int, max_fill_bytes::Int, ::Type{T}) where {T}
+    b = max_fill_bytes ÷ (3 * N * sizeof(T))
+    return clamp(b, 16, N)
 end
 
 @inline function chebyshev_logdet(ρ::R, τ::Vector{T}) where {R<:Real, T<:AbstractFloat}
@@ -421,6 +565,30 @@ split a marginal effect into its direct and indirect parts. Estimating
 them by unseeded random probes made the reported impacts, and the
 standard errors built from the same traces, differ from one run to the
 next on identical data.
+
+!!! note "The exact branch is the expensive one, deliberately"
+    `max_exact_n = 1000` is not a performance default. The exact branch
+    is a dense non-symmetric eigendecomposition: at `N = 900` it takes
+    about 0.3 s against 6 ms for 250 probes, so the default costs **51×**
+    at its own boundary, and it is `O(N³)` in time and `O(N²)` in memory
+    — 1.7 GB at `N = 14400` — so above the threshold it is not merely
+    slower but infeasible.
+
+    It is the default anyway because what it buys is that two runs on the
+    same data report the same impacts. The probe branch has a Hutchinson
+    standard error of order `1 / sqrt(n_probes)`, about 6% at the default
+    250, and `spatial_effects` and its standard errors inherit it. Pass
+    `max_exact_n = 0` to take the speed instead; pass a larger
+    `n_probes` to buy the accuracy back at `sqrt` cost.
+
+    There is no third option here. The eigendecomposition could be made
+    3–4× faster and real-arithmetic by symmetrising `W` to
+    `D^(1/2) W D^(-1/2)`, which is similar to `W` and symmetric when `W`
+    is a row-standardised symmetric adjacency — but that needs the
+    unstandardised adjacency and its degrees, and this function only ever
+    receives the standardised `W`. Recovering the degrees from `W` alone
+    means solving `dᵢ W[i,j] = dⱼ W[j,i]` across the graph, which is
+    possible and was judged not worth the failure modes.
 """
 function spatial_trace_powers(
     W::AbstractSparseMatrix{T};
