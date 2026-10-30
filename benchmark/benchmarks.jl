@@ -34,6 +34,10 @@ function knn_case(side::Int, k::Int)
     return (; W, coords, N = size(W, 1))
 end
 
+# Every leaf key is a String. BenchmarkTools serialises a group to JSON, and
+# JSON has no integer keys, so an Int key comes back as a String and a saved
+# baseline stops matching the run it is compared against -- silently, as a
+# missing speedup column rather than an error.
 const SUITE = BenchmarkGroup()
 
 # These benchmarks run in milliseconds to seconds, so the default of hunting
@@ -53,7 +57,7 @@ SUITE["logdet"] = BenchmarkGroup()
 for side in SIDES
     c = lattice_case(side)
     Isp = sparse(1.0I, c.N, c.N)
-    SUITE["logdet"]["exact_lu"][c.N] =
+    SUITE["logdet"]["exact_lu"]["N=$(c.N)"] =
         @benchmarkable first(logabsdet(lu($Isp - 0.5 * $(c.W))))
     for ord in (6, 12)
         SUITE["logdet"]["precompute_exact_traces"]["N=$(c.N),q=$ord"] =
@@ -77,7 +81,7 @@ end
 SUITE["traces"] = BenchmarkGroup()
 for side in SIDES
     c = lattice_case(side)
-    SUITE["traces"]["spatial_trace_powers"][c.N] =
+    SUITE["traces"]["spatial_trace_powers"]["N=$(c.N)"] =
         @benchmarkable SpatialEconometrics.SpatialUtils.spatial_trace_powers(
             $(c.W); max_power = 60, max_exact_n = 1000, n_probes = 250,
             rng = MersenneTwister(2))
@@ -86,11 +90,11 @@ for side in SIDES
     # DENSE non-symmetric eigendecomposition -- O(N^3) time and N^2 memory,
     # 1.7 GB at N = 14400 -- so it is only benchmarked where that is sane.
     if c.N <= 2500
-        SUITE["traces"]["forced_exact"][c.N] =
+        SUITE["traces"]["forced_exact"]["N=$(c.N)"] =
             @benchmarkable SpatialEconometrics.SpatialUtils.spatial_trace_powers(
                 $(c.W); max_power = 60, max_exact_n = typemax(Int))
     end
-    SUITE["traces"]["forced_probes"][c.N] =
+    SUITE["traces"]["forced_probes"]["N=$(c.N)"] =
         @benchmarkable SpatialEconometrics.SpatialUtils.spatial_trace_powers(
             $(c.W); max_power = 60, max_exact_n = 0, n_probes = 250,
             rng = MersenneTwister(2))
@@ -100,10 +104,10 @@ end
 SUITE["fit"] = BenchmarkGroup()
 for side in SIDES
     c = lattice_case(side)
-    SUITE["fit"]["sar"][c.N] = @benchmarkable fit_spatial(SAR(), $(c.W), $(c.X), $(c.y))
-    SUITE["fit"]["sdm"][c.N] = @benchmarkable fit_spatial(SDM(), $(c.W), $(c.X), $(c.y))
-    SUITE["fit"]["sem"][c.N] = @benchmarkable fit_spatial_error($(c.W), $(c.X), $(c.y))
-    SUITE["fit"]["slx"][c.N] = @benchmarkable fit_slx($(c.W), $(c.X), $(c.y))
+    SUITE["fit"]["sar"]["N=$(c.N)"] = @benchmarkable fit_spatial(SAR(), $(c.W), $(c.X), $(c.y))
+    SUITE["fit"]["sdm"]["N=$(c.N)"] = @benchmarkable fit_spatial(SDM(), $(c.W), $(c.X), $(c.y))
+    SUITE["fit"]["sem"]["N=$(c.N)"] = @benchmarkable fit_spatial_error($(c.W), $(c.X), $(c.y))
+    SUITE["fit"]["slx"]["N=$(c.N)"] = @benchmarkable fit_slx($(c.W), $(c.X), $(c.y))
 end
 
 # ─── GWR ──────────────────────────────────────────────────────────────
@@ -114,7 +118,7 @@ for side in (LARGE ? (20, 30, 40) : (20, 30))
     rng = MersenneTwister(9)
     X = randn(rng, c.N, 2)
     y = 1.0 .+ X * [1.0, -0.5] .+ 0.3 .* randn(rng, c.N)
-    SUITE["gwr"]["fixed_bw"][c.N] =
+    SUITE["gwr"]["fixed_bw"]["N=$(c.N)"] =
         @benchmarkable fit_gwr($X, $y, $(c.coords);
                                bandwidth = FixedBandwidth(8.0), kernel = GaussianKernel())
 end
@@ -128,7 +132,7 @@ for side in SIDES, k in KNN_K
 end
 for side in SIDES
     c = lattice_case(side)
-    SUITE["weights"]["row_standardize"][c.N] = @benchmarkable row_standardize($(c.W))
+    SUITE["weights"]["row_standardize"]["N=$(c.N)"] = @benchmarkable row_standardize($(c.W))
 end
 
 # ─── specification comparison ─────────────────────────────────────────
@@ -141,7 +145,7 @@ for side in (LARGE ? (20, 30, 40) : (20, 30))
         SUITE["selection"]["log_marginal"]["N=$(c.N),$spec"] =
             @benchmarkable log_marginal_likelihood($spec, $(c.y), $(c.X), $(c.W))
     end
-    SUITE["selection"]["bayes_spec_probs"][c.N] =
+    SUITE["selection"]["bayes_spec_probs"]["N=$(c.N)"] =
         @benchmarkable bayes_spec_probs($(c.y), $(c.X), [$(c.W)])
 end
 

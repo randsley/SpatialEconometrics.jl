@@ -283,6 +283,102 @@ end
 
 # ─── Neumann series traces ────────────────────────────────────────────
 
+"""
+    _rademacher_probes(T, N, p, rng)
+
+A `p x N` Rademacher probe block: probe `q` at node `i` is entry `(q, i)`.
+
+Drawn into an `N x p` matrix first and then transposed, which looks
+wasteful and is deliberate. `rand!` fills column-major, so drawing
+straight into `p x N` would pair the same stream of random numbers with
+different `(node, probe)` positions, and a caller who passed a seed to
+get one probe set would silently get another. This way the probe set is
+exactly the one the column-major draw gives, laid out so that the
+probes of a single node are contiguous.
+"""
+function _rademacher_probes(::Type{T}, N::Int, p::Int, rng::AbstractRNG) where {T<:AbstractFloat}
+    V = Matrix{T}(undef, N, p)
+    rand!(rng, V, (-one(T), one(T)))
+    return permutedims(V)      # V is unreachable from here, so collectable
+end
+
+"""
+    _spmm_rows_dot!(Vout, Wt, Vin, V0, rowdot)
+
+Write `Vout = W * Vin` in the probes-contiguous layout and return
+`dot(V0, Vout)`, in one pass over the nonzeros of `W`.
+
+`Wt` is `sparse(transpose(W))`, so column `i` of `Wt` holds row `i` of
+`W`. That turns the product into a gather: row `i` of the output reads
+other rows of the input and is written by nobody else. The alternative,
+a scatter from `W` in CSC form, has threads racing to accumulate into
+the same output row.
+
+Two things make this faster than `mul!` on the `N x p` layout. The inner
+loop runs over the `p` probes of one node, which are adjacent in memory,
+so it vectorises instead of striding by `N`. And the inner product that
+yields the trace estimate is taken while row `i` is still in cache,
+rather than in a second pass that re-reads the whole block.
+
+Determinism does not depend on the thread count: each thread writes only
+`rowdot[i]` for rows it owns, and the sum over `rowdot` is a serial pass
+in index order afterwards. Against `mul!` plus `dot` the accumulation
+order within a row is the same -- both add the contributions of column
+`j` in increasing `j` -- but the order of the outer sum is by node
+rather than by probe, so the trace estimates differ in the last few
+bits. That is reordering, not a different estimator: the probes are
+identical and the shift is ~1e-14 relative against a Hutchinson
+standard error of order `1 / sqrt(p)`.
+"""
+function _spmm_rows_dot!(
+    Vout::Matrix{T},
+    Wt::SparseMatrixCSC{T},
+    Vin::Matrix{T},
+    V0::Matrix{T},
+    rowdot::Vector{T}
+) where {T<:AbstractFloat}
+    p = size(Vout, 1)
+    rv = rowvals(Wt)
+    nz = nonzeros(Wt)
+    Threads.@threads for i in 1:size(Wt, 2)
+        base = (i - 1) * p
+        @inbounds for q in 1:p
+            Vout[base + q] = zero(T)
+        end
+        @inbounds for k in nzrange(Wt, i)
+            c = rv[k]
+            v = nz[k]
+            cb = (c - 1) * p
+            @simd for q in 1:p
+                Vout[base + q] += v * Vin[cb + q]
+            end
+        end
+        s = zero(T)
+        @inbounds @simd for q in 1:p
+            s += V0[base + q] * Vout[base + q]
+        end
+        @inbounds rowdot[i] = s
+    end
+    acc = zero(T)
+    @inbounds for i in eachindex(rowdot)
+        acc += rowdot[i]
+    end
+    return acc
+end
+
+"""
+    precompute_neumann_traces(W; max_power, n_probes, rng)
+
+Hutchinson estimates of `tr(Wᵐ) / N` for `m = 0, ..., max_power`.
+
+`tr(Wᵐ)` is estimated as the mean of `vᵀWᵐv` over `n_probes` Rademacher
+vectors `v`, which costs one sparse product per power because `Wᵐv` is
+built by repeated multiplication. `m = 0` and `m = 1` are not estimated:
+they are `1` and `tr(W) / N` exactly.
+
+The estimates are stochastic, so pass `rng` if the result has to be
+reproducible. It does not depend on the number of threads.
+"""
 function precompute_neumann_traces(
     W::AbstractSparseMatrix{T};
     max_power::Int=60,
@@ -294,15 +390,17 @@ function precompute_neumann_traces(
     μ[1] = one(T)
     μ[2] = tr(W) / N
 
-    V0 = Matrix{T}(undef, N, n_probes)
-    rand!(rng, V0, (-one(T), one(T)))
-    V_curr = W * V0
+    V0 = _rademacher_probes(T, N, n_probes, rng)
+    Wt = sparse(transpose(W))
+    V_curr = similar(V0)
     V_next = similar(V0)
+    rowdot = Vector{T}(undef, N)
 
+    _spmm_rows_dot!(V_curr, Wt, V0, V0, rowdot)   # m = 1; μ[2] is exact
     for m in 2:max_power
-        mul!(V_next, W, V_curr)
-        μ[m + 1] = dot(V0, V_next) / (N * n_probes)
-        copyto!(V_curr, V_next)
+        s = _spmm_rows_dot!(V_next, Wt, V_curr, V0, rowdot)
+        μ[m + 1] = s / (N * n_probes)
+        V_curr, V_next = V_next, V_curr           # swap, do not copy
     end
     return μ
 end

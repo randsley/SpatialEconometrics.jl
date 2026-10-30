@@ -9,8 +9,8 @@ models, HAC-robust inference, weight-matrix construction, input-output
 calibration, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** — 1,576 test assertions across 48 top-level testsets,
-> passing on Julia 1.13.2, and 1,570 on Julia 1.10.12. See
+> **Version 0.3.0** — 1,600 test assertions across 48 top-level testsets,
+> passing on Julia 1.13.2, and 1,594 on Julia 1.10.12. See
 > [Validation Status](#validation-status) for Monte Carlo results.
 
 **Documentation:** [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/)

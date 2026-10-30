@@ -19,20 +19,23 @@ const RESULTS = joinpath(HERE, "results")
 mkpath(RESULTS)
 
 args = copy(ARGS)
-compare_to = nothing
-let i = findfirst(==("--compare"), args)
-    if !isnothing(i)
-        compare_to = args[i + 1]
-        deleteat!(args, [i, i + 1])
-    end
+
+# Pull `--flag value` out of `args` and return the value, or nothing. A plain
+# `let` block here would be a trap: at top level in a script, assigning to an
+# outer name inside `let` creates a local, so the flag would be consumed from
+# `args` and then thrown away -- the groups would narrow and the comparison
+# would silently not happen.
+function take_flag!(args, flag)
+    i = findfirst(==(flag), args)
+    isnothing(i) && return nothing
+    i == lastindex(args) && error("$flag needs a value")
+    val = args[i + 1]
+    deleteat!(args, [i, i + 1])
+    return val
 end
-outname = "latest"
-let i = findfirst(==("--name"), args)
-    if !isnothing(i)
-        outname = args[i + 1]
-        deleteat!(args, [i, i + 1])
-    end
-end
+
+compare_to = take_flag!(args, "--compare")
+outname = something(take_flag!(args, "--name"), "latest")
 
 include(joinpath(HERE, "benchmarks.jl"))
 
@@ -67,9 +70,13 @@ fmt_time(t) = t < 1e3 ? @sprintf("%.0f ns", t) :
 
 function walk(io, node, old_node, path)
     if node isa BenchmarkTools.BenchmarkGroup
+        # Match by the string form of the key: a baseline round-tripped
+        # through JSON has String keys whatever it was saved with.
+        old_keys = isnothing(old_node) ? Dict{String,Any}() :
+                   Dict(string(k) => old_node[k] for k in keys(old_node))
         for k in sort(collect(keys(node)); by = string)
-            walk(io, node[k], isnothing(old_node) ? nothing :
-                 (haskey(old_node, k) ? old_node[k] : nothing), vcat(path, string(k)))
+            walk(io, node[k], get(old_keys, string(k), nothing),
+                 vcat(path, string(k)))
         end
     else
         t = time(median(node))

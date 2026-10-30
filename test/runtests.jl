@@ -4944,6 +4944,91 @@ vcov(m::HausMock) = m.V
             t = @elapsed row_standardize(Wbig)
             @test t < 0.05
         end
+
+        @testset "32b. the probes-contiguous trace kernel" begin
+            SU = SpatialEconometrics.SpatialUtils
+
+            # The kernel is a hand-written gather, so it gets checked against
+            # the thing it replaced rather than only against itself: the same
+            # probe block, multiplied by `W` with `mul!`, and the same traces
+            # read off by `dot`. Agreement has to be at roundoff and no
+            # better, since the two sum the outer loop in different orders.
+            for side in (6, 11), p in (1, 4, 37)
+                W = SparseMatrixCSC{Float64, Int}(make_rook_weights(side))
+                N = size(W, 1)
+                mp = 12
+                got = SU.precompute_neumann_traces(W; max_power = mp,
+                                                   n_probes = p,
+                                                   rng = MersenneTwister(4))
+                # Reference: draw the probes column-major exactly as the
+                # documented contract says, then walk the powers densely.
+                V0 = Matrix{Float64}(undef, N, p)
+                rand!(MersenneTwister(4), V0, (-1.0, 1.0))
+                want = zeros(mp + 1)
+                want[1] = 1.0
+                want[2] = tr(W) / N
+                Vc = W * V0
+                for m in 2:mp
+                    Vc = W * Vc
+                    want[m + 1] = dot(V0, Vc) / (N * p)
+                end
+                @test got ≈ want rtol = 1e-10
+                @test got[1] == 1.0
+                @test got[2] == tr(W) / N
+            end
+
+            # The probe set is part of the contract: a caller who passes a
+            # seed gets the column-major Rademacher draw, not whatever
+            # layout happens to be fastest inside. If that ever changes,
+            # every reported impact and standard error moves by a Monte
+            # Carlo error, which is exactly the surprise this pins down.
+            V = Matrix{Float64}(undef, 9, 5)
+            rand!(MersenneTwister(13), V, (-1.0, 1.0))
+            @test SU._rademacher_probes(Float64, 9, 5, MersenneTwister(13)) ==
+                  permutedims(V)
+            @test all(x -> abs(x) == 1.0, V)
+
+            # Same seed, same answer, bit for bit -- the reason the kernel
+            # reduces over a per-row array in index order instead of letting
+            # threads accumulate into one scalar.
+            W2 = SparseMatrixCSC{Float64, Int}(make_rook_weights(14))
+            a = SU.precompute_neumann_traces(W2; max_power = 20, n_probes = 8,
+                                             rng = MersenneTwister(1))
+            b = SU.precompute_neumann_traces(W2; max_power = 20, n_probes = 8,
+                                             rng = MersenneTwister(1))
+            @test all(a .=== b)
+
+            # An asymmetric W, checked the same way. Worth stating why this
+            # case needs the reference comparison and not a cleverer test:
+            # tr((Wᵀ)ᵐ) = tr(Wᵐ) for every m, so a gather that walked the
+            # matrix the wrong way round would still be an unbiased
+            # estimator of the right traces and no test of the trace values
+            # alone could see it. What pins the direction is agreeing with
+            # `mul!(V, W, ...)` realisation for realisation.
+            Wa = SparseMatrixCSC{Float64, Int}(
+                sparse([1, 2, 3, 1, 4, 4], [2, 3, 1, 3, 1, 2],
+                       [0.5, 0.25, 0.75, 0.5, 0.3, 0.7], 4, 4))
+            @test !issymmetric(Matrix(Wa))
+            p = 16
+            got = SU.precompute_neumann_traces(Wa; max_power = 9, n_probes = p,
+                                               rng = MersenneTwister(6))
+            V0 = Matrix{Float64}(undef, 4, p)
+            rand!(MersenneTwister(6), V0, (-1.0, 1.0))
+            want = zeros(10)
+            want[1] = 1.0
+            want[2] = tr(Wa) / 4
+            Vc = Wa * V0
+            for m in 2:9
+                Vc = Wa * Vc
+                want[m + 1] = dot(V0, Vc) / (4 * p)
+            end
+            @test got ≈ want rtol = 1e-10
+            # And it would not have agreed with the transpose: same probes,
+            # a different realisation, even though the expectation is equal.
+            Vt = permutedims(Matrix(Wa)) * V0
+            Vt = permutedims(Matrix(Wa)) * Vt
+            @test !isapprox(dot(V0, Vt) / (4 * p), got[4]; rtol = 1e-6)
+        end
     end
 
 end

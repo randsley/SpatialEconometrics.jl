@@ -2,8 +2,8 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,576 test assertions in 48 top-level testsets on Julia
-> 1.13.2 and 1,570 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
+> 22 submodules, 1,600 test assertions in 48 top-level testsets on Julia
+> 1.13.2 and 1,594 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
 > extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5, 6 and 6B are
 > complete except item #10 (Performance)**, which is the next piece of work.
 > Tier 3 is untouched, and the correctness audit in `docs/AUDIT.md` is closed
@@ -522,7 +522,7 @@ already in `src/GWREstimation.jl` (`_mgwr_enp_hutchinson`, `df_method` of
 each `enp`. What remains here is the same idea applied to the spatial
 log-determinant, where only the Chebyshev approximation exists today.
 
-**Status:** 🚧 In progress — the benchmark suite is delivered
+**Status:** 🚧 In progress — the benchmark suite and the trace-powers rewrite are delivered
 (`benchmark/`, run with `julia --project=benchmark -t auto benchmark/run.jl`),
 and what it measured has re-ordered the rest of this item. See
 `benchmark/README.md` for the numbers and `docs/AUDIT.md` finding 29.
@@ -537,10 +537,10 @@ precompute nor the per-evaluation cost matters. 71–92% of a fit is
 | Finding | Status |
 |---|---|
 | `row_standardize!` was O(N · nnz), not O(nnz) — 1,677× at `N = 8100`, output bit-identical | ✅ Fixed, testset 32, finding 29 |
-| `spatial_trace_powers` is 71–92% of `fit_spatial` | ⬜ Next |
-| `max_exact_n = 1000` picks the dense `eigvals` branch, 4.3× slower than probes at `N = 900` and O(N³)/O(N²)-memory above it | ⬜ |
+| `spatial_trace_powers` is 71–92% of `fit_spatial` | ✅ Fixed, testset 32b — 3.4–12.2× on the probe branch, 1.8–2.7× on `fit_spatial` at `N ≥ 3600` |
+| `max_exact_n = 1000` picks the dense `eigvals` branch, now **51×** slower than probes at `N = 900` (0.3 s against 6.0 ms) and O(N³)/O(N²)-memory above it | ⬜ Next — a policy call, see below |
 | The default `ChebyshevApprox(n_probes = 0)` densifies: 461 MiB at `N = 8100, q = 12`, and 97.8% of `N²` nonzeros for a knn `W` with `k = 24` | ⬜ |
-| No `Threads` call anywhere in `src/` — the probe loop and GWR's local regressions are both embarrassingly parallel | ⬜ |
+| No `Threads` call anywhere in `src/` — GWR's local regressions are embarrassingly parallel; the probe loop is now threaded but is bandwidth-bound, so it gained 4% at `N = 14400` | ⬜ GWR only |
 | `log_marginal_likelihood` makes the same `max_exact_n` mistake: 200 exact LUs per call where the amortised path costs one precompute | ⬜ |
 | `knn_weights` is O(N²) — 820 ms at `N = 8100, k = 12` | ⬜ |
 
@@ -548,6 +548,20 @@ The deprioritised three are not wrong, and the matrix-free log-determinant
 is still the right tool at the `N` where the Chebyshev fill-in binds. They
 simply cannot pay off on the measured profile, and two of them carry
 optional dependencies, so they go after the work above.
+
+**The `max_exact_n` decision is not the implementer's to make.** Below
+`max_exact_n` the trace powers are exact, from the eigenvalues of `W`;
+above it they are Hutchinson estimates with a roughly 6% standard error at
+250 probes. `spatial_effects` reads these traces to split a marginal
+effect into direct and indirect parts, and the standard errors come from
+the same place, so lowering the threshold would make reported impacts
+stochastic for every `N <= 1000` — which is most applied work with this
+package, and is the exact surprise the current default was chosen to
+avoid. The price of that choice has risen from about 4.6x to 51x, and
+there is no third option: the exact branch needs the original adjacency
+and its degrees to be symmetrised into a fast real eigenproblem, and
+`spatial_trace_powers` only ever receives the standardised `W`.
+
 
 **Files to add:** Existing modules + new `src/SpatialGPU.jl` (extension). `benchmark/` is delivered.
 
@@ -778,17 +792,18 @@ Rows above the rule are measured; rows below are estimates.
 | **master** (+ Phase 6B item 14, identification guards) | 22 | 1,374 | 14,843 |
 | **master** (+ Phase 6B item 15, so 6B complete) | 22 | 1,566 | 15,271 |
 | **master** (+ #10 benchmarks, finding 29) | 22 | 1,576 | 15,269 |
+| **master** (+ #10 trace kernel, finding 30) | 22 | 1,600 | 15,367 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 15,269 lines of
-`src/`, 4,951 lines of tests, 2,884 lines of examples across 22 scripts,
+Measured on master: 22 submodules plus the umbrella across 15,367 lines of
+`src/`, 5,034 lines of tests, 2,884 lines of examples across 22 scripts,
 398 lines of package extensions, 48 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 The assertion counts above are measured with Makie and Turing absent, so the
-two package-extension testsets skip: 1,576 on Julia 1.13.2 and 1,570 on
+two package-extension testsets skip: 1,600 on Julia 1.13.2 and 1,594 on
 Julia 1.10.12. The six-assertion difference is version-dependent testsets,
 not the change log — it predates Phase 6B and is unchanged by it: items 14
 and 15 added 88 and 192 assertions, every one of which passes identically on

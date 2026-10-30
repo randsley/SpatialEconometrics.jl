@@ -1591,11 +1591,14 @@ standard a score test cares about, while a sound block sits near 1. All three
 entry points now throw on the duplicated-column design on both versions.
 
 
-## Post-audit defects: an accidental quadratic in `row_standardize!`
+## Post-audit: what the benchmark suite found
 
-Found on 2026-10-30 by the benchmark suite built for roadmap item #10, not
-by the test suite, which had asserted the right answer about this function
-for its whole life.
+Both of these came from the benchmark suite built for roadmap item #10 on
+2026-10-30, and neither could have come from the test suite, which had
+asserted the right answer about both functions for their whole lives. One
+is a defect in asymptotic cost; the other is an optimisation that moves
+reported numbers in the last few bits, which is why it is written down
+here rather than left in a commit message.
 
 ### 29. `row_standardize!` was O(N · nnz) — FIXED
 
@@ -1636,6 +1639,74 @@ that standard, and `row_standardize` sits under almost every example,
 benchmark and test in the package, so the cost was being paid everywhere and
 measured nowhere. A benchmark suite is not only for tuning; for this class
 of defect it is the only instrument that detects it at all.
+
+### 30. `precompute_neumann_traces` strode the wrong way — OPTIMISED
+
+Not a defect: the answers were right. It is in the ledger because the fix
+changes reported numbers in the last few bits, and the ledger is where that
+gets stated rather than discovered.
+
+The function estimates `tr(Wᵐ)/N` by carrying a block of `n_probes`
+Rademacher vectors through repeated multiplication by `W`. The block was
+`N x p`, so the inner loop of the sparse product stepped by `N` between
+one probe and the next, and the trace estimate was then read off in a
+second pass that re-read the whole block. Three changes:
+
+- the block is `p x N`, so the `p` probes of one node are adjacent and the
+  inner loop vectorises;
+- the product gathers from `sparse(transpose(W))` — column `i` holds row
+  `i` of `W` — instead of scattering from `W` in CSC form, which both
+  removes the `copyto!` of the whole block per power and makes the loop
+  safe to thread, since each output row is written by one thread and read
+  by none;
+- the inner product that yields the estimate is taken while the row is
+  still in cache.
+
+| | before | after | |
+|---|---|---|---|
+| `N = 900`, 250 probes | 73.2 ms | 6.0 ms | 12.2× |
+| `N = 3600` | 248 ms | 41.7 ms | 5.9× |
+| `N = 8100` | 684 ms | 204 ms | 3.4× |
+| `fit_spatial` SAR, `N = 8100` | 806 ms | 444 ms | 1.8× |
+| `fit_spatial` SEM, `N = 3600` | 329 ms | 121 ms | 2.7× |
+
+**What changed in the output, stated precisely.** The probe set is
+identical: the draw is still made into an `N x p` matrix and then
+transposed, because `rand!` fills column-major and drawing straight into
+`p x N` would silently hand a caller who passed a seed a different probe
+set. Within a row the contributions are still accumulated in increasing
+column order, as `mul!` on a CSC matrix does. What differs is the outer
+sum, which now runs over nodes rather than probes, so the trace estimates
+move by up to **7e-14** relative. The Hutchinson standard error at 250
+probes is of order `1/sqrt(250)`, or 6%. The full suite passes with every
+pinned value intact on both Julia 1.13.2 and 1.10.12.
+
+**Determinism does not depend on the thread count.** Each thread writes
+only `rowdot[i]` for the rows it owns, and the reduction over `rowdot` is
+a serial pass in index order afterwards. Verified by hashing the 61
+returned doubles at 1, 2, 7 and 16 threads: one distinct value. A
+`Threads.@atomic` accumulator or a `@threads` reduction would have been
+simpler and would have made the result vary with the machine, which for a
+function feeding `spatial_effects` is the same class of surprise as an
+unseeded probe.
+
+**The threading is not where the speedup came from**, and saying so
+matters because the roadmap had listed threading as a deliverable. At
+`-t 1` the same rewrite is 2.4–5.7×; sixteen threads add 4% over one at
+`N = 14400`. Once the probe block exceeds cache the loop is bound by
+memory bandwidth, not arithmetic, so more cores have nothing to do. The
+threading is kept because it is free at small `N` and provably
+deterministic, not because it carried the result.
+
+**What it did not fix.** `N = 900` is unchanged, because at or below
+`max_exact_n = 1000` the traces come from a dense eigendecomposition
+instead. The gap between the branches at their own boundary is now 51×
+rather than 4.6×. Narrowing it means trading exactness for probes, which
+changes what `spatial_effects` reports for most applied `N`, so it is
+recorded in `ROADMAP.md` as a decision rather than taken here. The
+symmetrisation that would make the exact branch fast and keep it exact is
+not available: it needs the unstandardised adjacency and its degrees, and
+`spatial_trace_powers` receives only the standardised `W`.
 
 ## Post-audit defects: identification guards
 

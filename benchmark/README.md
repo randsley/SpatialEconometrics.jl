@@ -71,6 +71,54 @@ weights the `k`-th Chebyshev matrix reaches **97.8% of `N²` nonzeros** at
 `N = 900, k = 24, order 12`, and 69.3% at `k = 12`. `fit_spatial` defaults
 to `ChebyshevApprox(order = 6, n_probes = 0)`, the densifying branch.
 
+## What the first change did
+
+`precompute_neumann_traces` was rewritten to hold the probe block with the
+probes contiguous, gather instead of scatter, and take the trace estimate
+in the same pass. Measured with `--compare`, 16 threads:
+
+| | before | after | speedup |
+|---|---|---|---|
+| `spatial_trace_powers`, probes, `N = 900` | 73.2 ms | 6.0 ms | **12.2x** |
+| probes, `N = 3600` | 248 ms | 41.7 ms | **5.9x** |
+| probes, `N = 8100` | 684 ms | 204 ms | **3.4x** |
+| `fit_spatial` SAR, `N = 3600` | 321 ms | 174 ms | 1.84x |
+| `fit_spatial` SAR, `N = 8100` | 806 ms | 444 ms | 1.82x |
+| `fit_spatial` SEM, `N = 3600` | 329 ms | 121 ms | 2.72x |
+| `fit_spatial` SDM, `N = 8100` | 799 ms | 421 ms | 1.90x |
+
+Three details worth keeping straight about these numbers.
+
+**The win is the memory layout, not the threads.** At `-t 1` the same
+rewrite is 2.4x to 5.7x, and at `N = 14400` sixteen threads buy 4% over
+one (0.404 s against 0.389 s). The loop is bandwidth-bound once the probe
+block stops fitting in cache, so the threading helps at small `N` and
+barely at large. It is kept because it is free and deterministic, not
+because it is where the speedup came from.
+
+**`N = 900` did not move** (1.01x) and that is the point: at or below
+`max_exact_n = 1000` the traces come from a dense eigendecomposition
+instead, which the rewrite does not touch. The gap between the two
+branches at their own boundary has therefore gone from about 4.6x to
+**51x** — 0.3 s exact against 6.0 ms for 250 probes. The policy question
+is unchanged but the price of it is now an order of magnitude larger.
+
+**Allocation went up, by one transient block**: 46.4 to 62.8 MiB at
+`N = 8100`. The probes are drawn into an `N x p` matrix and transposed,
+because `rand!` fills column-major and drawing straight into `p x N`
+would hand a caller who passed a seed a different probe set. Drawing `p`
+length-`N` vectors instead reproduces the column-major stream exactly on
+both Julia 1.10 and 1.13 and would save the block, but it relies on an
+undocumented detail of how `rand!` consumes the stream, so it was not
+taken.
+
+The trace estimates themselves shift by 7e-14 at worst. The probe set is
+identical; what changed is that the outer sum runs over nodes rather than
+probes. Against a Hutchinson standard error of order `1/sqrt(250)`, or 6%,
+that is not a change in the answer. It is bit-identical across 1, 2, 7 and
+16 threads.
+
+
 ### What this implies for the item
 
 Three of the seven listed deliverables — sparse Chebyshev, GPU spatial lag,
@@ -79,7 +127,8 @@ matrix-free log-determinant — target the part of `fit_spatial` that is under
 profile, and the GPU and out-of-core ones carry optional dependencies. The
 work the measurements justify is, in order:
 
-1. the `spatial_trace_powers` path, which is 71–92% of every fit;
+1. ~~the `spatial_trace_powers` path, which is 71–92% of every fit~~ —
+   done, see above;
 2. threading, since the probe loop and the GWR local regressions are both
    embarrassingly parallel and the package currently contains no `Threads`
    call at all;
