@@ -11,7 +11,7 @@ using StatsAPI
 import ..SpatialUtils
 import ..SpatialUtils: _chi2_sf,
        panel_spatial_lag!, panel_spatial_lag,
-       within_transform!, within_transform,
+       within_transform!, within_transform, check_design_rank,
        _normcdf, _print_coef_table
 
 const FixedEffectsSpec = SpatialUtils.FixedEffectsSpec
@@ -432,6 +432,19 @@ function fit_gs2sls_panel(
     X_ex_t = within_transform(X_ex_p, N, T_post, fe_spec)
     X_en_t = within_transform(X_en_p, N, T_post, fe_spec)
     Z_iv_t = within_transform(Z_iv_p, N, T_post, fe_spec)
+
+    K_ex_chk = size(X_ex_t, 2)
+    K_en_chk = size(X_en_t, 2)
+    chk_names = vcat(
+        isnothing(exog_names) ? ["exog_$i" for i in 1:K_ex_chk] : exog_names,
+        isnothing(endog_names) ? ["endog_$i" for i in 1:K_en_chk] : endog_names)
+    check_design_rank(hcat(X_ex_t, X_en_t), chk_names, "fit_gs2sls_panel";
+                      context = "Under individual fixed effects a regressor that does not vary over time is swept out entirely, and under time fixed effects one that does not vary across units is; such a coefficient cannot be estimated from the within variation. Drop the column, or change `fe_spec`.")
+    check_design_rank(Z_iv_t, ["instrument_$i" for i in 1:size(Z_iv_t, 2)],
+                      "fit_gs2sls_panel";
+                      context = "The excluded instruments have to be " *
+                                "independent of each other after the within " *
+                                "transform as well.")
 
     WX_ex  = panel_spatial_lag(W, X_ex_t, N, T_post)
     WWX_ex = panel_spatial_lag(W, WX_ex, N, T_post)

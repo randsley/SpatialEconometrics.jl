@@ -10,7 +10,7 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
        loglikelihood, dof_residual, predict
 
 import ..SpatialUtils
-import ..SpatialUtils: _normcdf, _print_coef_table
+import ..SpatialUtils: check_design_rank, _normcdf, _print_coef_table
 
 export SpatialProbitModel, fit_spatial_probit,
        BayesianSpatialProbitModel, fit_bayesian_spatial_probit,
@@ -180,6 +180,8 @@ function fit_spatial_probit(
     X_aug = hcat(ones(T, N), X)
     P = size(X_aug, 2)
     cnames = vcat(["(Intercept)"], vnames, ["ρ"])
+    check_design_rank(X_aug, cnames, "fit_spatial_probit";
+                      context = "`X` must not contain its own intercept, since one is added.")
 
     β0 = _fit_probit(X_aug, Vector{T}(y))
 
@@ -489,6 +491,11 @@ function fit_bayesian_spatial_probit(
     Xa = Matrix{Float64}(hcat(ones(T, N), X))
     P = size(Xa, 2)
     cnames = vcat(["(Intercept)"], vnames, ["ρ"])
+    # The Gibbs sampler never factorises anything that fails outright: with
+    # a dependent column the prior keeps the posterior proper and the chain
+    # returns an arbitrary split of one coefficient across two.
+    check_design_rank(Xa, cnames, "fit_bayesian_spatial_probit";
+                      context = "`X` must not contain its own intercept, since one is added.")
     yf = Vector{Float64}(y)
     Wf = SparseMatrixCSC{Float64, Int}(W)
 
@@ -665,6 +672,11 @@ function fit_spatial_ordered_probit(
     cnames = vcat(vnames, ["ρ"])
 
     Xf = Matrix{Float64}(X)
+    # No intercept here: the cutpoints play that role, so a constant column
+    # in `X` is itself the rank-deficient case.
+    check_design_rank(Xf, cnames, "fit_spatial_ordered_probit";
+                      context = "`X` must not contain a constant column: " *
+                                "the cutpoints absorb the level.")
     Wf = SparseMatrixCSC{Float64, Int}(W)
     yi = Vector{Int}(y)
     n_free = max(0, J - 2)

@@ -11,7 +11,7 @@ using StatsAPI
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, spatial_trace_powers, g_traces,
-       brent_maximize, rank_deficient_columns, _normcdf, _print_coef_table
+       brent_maximize, check_design_rank, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -121,17 +121,11 @@ end
 # which `W*X` lands in the span of `X`, which makes an SDM unidentified.
 function _check_design_rank(X_aug::AbstractMatrix{T},
                             coefnames::Vector{String}) where {T<:AbstractFloat}
-    bad = rank_deficient_columns(X_aug)
-    isempty(bad) && return nothing
     # `coefnames` ends with the spatial parameter, which is not a column.
-    colnames = coefnames[1:size(X_aug, 2)]
-    named = join(("`" * colnames[j] * "`" for j in bad), ", ")
-    throw(ArgumentError(
-        "fit_spatial: the design matrix is rank deficient -- " * named *
-        " can be written in terms of the other columns, so the coefficients " *
-        "are not identified. `X` must not contain its own intercept (one is " *
-        "added), and no covariate may be a linear combination of the others. " *
-        "For an SDM, check that `W*X` does not lie in the span of `X`."))
+    check_design_rank(X_aug, coefnames[1:size(X_aug, 2)], "fit_spatial";
+        context = "`X` must not contain its own intercept, since one is " *
+                  "added. For an SDM, check that `W*X` does not lie in the " *
+                  "span of `X`.")
 end
 
 """

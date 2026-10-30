@@ -8,7 +8,7 @@ using Printf
 using StatsAPI
 using NearestNeighbors
 
-import ..SpatialUtils: _normcdf, _print_coef_table
+import ..SpatialUtils: check_design_rank, _normcdf, _print_coef_table
 
 export BandwidthType, FixedBandwidth, AdaptiveBandwidth,
        KernelFunction, GaussianKernel, BisquareKernel, ExponentialKernel,
@@ -499,6 +499,7 @@ function fit_gwr(
     X_aug = hcat(ones(T, N), X)
     K = K_raw + 1
     vnames = isnothing(varnames) ? vcat(["(Intercept)"], ["x$i" for i in 1:K_raw]) : vcat(["(Intercept)"], varnames)
+    check_design_rank(X_aug, vnames, "fit_gwr"; context = "`X` must not contain its own intercept, since one is added. Note this is a check on the global design: a local fit can still be rank deficient at a narrow bandwidth even when the global one is not.")
 
     coords_mat = Matrix{T}(coords)
     tree = _build_tree(coords_mat)
@@ -898,6 +899,7 @@ function fit_mgwr(
     X_aug = hcat(ones(T, N), X)
     K = K_raw + 1
     vnames = isnothing(varnames) ? vcat(["(Intercept)"], ["x$i" for i in 1:K_raw]) : vcat(["(Intercept)"], varnames)
+    check_design_rank(X_aug, vnames, "fit_mgwr"; context = "`X` must not contain its own intercept, since one is added. Note this is a check on the global design: a local fit can still be rank deficient at a narrow bandwidth even when the global one is not.")
 
     coords_mat = Matrix{T}(coords)
     tree = _build_tree(coords_mat)

@@ -12,7 +12,8 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        g_traces,
-       brent_maximize, _normcdf, _print_coef_table, _chi2_sf
+       brent_maximize, check_design_rank, _normcdf, _print_coef_table,
+       _chi2_sf
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -282,6 +283,9 @@ function fit_spatial_regime(
         push!(cnames, "R$(r)_(Intercept)")
         for v in vnames; push!(cnames, "R$(r)_$v"); end
     end
+
+    check_design_rank(X_regime, cnames, "fit_spatial_regime";
+                      context = "The design is block diagonal in the regimes, so a covariate that is constant inside one regime collides with that regime's intercept even when it varies over the sample as a whole. Merge the regime, or drop the column.")
 
     if !spatial_lag
         β = X_regime \ Vector{T}(y)

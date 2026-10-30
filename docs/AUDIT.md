@@ -1449,7 +1449,58 @@ range. Suite through `Pkg.test`, extensions absent: 1,235 → 1,265 on Julia
 1.13 and 1,229 → 1,259 on Julia 1.10. The six-assertion difference between
 the two versions is older than this change and sits elsewhere in the suite.
 
-**What this does not cover.** The same trap exists at the other entry points
-— `fit_spatial_error`, `fit_slx`, `fit_sac`, `fit_sdem`, `fit_spatial_panel`
-and the rest build designs the same way and have no rank check. They are
-untouched here, and worth a sweep.
+### 28. The same trap at every other entry point — FIXED
+
+Findings 26 and 27 were two instances of one hole, so the rest were swept in
+the same pass. Every entry point that takes an `X` was probed with a
+duplicated column. Not one was guarded, and they failed in two ways:
+
+| Failure | Entry points |
+|---|---|
+| `SingularException` from inside the linear algebra | `fit_slx`, `fit_sdem`, `fit_spatial_regime`, `fit_gwr`, `fit_mgwr`, `fit_spatial_probit`, `fit_spatial_panel`, `fit_spatial_error` (panel), `fit_dynamic_spatial_panel`, `fit_gs2sls_panel`, `fit_dynamic_gmm` |
+| returned a number | `fit_spatial_error` (cross-section), `fit_sac`, `fit_bayesian_spatial_probit`, `fit_esf`, `fit_re_esf` |
+
+The second row is the dangerous one. A minimum-norm least squares splits the
+unidentified coefficient across the dependent columns, so `fit_spatial_error`
+reported
+
+```
+coef = [1.5376, 0.8833, 0.8833, 0.7398]
+se   = [NaN, NaN, NaN, NaN]
+```
+
+for a design whose single true coefficient was 1.77: two plausible halves,
+and a standard error that had already gone to `NaN` without anything saying
+so. `fit_re_esf` split the same coefficient as 0.0956 and 1.6982 — the split
+is arbitrary, not even even.
+
+All of them now call `check_design_rank`, which wraps
+`rank_deficient_columns` with the message. Where the estimator transforms the
+design before solving it, the **transformed** matrix is what gets checked,
+because that is what carries the rank:
+
+- the panel estimators check after `within_transform`, which catches a
+  regressor with no within variation — time-invariant under `IndivFE`,
+  unit-invariant under `TimeFE`. `fit_spatial_panel` returned a coefficient
+  of 1.23 for such a column before.
+- `fit_gs2sls_panel` checks the transformed covariates **and** the excluded
+  instruments, before `H` is built: `inv(Symmetric(H'H))` is what actually
+  failed, and it runs before the structural solve.
+- `fit_dynamic_gmm` checks the stacked differenced regressors, since the
+  moment matrix `S_ZX' W S_ZX` inherits their rank.
+- `fit_spatial_ordered_probit` has no intercept of its own — the cutpoints
+  carry the level — so a constant column in `X` is itself the deficient
+  case, and the message says so.
+
+`fit_gwr` and `fit_mgwr` check the global design only. A local fit can still
+be rank deficient at a narrow bandwidth with the global design full rank;
+that is a different problem and is not addressed here.
+
+Testset 29d covers all of it: every entry point on a duplicated column, the
+instrument case, the time-invariant-under-`IndivFE` case **and** its control
+— the same design fits under `NoFE`, which is what shows the guard is reading
+the transform rather than the column it was handed. Suite 1,265 → 1,286 on
+Julia 1.13 and 1,259 → 1,280 on Julia 1.10, both through `Pkg.test`.
+
+**No false positives.** The 1,264 assertions that predate this pass all still
+hold: not one legitimate design anywhere in the suite trips a guard.

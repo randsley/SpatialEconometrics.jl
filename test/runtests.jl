@@ -4167,8 +4167,9 @@ vcov(m::HausMock) = m.V
             catch e
                 sprint(showerror, e)
             end
-            @test occursin("rank deficient", err)
+            @test occursin("not identified", err)
             @test occursin("intercept", err)
+            @test occursin("fit_spatial:", err)
 
             # And a design that is fine stays fine: the guard is a
             # precondition, not a change to the estimator.
@@ -4225,6 +4226,102 @@ vcov(m::HausMock) = m.V
             # guarded too.
             @test_throws ArgumentError fit_gravity(
                 NegBinGravity(), yg, hcat(logd, logd), o, d; fe = BilateralFE())
+        end
+
+        @testset "29d. the same guard at every other entry point" begin
+            # Before this sweep, nine of these died inside LAPACK with a
+            # message about a zero pivot and six returned quietly: the
+            # minimum-norm solve splits the unidentified coefficient across
+            # the dependent columns, so fit_spatial_error handed back 0.8833
+            # twice where the truth was one coefficient of 1.77, with NaN
+            # standard errors beside it.
+            W = row_standardize(make_rook_weights(8))
+            N = size(W, 1)
+            x = Float64[sin(i / 4) for i in 1:N]
+            eps = Float64[0.2 * cos(i / 3) for i in 1:N]
+            y = (I - 0.4 * W) \ (1.0 .+ 2.0 .* x .+ eps)
+            Xb = hcat(x, x)                       # the duplicated column
+            yb = Float64.(y .> median(y))
+            yo = Int.(1 .+ (y .> median(y)) .+ (y .> quantile(y, 0.75)))
+            coords = hcat(repeat(1.0:8.0, inner = 8), repeat(1.0:8.0, outer = 8))
+            labels = [i <= N ÷ 2 ? 1 : 2 for i in 1:N]
+
+            @test_throws ArgumentError fit_spatial_error(W, Xb, y)
+            @test_throws ArgumentError fit_slx(W, Xb, y)
+            @test_throws ArgumentError fit_sac(W, W, Xb, y; method = ExactLU())
+            @test_throws ArgumentError fit_sdem(W, Xb, y; method = ExactLU())
+            @test_throws ArgumentError fit_spatial_regime(W, Xb, y,
+                ExogenousRegimes(labels))
+            @test_throws ArgumentError fit_gwr(Xb, y, coords;
+                bandwidth = AdaptiveBandwidth(30))
+            @test_throws ArgumentError fit_mgwr(Xb, y, coords; inference = false)
+            @test_throws ArgumentError fit_spatial_probit(W, Xb, yb)
+            @test_throws ArgumentError fit_bayesian_spatial_probit(W, Xb, yb;
+                n_samples = 20, burnin = 5)
+            @test_throws ArgumentError fit_spatial_ordered_probit(W, Xb, yo;
+                n_samples = 20, burnin = 5, n_categories = 3)
+            @test_throws ArgumentError fit_esf(Xb, y, W; family = :gaussian,
+                max_eigenvectors = 5)
+            @test_throws ArgumentError fit_re_esf(Xb, y, W)
+
+            # Panels. The design that gets solved is the within-transformed
+            # one, so that is what the guard has to look at.
+            L = 5; Np = L * L; Tp = 4; NT = Np * Tp
+            Wp = row_standardize(make_rook_weights(L))
+            xp = Float64[sin(i / 5) for i in 1:NT]
+            Sp = lu(sparse(1.0I, Np, Np) - 0.3 * Wp)
+            mu = Float64[0.4 * cos(i) for i in 1:Np]
+            yp = zeros(NT)
+            for t in 1:Tp
+                idx = ((t - 1) * Np + 1):(t * Np)
+                yp[idx] = Sp \ (mu .+ 1.2 .* xp[idx] .+
+                                Float64[0.1 * sin(i + t) for i in 1:Np])
+            end
+            Xpb = hcat(xp, xp)
+
+            @test_throws ArgumentError fit_spatial_panel(SAR(), IndivFE(), Wp,
+                Xpb, yp, Np, Tp)
+            @test_throws ArgumentError fit_spatial_error(IndivFE(), Wp, Xpb,
+                yp, Np, Tp)
+            @test_throws ArgumentError fit_dynamic_spatial_panel(SAR(),
+                IndivFE(), Wp, Xpb, yp, Np, Tp)
+            en = Float64[0.3 * cos(i / 2) for i in 1:NT]
+            z1 = Float64[sin(i / 7) for i in 1:NT]
+            z2 = Float64[cos(i / 11) for i in 1:NT]
+            @test_throws ArgumentError fit_gs2sls_panel(IndivFE(), Wp, Xpb,
+                reshape(en, NT, 1), hcat(z1, z2), yp, Np, Tp)
+            # Duplicated instruments are unidentified too, and they fail in a
+            # different place: inv(H'H), before the structural solve.
+            @test_throws ArgumentError fit_gs2sls_panel(IndivFE(), Wp,
+                reshape(xp, NT, 1), reshape(en, NT, 1), hcat(z1, z1), yp, Np, Tp)
+
+            # Not a duplicate at all: a regressor that is constant within
+            # each unit, which individual effects sweep out entirely. This
+            # one returned a coefficient before -- the column the caller
+            # passed has plenty of variation, it is only the transformed
+            # design that is short a rank.
+            xinv = repeat(Float64[0.7 * sin(i) for i in 1:Np], Tp)
+            @test_throws ArgumentError fit_spatial_panel(SAR(), IndivFE(), Wp,
+                hcat(xp, xinv), yp, Np, Tp)
+            # and it is fine without those fixed effects, which is the proof
+            # that the guard is reading the transform and not the column.
+            @test fit_spatial_panel(SAR(), NoFE(), Wp, hcat(xp, xinv), yp,
+                                    Np, Tp) isa SpatialPanelModel
+
+            # Dynamic GMM carries the lagged response beside the covariates.
+            Ng, Tg = 25, 6
+            Xg1 = Float64[sin(i / 3 + t) for i in 1:Ng, t in 1:Tg]
+            Xten = zeros(Ng, Tg, 2)
+            Xten[:, :, 1] = Xg1
+            Xten[:, :, 2] = Xg1
+            Yg = zeros(Ng, Tg)
+            Yg[:, 1] = Float64[0.5 * cos(i) for i in 1:Ng]
+            for t in 2:Tg
+                Yg[:, t] = 0.4 .* Yg[:, t - 1] .+ 0.8 .* Xg1[:, t] .+
+                           Float64[0.05 * sin(i * t) for i in 1:Ng]
+            end
+            @test_throws ArgumentError fit_dynamic_gmm(SystemGMM(), Yg, Xten;
+                                                       max_lag = 3)
         end
     end
 

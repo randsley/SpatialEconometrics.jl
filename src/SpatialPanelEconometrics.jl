@@ -13,7 +13,7 @@ import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, spatial_trace_powers, g_traces,
        brent_maximize, panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform, effective_dims, has_indiv_fe, has_time_fe,
-       _normcdf, _print_coef_table
+       check_design_rank, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -244,6 +244,11 @@ function fit_spatial_panel(
     y_tilde = within_transform!(copy(y), N, T_per, fe_spec)
     Wy_tilde = within_transform!(Wy, N, T_per, fe_spec)
     X_tilde = within_transform(X_aug, N, T_per, fe_spec)
+    # The within-transformed design is what gets solved, so it is what has
+    # to be checked: a time-invariant regressor under individual effects
+    # leaves a zero column here while the column passed in looks fine.
+    check_design_rank(X_tilde, coefnames[1:size(X_tilde, 2)],
+                      "fit_spatial_panel"; context = "Under individual fixed effects a regressor that does not vary over time is swept out entirely, and under time fixed effects one that does not vary across units is; such a coefficient cannot be estimated from the within variation. Drop the column, or change `fe_spec`.")
 
     qr_X = qr(X_tilde)
     β0 = qr_X \ y_tilde

@@ -10,7 +10,7 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
        loglikelihood, dof_residual, predict, fitted
 
 import ..SpatialUtils
-import ..SpatialUtils: brent_maximize, _normcdf, _print_coef_table
+import ..SpatialUtils: brent_maximize, check_design_rank, _normcdf, _print_coef_table
 
 export SpatialEigen, spatial_eigenvectors, moran_coefficient,
        ESFModel, fit_esf, selected_eigenvectors,
@@ -637,6 +637,8 @@ function fit_esf(
     n_cand = length(se.values)
 
     X_base = hcat(ones(T, N), X)
+    check_design_rank(X_base, vcat(["(Intercept)"], vnames), "fit_esf";
+                      context = "`X` must not contain its own intercept, since one is added.")
     yv = Vector{T}(y)
     S0 = T(sum(W))
 
@@ -883,6 +885,8 @@ function fit_re_esf(
 
     Xa = hcat(ones(T, N), X)
     P = size(Xa, 2)
+    check_design_rank(Xa, vcat(["(Intercept)"], vnames), "fit_re_esf";
+                      context = "`X` must not contain its own intercept, since one is added.")
     yv = Vector{T}(y)
     S0 = T(sum(W))
 

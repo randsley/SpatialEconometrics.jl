@@ -8,6 +8,8 @@ using Printf
 using ForwardDiff
 using StatsAPI
 
+import ..SpatialUtils: check_design_rank
+
 export GMMVariant, DifferenceGMM, SystemGMM,
        SystemGMMModel, fit_dynamic_gmm
 
@@ -265,6 +267,16 @@ function fit_dynamic_gmm(
     N, T_tot, K = size(X_ten)
     X_list, y_list, Z_list, H, T_diff, L = build_gmm_system(variant, Y_mat, X_ten, max_lag, collapsed)
     P = 1 + K
+    # The moment matrix S_ZX' W S_ZX inherits the rank of the stacked
+    # regressors, and inverting it is what fails -- three frames from here,
+    # with a message about a pivot. Check the regressors themselves.
+    check_design_rank(reduce(vcat, X_list),
+                      vcat(["y_lag"],
+                           isnothing(varnames) ? ["x$k" for k in 1:K] : varnames),
+                      "fit_dynamic_gmm";
+                      context = "The differenced regressors have to be " *
+                                "independent of each other and of the lagged " *
+                                "response.")
 
     S_ZX = zeros(T, L, P)
     S_Zy = zeros(T, L)

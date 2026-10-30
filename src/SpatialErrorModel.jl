@@ -13,7 +13,7 @@ import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, g_traces,
        brent_maximize, panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform, effective_dims, has_indiv_fe, has_time_fe,
-       _normcdf, _print_coef_table
+       check_design_rank, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -164,6 +164,8 @@ function fit_spatial_error(
     vnames = isnothing(varnames) ? ["x$i" for i in 1:K] : varnames
     X_aug = hcat(ones(T, N), X)
     coefnames_vec = vcat(["(Intercept)"], vnames, ["λ"])
+    check_design_rank(X_aug, coefnames_vec, "fit_spatial_error";
+                      context = """`X` must not contain its own intercept, since one is added.""")
 
     Wy = W * y
     WX = W * X_aug
@@ -310,6 +312,11 @@ function fit_spatial_error(
     y_tilde = within_transform!(copy(y), N, T_per, fe_spec)
     Wy_tilde = within_transform!(copy(Wy), N, T_per, fe_spec)
     X_tilde = within_transform(X_aug, N, T_per, fe_spec)
+    # The transformed design is the one that gets solved, so it is the one
+    # to check: a regressor the within transform absorbs leaves a column of
+    # zeros here while the column the caller passed looks perfectly fine.
+    check_design_rank(X_tilde, coefnames_vec, "fit_spatial_error";
+                      context = """Under individual fixed effects a regressor that does not vary over time is swept out entirely, and under time fixed effects one that does not vary across units is; such a coefficient cannot be estimated from the within variation. Drop the column, or change `fe_spec`.""")
     WX_tilde = within_transform(WX, N, T_per, fe_spec)
 
     N_eff, T_eff = effective_dims(N, T_per, fe_spec)

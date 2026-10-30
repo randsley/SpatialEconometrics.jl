@@ -13,7 +13,7 @@ import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames,
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, g_traces,
-       brent_maximize, _normcdf, _print_coef_table
+       brent_maximize, check_design_rank, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -75,6 +75,7 @@ function fit_slx(
     WX = W * X
     X_aug = hcat(ones(T, N), X, WX)
     cnames = vcat(["(Intercept)"], vnames, ["W_" * v for v in vnames])
+    check_design_rank(X_aug, cnames, "fit_slx"; context = "`X` must not contain its own intercept, since one is added. Check also that `W*X` does not lie in the span of `X`, which is what makes the spillover terms unidentified.")
 
     β = X_aug \ Vector{T}(y)
     res = y .- X_aug * β
@@ -173,6 +174,7 @@ function fit_sac(
     X_aug = hcat(ones(T, N), X)
     P = size(X_aug, 2)
     cnames = vcat(["(Intercept)"], vnames, ["ρ", "λ"])
+    check_design_rank(X_aug, cnames, "fit_sac"; context = "`X` must not contain its own intercept, since one is added.")
 
     W1y = W_lag * y
     W2y = W_error * y
@@ -442,6 +444,7 @@ function fit_sdem(
     X_aug = hcat(ones(T, N), X, WX)
     P = size(X_aug, 2)
     cnames = vcat(["(Intercept)"], vnames, ["W_" * v for v in vnames], ["λ"])
+    check_design_rank(X_aug, cnames, "fit_sdem"; context = "`X` must not contain its own intercept, since one is added. Check also that `W*X` does not lie in the span of `X`, which is what makes the spillover terms unidentified.")
 
     Wy = W * y
     W_Xaug = W * X_aug

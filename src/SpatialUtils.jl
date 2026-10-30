@@ -15,7 +15,7 @@ export LogDetMethod, ExactLU, ChebyshevApprox,
        panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform,
        effective_dims, has_indiv_fe, has_time_fe,
-       rank_deficient_columns,
+       rank_deficient_columns, check_design_rank,
        _normcdf, _print_coef_table,
        _chi2_sf, _gamma_series, _gamma_cf, _loggamma
 
@@ -566,6 +566,28 @@ function rank_deficient_columns(X::AbstractMatrix{T};
     (isempty(d) || first(d) == zero(T)) && return collect(1:K)
     r = count(>(T(tol) * first(d)), d)
     return sort(F.p[(r + 1):end])
+end
+
+# Throw if `X` cannot identify its coefficients.
+#
+# `colnames` names the columns of the design actually being solved, which
+# after an augmentation or a within transform is not what the caller passed;
+# `caller` is the entry point to name in the message, and `context` the one
+# sentence that says what to do about it, since the cure differs by
+# estimator -- drop a column, drop an intercept, change the fixed effects.
+function check_design_rank(X::AbstractMatrix{T},
+                           colnames::AbstractVector{<:AbstractString},
+                           caller::AbstractString;
+                           context::AbstractString = "") where {T<:AbstractFloat}
+    bad = rank_deficient_columns(X)
+    isempty(bad) && return nothing
+    named = join(("`" * String(colnames[j]) * "`" for j in bad), ", ")
+    subject = length(bad) == 1 ? named * " is a linear combination of" :
+                                 named * " are linear combinations of"
+    msg = caller * ": " * subject * " the other columns of the design, so " *
+          "the coefficients are not identified."
+    isempty(context) || (msg *= " " * context)
+    throw(ArgumentError(msg))
 end
 
 # ─── Normal CDF approximation (Abramowitz & Stegun 26.2.17) ──────────

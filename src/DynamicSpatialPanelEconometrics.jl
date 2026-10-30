@@ -13,7 +13,7 @@ import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, spatial_trace_powers, g_traces,
        brent_maximize, panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform, has_time_fe,
-       _normcdf, _print_coef_table
+       check_design_rank, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -213,6 +213,10 @@ function fit_dynamic_spatial_panel(
     y_tilde  = within_transform!(copy(y_post), N, T_post, fe_spec)
     Wy_tilde = within_transform!(copy(Wy_post), N, T_post, fe_spec)
     Z_tilde  = within_transform(Z_post, N, T_post, fe_spec)
+    # Z carries the lagged response alongside the covariates, so this also
+    # catches a y that is constant within units once differenced out.
+    check_design_rank(Z_tilde, coefnames[1:size(Z_tilde, 2)],
+                      "fit_dynamic_spatial_panel"; context = "Under individual fixed effects a regressor that does not vary over time is swept out entirely, and under time fixed effects one that does not vary across units is; such a coefficient cannot be estimated from the within variation. Drop the column, or change `fe_spec`.")
 
     qr_Z = qr(Z_tilde)
     δ0 = qr_Z \ y_tilde
