@@ -9,8 +9,8 @@ models, HAC-robust inference, weight-matrix construction, input-output
 calibration, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** — 1,374 test assertions across 46 top-level testsets,
-> passing on Julia 1.13.2, and 1,368 on Julia 1.10.12. See
+> **Version 0.3.0** — 1,566 test assertions across 47 top-level testsets,
+> passing on Julia 1.13.2, and 1,560 on Julia 1.10.12. See
 > [Validation Status](#validation-status) for Monte Carlo results.
 
 **Documentation:** [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/)
@@ -209,8 +209,8 @@ our own because:
 SpatialEconometrics/
 ├── src/            # 23 modules: the umbrella plus 22 submodules
 ├── ext/            # Makie and Turing package extensions
-├── test/           # runtests.jl — 46 top-level testsets
-├── examples/       # 21 runnable examples, one per topic
+├── test/           # runtests.jl — 47 top-level testsets
+├── examples/       # 22 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
 └── validation/     # Monte Carlo output referenced below
 ```

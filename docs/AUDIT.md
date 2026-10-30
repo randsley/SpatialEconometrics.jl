@@ -1259,6 +1259,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-23 | `sdm_tests` — the five Koley & Bera Durbin score statistics | 20000 replications, `N = 81`: mean = df to within 2.6%, variance = 2df to within 1.9%, size 0.047–0.054 at the 5% level and 0.009–0.010 at the 1% | Verified correct |
 | 2026-10-24 | `select_knn_w` — choosing `k` for a knn `W` by AIC | not a test statistic, so the gate is the selection error rate: 300 draws generated at `k = 6`, `k` searched over `2:20`, exact recovery 42.3% / 57.3% / 77.0% at `N = 100 / 200 / 400` against 5.3% by chance, median `k̂ = 6` throughout | Verified correct |
 | 2026-10-30 | `bayes_spec_probs` / `sdem_roadmap` — posterior model probabilities over specifications and `W` | not a test statistic, so the gate is the selection error rate: 200 draws from each of six specifications, all six compared on the generating `W`, recovery 81.5–95.5% at `N = 100` and 92.5–100% at `N = 256` against 16.7% by chance; the global-versus-local reach right in 90.5–100% of draws | Verified correct |
+| 2026-10-30 | `stpca` — spatio-temporal principal components | a decomposition, not a statistic, so the gate is again the error rate: 200 draws per cell with a known field planted in one feature, `:moran` puts a smooth field first in 73–87% and a high-contrast field last in 72–86%, with 0 of 800 draws at the wrong end; the eigenvalue identity `λ = Var(U)·I(Aγ)` is checked against independently implemented statistics to 5.0e-14 | Verified correct |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -1426,6 +1427,106 @@ file: deterministic, identical on every version, and independent of the
 lattice. The general form of the trap is that on spatial data a
 "deterministic surrogate for randomness" has to be checked for spatial
 structure before it can stand in for an independent draw.
+
+### `stpca` — five checks, in testset 31
+
+Spatio-temporal principal components are a decomposition rather than a test,
+so the rule is read across to the error rate once more, as for
+`select_knn_w` and `bayes_spec_probs`. The rates in the table above are the
+gate. What makes them a gate on the right quantity is that the eigenvalue
+being ranked is checkable in closed form.
+
+1. **Every eigenvalue is its own objective.** The method maximises the
+   product of a functional principal component's variance and the spatial
+   autocorrelation of the scores it produces, and the algebra collapses that
+   product into a quadratic form, so for each component
+
+   ```
+   lambda_k = Var(U_k) x A(A gamma_k)
+   ```
+
+   exactly, not approximately. The committed test recomputes **both**
+   factors from other modules — `SpatialDiagnostics.geary_c` and
+   `SpatialFiltering.moran_coefficient`, neither of which `stpca` calls —
+   and compares, for every one of the 15 components under both measures: 60
+   checks, agreeing to 5.0e-14. This is the strongest form the closing
+   standard can take, because the quantity being ranked has an independent
+   definition and the test uses it. It fails if the scaling of `C` or `E` is
+   wrong, and it fails if the coefficient matrix is not centred.
+
+2. **The basis.** The construction rests on the Fourier basis being
+   orthonormal with respect to the integral over the expansion interval —
+   that is what makes the functional inner product equal the dot product of
+   coefficient vectors, and so what makes `gamma'S gamma` the variance of
+   the functional principal component. Checked by numerical integration on
+   100,001 points: `max |G - I| = 5.6e-16`. Least squares in that basis
+   recovers the coefficients of a function already in its span to 4.4e-16.
+
+3. **The contiguity matrix.** Turning Geary's ratio into an eigenproblem
+   needs `y'By = sum_ij w_ij (y_i - y_j)^2`, which is checked against the
+   raw double sum rather than assumed, and the ratio it builds is checked
+   against the package's own `geary_c`. Both exact to rounding.
+
+4. **Scale and shift.** Variance scales with `c^2` and both ratios are
+   scale-free, so multiplying the data by 3 multiplies the whole spectrum by
+   9 and leaves the directions fixed — asserted on the eigenvalues and on
+   `|V3' V1| = I`. Adding a constant to every unit's series changes nothing,
+   because it moves only the coefficient of the constant basis function and
+   the coefficients are centred.
+
+5. **Sign structure.** Under `:geary` the objective is a variance times a
+   sum of squares, so `E` is non-negative definite and the negative group is
+   empty — a property of the construction, asserted as one. Under `:moran`
+   both signs appear on data carrying both structures, and the sign of each
+   eigenvalue matches the sign of its component's Moran coefficient.
+
+**Recovery rates.** 200 draws per cell, `p = 3` features on 17 annual
+moments, five Fourier functions each. A known field is planted in feature 1
+with a sinusoidal temporal profile: either the leading eigenvector of the
+rook `W` (smooth, `I = +0.92` at `N = 36`) or its trailing eigenvector
+(high-contrast, `I = -1.00`). The entry is the share of draws in which the
+component most correlated with the planted field was the first or last of
+the spectrum.
+
+| Planted field | `N` | `:moran` first | `:moran` last | `:geary` first | `:geary` last |
+|---|---|---|---|---|---|
+| smooth | 36 | 86.5% | 0.0% | 0.0% | 7.0% |
+| smooth | 64 | 73.0% | 0.0% | 0.0% | 14.0% |
+| high-contrast | 36 | 0.0% | 86.0% | 33.5% | 0.0% |
+| high-contrast | 64 | 0.0% | 71.5% | 7.0% | 0.0% |
+
+The `:moran` split is sharp and never inverted: 0 of 800 draws put a field
+at the wrong end. The `:geary` ordering is the finding that changed the
+documentation. It demotes smooth structure reliably — a smooth field was
+never the leading `:geary` component in 400 draws — but it does **not**
+simply promote the roughest, which led in 7–34% of draws. The objective is a
+product, so a component with moderate `C` and large variance outranks one
+with high `C` and little. An earlier draft of the `stpca` docstring claimed
+the two orderings were "close to reversals of each other"; the measurement
+refuted the second half of that and the docstring now says what the numbers
+support.
+
+A second number worth recording, because it bounds what the method claims:
+the median correlation between the planted field and its best-matching
+component was 0.56 at `N = 36` and 0.43 at `N = 64`. The field is spread
+across several components rather than captured whole. The component
+*ranking* is the reliable output; the loading is not a recovery of the
+field, and a first draft of the committed test asserted `cor > 0.9` on one
+sample before the Monte Carlo showed what the distribution actually is.
+
+**On sources.** `measure = :moran` is equation (21) of Krzyśko, Nijkamp,
+Ratajczak, Wołyński & Wenerska (2024), *Spatial Economic Analysis* 19(1),
+8–29, with the symmetrisation of its equation (23); `measure = :geary` is
+equation (4) of the sibling paper, Krzyśko, Nijkamp, Ratajczak, Wołyński,
+Wojtyła & Wenerska (2023), *Computers, Environment and Urban Systems* 103,
+101980. Both were read in full before the implementation was finalised. The
+Geary paper arrived first and the Moran paper second, and the second
+confirmed the branch that had been written from a secondary description —
+`C = (sum w_ij)^-1 A'WA` — unchanged. The permutation test of the Moran
+paper's section 5, which tests the significance of the positive and negative
+groups jointly, is **not** implemented: it is a test statistic, so it falls
+under the standing rule and needs its own null distribution before it can be
+believed.
 
 ## A whole class of fragile assertion: pinning a random draw
 

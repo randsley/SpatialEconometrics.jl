@@ -2,11 +2,10 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 1,374 test assertions in 46 top-level testsets on Julia
-> 1.13.2 and 1,368 on Julia 1.10.12, 21 examples, 12 notebooks, 2 package
-> extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5 and 6 are
-> complete except item #10 (Performance)**, and Phase 6B is one item from
-> done: only #15, the spatio-temporal Moran PCA, is left.
+> 22 submodules, 1,566 test assertions in 47 top-level testsets on Julia
+> 1.13.2 and 1,560 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
+> extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5, 6 and 6B are
+> complete except item #10 (Performance)**, which is the next piece of work.
 > Tier 3 is untouched, and the correctness audit in `docs/AUDIT.md` is closed
 > — findings 1–25, nothing outstanding.
 >
@@ -381,7 +380,7 @@ is excluded from the argmin instead of winning it by having no number.
 | ESF-GLM | Spatial filtering for Poisson, logit, negative binomial | Griffith (2003); Chun et al. (2016) |
 | Random effects ESF | Eigenvector spatial filtering with random effects for panels | Murakami & Griffith (2015) |
 
-**Status:** ✅ Implemented — `src/SpatialFiltering.jl` (718 lines). Docs: `docs/src/models/filtering.md`. Example: `examples/12_spatial_filtering.jl`. Tests: 47 assertions in testset “Spatial Filtering”.
+**Status:** ✅ Implemented — `src/SpatialFiltering.jl` (1,426 lines). Docs: `docs/src/models/filtering.md`. Examples: `examples/12_spatial_filtering.jl`, `examples/22_spatiotemporal_pca.jl`. Tests: 47 assertions in testset “Spatial Filtering” and 192 in testset 31 (spatio-temporal components).
 
 **Key functions (delivered):**
 - `spatial_eigenvectors(W; n_candidates=nothing, min_moran_ratio=0.0)` → `SpatialEigen`
@@ -390,6 +389,12 @@ is excluded from the argmin instead of winning it by having no number.
   (families `:gaussian`, `:poisson`, `:logit`, `:negbin`; `criterion` `:moran` or `:aic`)
 - `selected_eigenvectors(m::ESFModel)` → indices and Moran values of selected eigenvectors
 - `fit_re_esf(X, y, W; min_moran_ratio=0.25)` → `REESFModel` (profile-REML shrinkage)
+- `stpca(X, W; measure=:geary|:moran, n_basis=5, times, interval)` → `STPCAResult`
+  (spatio-temporal principal components: `n × p × T` data, Fourier expansion in
+  time, components maximising variance × spatial autocorrelation)
+- `component_groups(m)` → the global (positive) and local (negative) components
+- `feature_contributions(m, k)`, `component_weight(m, k, t)` → what a component reads
+- `fourier_basis(times, n_basis; interval)` → the orthonormal basis itself
 
 **Implementation notes:**
 - The basis is built on the orthogonal complement of `1` via QR rather than by
@@ -402,18 +407,28 @@ is excluded from the argmin instead of winning it by having no number.
   expected to be substantially negative and must be read against that reference
   rather than against zero.
 
-**Planned addition — spatio-temporal Moran PCA:** the same eigenvector
-machinery supports exploratory analysis, not just filtering. Krzyśko et al.
-(2023) generalise PCA to an `n × pT` data matrix by transforming it to
-multivariate functional data and linking it through Moran's `I`, giving
-components that carry spatial *and* temporal structure. The eigenvalues can
-be negative as well as positive — the sign says whether a component is
-positively or negatively autocorrelated — and the whole basis depends on
-`W`, so the choice of `W` is again the substantive decision.
+**Spatio-temporal principal components — delivered, see `stpca`:** the same
+eigenvector machinery supports exploratory analysis, not just filtering.
+Each unit-feature series is expanded in an orthonormal Fourier basis, and
+the components maximise the product of a functional principal component's
+variance and the spatial autocorrelation of the scores it produces — which
+collapses to an eigenproblem whose eigenvalues *are* that product.
 
 | Feature | Description | Reference |
 |---|---|---|
-| Spatio-temporal principal components | Moran-weighted eigendecomposition of an `n × pT` matrix, with signed eigenvalues and guidance on component count | Krzyśko et al. (2023) |
+| ~~Spatio-temporal principal components~~ — **delivered** | Moran-weighted eigendecomposition in the functional coefficient space, with signed eigenvalues splitting global from local components | Krzyśko et al. (2024), *Spatial Economic Analysis* 19(1), eq. (21) |
+| ~~Geary's contiguity variant~~ — **delivered** | The same construction with Geary's `C` in place of Moran's `I`, which is non-negative definite and so has no sign to read | Krzyśko et al. (2023), *CEUS* 103, eq. (4) |
+
+The eigenvalue signs are the substantive output under `:moran`: positive is a
+global component, negative a local one, and `component_groups` returns the
+two groups in the reference's order. The basis depends on `W` throughout, so
+the choice of `W` remains the substantive decision — the reference compares
+nine and offers no rule.
+
+**Not delivered:** the permutation test of the Moran paper's section 5, which
+tests the joint significance of the positive and negative groups. It is a
+test statistic, so it falls under the standing rule in `docs/AUDIT.md` and
+needs its own null distribution before it can be believed.
 
 **Dependencies:** None (uses LinearAlgebra `eigen`)
 
@@ -686,7 +701,7 @@ cleanest demonstration that the package's machinery is not about geography.
 | 11 | Performance (#10) | ~600 | — | ⬜ **Next up** |
 | | **Phase 6 total** | **~1,450** | | |
 
-### Phase 6B — 🚧 Specification search & `W` selection
+### Phase 6B — ✅ Specification search & `W` selection
 
 Small, cohesive, and all of it extends modules that are already finished and
 audited. Cheap to build and cheap to verify, which is why it sits before the
@@ -697,7 +712,7 @@ Tier 3 builds rather than inside them.
 | ~~12~~ | ✅ Durbin score tests (#5) | 350 | Delivered: `sdm_tests`, testset 27, null distribution in `docs/AUDIT.md` |
 | ~~13~~ | ✅ knn `W` selection by AIC (#6) | 210 | Delivered: `select_knn_w`, testset 28, recovery rates in `docs/AUDIT.md` |
 | ~~14~~ | ✅ SDEM roadmap + Bayesian SD/SDE (#5) | 515 | Delivered: `log_marginal_likelihood`, `bayes_spec_probs`, `sdem_roadmap`, testset 30, selection rates in `docs/AUDIT.md` |
-| 15 | Spatio-temporal Moran PCA (#7) | ~300 | Reuses the eigenvector basis |
+| ~~15~~ | ✅ Spatio-temporal principal components (#7) | 400 | Delivered: `stpca` under Moran's I and Geary's C, testset 31, recovery rates in `docs/AUDIT.md` |
 | | **Phase 6B total** | **~1,200** | |
 
 ### Phase 7A — ⬜ Networks & causal policy evaluation
@@ -736,21 +751,23 @@ Rows above the rule are measured; rows below are estimates.
 | **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
 | **master** (+ Phase 6B items 1–2) | 22 | 1,270 | 13,995 |
 | **master** (+ Phase 6B item 14, identification guards) | 22 | 1,374 | 14,843 |
+| **master** (+ Phase 6B item 15, so 6B complete) | 22 | 1,566 | 15,271 |
 | — | | | |
 | **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
 | **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
 
-Measured on master: 22 submodules plus the umbrella across 14,843 lines of
-`src/`, 4,650 lines of tests, 2,647 lines of examples across 21 scripts,
+Measured on master: 22 submodules plus the umbrella across 15,271 lines of
+`src/`, 4,908 lines of tests, 2,884 lines of examples across 22 scripts,
 398 lines of package extensions, 48 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 The assertion counts above are measured with Makie and Turing absent, so the
-two package-extension testsets skip: 1,374 on Julia 1.13.2 and 1,368 on
+two package-extension testsets skip: 1,566 on Julia 1.13.2 and 1,560 on
 Julia 1.10.12. The six-assertion difference is version-dependent testsets,
-not the change log — it predates Phase 6B and is unchanged by it. Rows
-measured before 2026-10-30 counted the extension testsets too, which is why
-the step from 1,270 to 1,374 is larger than the 88 assertions item 14 added.
+not the change log — it predates Phase 6B and is unchanged by it: items 14
+and 15 added 88 and 192 assertions, every one of which passes identically on
+both versions. Rows measured before 2026-10-30 counted the extension
+testsets too, which is why the step from 1,270 is larger than 280.
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed

@@ -14,7 +14,9 @@ import ..SpatialUtils: brent_maximize, check_design_rank, _normcdf, _print_coef_
 
 export SpatialEigen, spatial_eigenvectors, moran_coefficient,
        ESFModel, fit_esf, selected_eigenvectors,
-       REESFModel, fit_re_esf
+       REESFModel, fit_re_esf,
+       STPCAResult, stpca, fourier_basis, component_weight,
+       feature_contributions, component_groups
 
 const _ESF_FAMILIES = (:gaussian, :poisson, :logit, :negbin)
 
@@ -1000,6 +1002,431 @@ function Base.show(io::IO, m::REESFModel{T}) where {T}
     end
     println(io, "")
     _print_coef_table(io, m.coefnames, m.coef, stderror(m))
+end
+
+# ═══════════════════════════════════════════════════════════════════════
+# Spatio-temporal principal components
+# ═══════════════════════════════════════════════════════════════════════
+
+"""
+    fourier_basis(times, n_basis; interval = nothing)
+
+Evaluate the first `n_basis` orthonormal Fourier basis functions at `times`,
+returning a `length(times) × n_basis` matrix.
+
+The basis on an interval of length `L` is `1/√L`, then `√(2/L)·sin(2πkt/L)`
+and `√(2/L)·cos(2πkt/L)` for `k = 1, 2, …`, taken in that order and
+truncated at `n_basis`. It is orthonormal with respect to `∫ over the
+interval`, which is what lets the functional inner product `⟨u, X⟩` be
+computed as the plain dot product of coefficient vectors.
+
+The reference's construction is one constant plus whole sin/cos pairs, so
+an odd `n_basis` is the natural choice — 5 is the reference's own, and the
+default here. An even `n_basis` is allowed and still orthonormal, but it
+ends on a sine with its cosine missing, which is a basis the reference does
+not use.
+
+`interval` defaults to `times` padded by half the mean spacing at each end.
+The padding is not cosmetic: a Fourier basis is periodic, so an interval
+running exactly from the first observation to the last forces the fitted
+curve to take the same value at both, which is a constraint the data have
+no reason to satisfy. Krzyśko et al. observe 2002–2018 at `t = 0.5, 1.5,
+…, 16.5` and expand on `[0, 17]`, which is this default.
+
+See also [`stpca`](@ref).
+"""
+function fourier_basis(times::AbstractVector{<:Real}, n_basis::Int;
+                       interval::Union{Nothing, Tuple{<:Real, <:Real}} = nothing)
+    n_basis >= 1 || throw(ArgumentError("fourier_basis: n_basis must be at least 1"))
+    T = float(eltype(times))
+    t = collect(T, times)
+    length(t) >= 2 || throw(ArgumentError("fourier_basis: need at least two time points"))
+    issorted(t) || throw(ArgumentError("fourier_basis: times must be non-decreasing"))
+
+    a, b = if isnothing(interval)
+        h = (last(t) - first(t)) / (length(t) - 1)
+        (first(t) - h / 2, last(t) + h / 2)
+    else
+        (T(interval[1]), T(interval[2]))
+    end
+    b > a || throw(ArgumentError("fourier_basis: the interval must have positive length"))
+    L = b - a
+
+    Phi = Matrix{T}(undef, length(t), n_basis)
+    @inbounds for i in eachindex(t)
+        u = 2 * T(pi) * (t[i] - a) / L
+        Phi[i, 1] = one(T) / sqrt(L)
+        for j in 2:n_basis
+            k = (j - 1 + 1) ÷ 2          # 2,3 -> 1;  4,5 -> 2;  …
+            Phi[i, j] = sqrt(2 / L) * (iseven(j) ? sin(k * u) : cos(k * u))
+        end
+    end
+    return Phi
+end
+
+# The degree-n contiguity matrix of Geary's ratio: y'By is exactly
+# sum_ij w_ij (y_i - y_j)^2, which is the numerator of C. Expanding the
+# square gives y_i^2 times the i-th row sum, y_j^2 times the j-th column
+# sum, and -2 w_ij y_i y_j off the diagonal.
+function _geary_matrix(W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
+    n = size(W, 1)
+    R = vec(sum(W; dims = 2))
+    K = vec(sum(W; dims = 1))
+    B = Matrix{T}(-2 .* W)
+    @inbounds for i in 1:n
+        B[i, i] = R[i] + K[i] - 2 * W[i, i]
+    end
+    return B
+end
+
+"""
+    STPCAResult
+
+Spatio-temporal principal components, as returned by [`stpca`](@ref).
+
+# Fields
+- `values`: eigenvalues of `E`, descending. Each is the value of the
+  maximised objective, `Var(U_k) · A(Aγ_k)`, for its own component.
+- `vectors`: the directions `γ_k`, one per column, orthonormal.
+- `scores`: `n × K`, the units' positions on each component, `A γ_k`.
+- `variance`: `Var(U_k) = γ_k' S γ_k`, the first factor of the objective.
+- `autocorr`: the second factor — Geary's `C` or Moran's `I` of that
+  component's scores.
+- `proportion`: `λ_k / Σ|λ|`. For `:geary` every eigenvalue is
+  non-negative, so this is the ordinary share; for `:moran` it is signed.
+- `coefs`: `n × B`, the column-centred basis coefficients `A`.
+- `measure`: `:geary` or `:moran`.
+- `n_basis`, `n_features`, `interval`, `varnames`: what the expansion used.
+
+See also [`stpca`](@ref), [`feature_contributions`](@ref),
+[`component_weight`](@ref).
+"""
+struct STPCAResult{T<:AbstractFloat}
+    values::Vector{T}
+    vectors::Matrix{T}
+    scores::Matrix{T}
+    variance::Vector{T}
+    autocorr::Vector{T}
+    proportion::Vector{T}
+    coefs::Matrix{T}
+    measure::Symbol
+    n_basis::Int
+    n_features::Int
+    interval::Tuple{T, T}
+    varnames::Vector{String}
+end
+
+function Base.show(io::IO, m::STPCAResult)
+    meas = m.measure === :geary ? "Geary's C" : "Moran's I"
+    println(io, "Spatio-temporal principal components (", meas, ")")
+    println(io, "─"^64)
+    @printf(io, "%d units, %d features, %d basis functions each (B = %d)\n",
+            size(m.scores, 1), m.n_features, m.n_basis,
+            m.n_features * m.n_basis)
+    @printf(io, "expanded on [%.3f, %.3f]\n", m.interval[1], m.interval[2])
+    println(io, "─"^64)
+    @printf(io, "%5s %14s %12s %10s %10s\n",
+            "comp", "eigenvalue", "variance",
+            m.measure === :geary ? "C" : "I", "share")
+    for k in 1:min(length(m.values), 8)
+        @printf(io, "%5d %14.4f %12.4f %10.4f %9.2f%%\n", k, m.values[k],
+                m.variance[k], m.autocorr[k], 100 * m.proportion[k])
+    end
+    length(m.values) > 8 && println(io, "  … ", length(m.values) - 8, " more")
+    println(io, "─"^64)
+    @printf(io, "first two components: %.2f%% of the spectrum\n",
+            100 * sum(m.proportion[1:min(2, end)]))
+end
+
+"""
+    stpca(X, W; measure = :geary, n_basis = 5, times = axes(X, 3), kwargs...)
+
+Spatio-temporal principal components: directions that maximise the product
+of a functional principal component's variance and the spatial
+autocorrelation of the scores it produces.
+
+`X` is `n × p × T` — `n` spatial units, `p` features, `T` observation times
+— or `n × T` for a single feature. Each unit-feature time series is first
+expanded in `n_basis` orthonormal Fourier functions by least squares, giving
+an `n × B` coefficient matrix `A` with `B = p · n_basis`; the components are
+then found in that coefficient space, so time enters through the expansion
+and space through `W`.
+
+With `S = A'A/n`, a functional principal component `U = γ'α` has estimated
+variance `γ'Sγ`, and its scores across units are `y = Aγ`. Writing the
+spatial measure of those scores as a ratio of quadratic forms, the product
+of the two factors collapses to a single eigenproblem:
+
+```math
+\\hat{\\mathrm{Var}}(U)\\,\\mathcal{A}(A\\gamma) = \\gamma' E \\gamma,
+\\qquad \\|\\gamma\\| = 1
+```
+
+so the components are the orthonormal eigenvectors of `E`, and each
+eigenvalue *is* the product being maximised. For `measure = :geary`,
+`E = ((n-1)/(2na))·A'B*A` where `a = Σᵢⱼwᵢⱼ` and `B*` is the symmetrised
+contiguity matrix of Geary's ratio; for `measure = :moran`,
+`E = (n/(a·n))·A'·((W + W')/2)·A`.
+
+# Keywords
+- `measure`: `:geary` (default, Krzyśko et al. 2023) or `:moran`.
+- `n_basis`: Fourier functions per feature. Must not exceed `T`.
+- `times`: observation times, `1:T` by default.
+- `interval`: expansion interval, padded by half the mean spacing by
+  default — see [`fourier_basis`](@ref).
+- `varnames`: feature names, used in `feature_contributions`.
+
+!!! warning "The two measures do not order the spectrum the same way"
+    Moran's `I` is large when linked units agree, so `measure = :moran`
+    puts smooth, global structure at the top and leaves the negative
+    eigenvalues — the local components — at the bottom. That split is
+    sharp: over 800 planted draws a smooth field landed on the first
+    component in 73–87% of them and a high-contrast field on the last in
+    72–86%, and neither ever landed at the wrong end.
+
+    Geary's `C` runs the other way, large when linked units differ, so
+    maximising `Var · C` demotes smooth structure — in those same draws a
+    smooth planted field was never the first `:geary` component. But the
+    `:geary` ordering is **not** the reverse of the `:moran` one: the
+    high-contrast field led only 7–34% of the time, because the objective
+    is a product and a moderate-`C` component with large variance outranks
+    a high-`C` component with little. Read the `:geary` ordering as
+    "variance weighted by dissimilarity", not as "most dissimilar first".
+
+    The whole spectrum is returned either way, so both ends are always
+    available. What is not safe is reading "the first component" without
+    saying which measure produced it. `docs/AUDIT.md` has the rates.
+
+!!! note "Why `E` is non-negative definite under `:geary`"
+    `γ'Eγ` is a variance times a Geary ratio, and both factors are
+    non-negative, so every eigenvalue is too — `rank(E)` of them positive
+    and the rest zero. Under `:moran` the second factor can be negative,
+    which is exactly the global/local split the eigenvalue signs carry.
+
+# Examples
+```julia
+m = stpca(X, W; n_basis = 5, times = 0.5:1:16.5, interval = (0.0, 17.0))
+m.scores[:, 1]                 # where the units sit on the first component
+feature_contributions(m, 1)    # which feature drives it
+```
+
+# References
+`measure = :moran` is equation (21) of Krzyśko, M., Nijkamp, P., Ratajczak,
+W., Wołyński, W. & Wenerska, B. (2024). Spatio-temporal principal component
+analysis. *Spatial Economic Analysis*, 19(1), 8–29, with the symmetrisation
+of its equation (23).
+
+`measure = :geary` is equation (4) of Krzyśko, M., Nijkamp, P., Ratajczak,
+W., Wołyński, W., Wojtyła, A. & Wenerska, B. (2023). A novel spatio-temporal
+principal component analysis based on Geary's contiguity ratio. *Computers,
+Environment and Urban Systems*, 103, 101980.
+
+Both rest on the spatial PCA of Jombart, T., Devillard, S., Dufour, A.-B. &
+Pontier, D. (2008). Revealing cryptic spatial patterns in genetic variability
+by a new multivariate method. *Heredity*, 101, 92–103, and on the
+multivariate functional PCA of Górecki et al. (2018).
+"""
+function stpca(
+    X::AbstractArray{T, 3},
+    W::AbstractSparseMatrix{T};
+    measure::Symbol = :geary,
+    n_basis::Int = 5,
+    times::AbstractVector{<:Real} = 1:size(X, 3),
+    interval::Union{Nothing, Tuple{<:Real, <:Real}} = nothing,
+    varnames::Union{Nothing, Vector{String}} = nothing
+) where {T<:AbstractFloat}
+
+    measure in (:geary, :moran) ||
+        throw(ArgumentError("stpca: measure must be :geary or :moran, got :$measure"))
+    n, p, nt = size(X)
+    size(W) == (n, n) ||
+        throw(DimensionMismatch("stpca: W is $(size(W)) but X has $n spatial units"))
+    length(times) == nt ||
+        throw(DimensionMismatch("stpca: $(length(times)) times for $nt observations " *
+                                "of each series"))
+    n >= 2 || throw(ArgumentError("stpca: need at least two spatial units"))
+    n_basis <= nt || throw(ArgumentError("stpca: n_basis = $n_basis exceeds the " *
+        "$nt observation times, so the expansion is not identified — the basis " *
+        "coefficients of one series are fitted by least squares on those times."))
+    all(isfinite, X) || throw(ArgumentError("stpca: X contains non-finite values"))
+
+    Phi = fourier_basis(times, n_basis; interval = interval)
+    check_design_rank(Phi, ["phi$j" for j in 1:n_basis], "stpca";
+        context = "The Fourier basis is degenerate at these observation times, " *
+                  "which happens when `times` repeats a point or when `n_basis` " *
+                  "is close to the number of times. Reduce `n_basis`.")
+    F = qr(Phi)
+
+    # A holds every unit's coefficients: feature 1's n_basis columns, then
+    # feature 2's, and so on, which is the block layout Phi(t) = diag(...)
+    # of the reference.
+    B = p * n_basis
+    A = Matrix{T}(undef, n, B)
+    @inbounds for j in 1:p, i in 1:n
+        A[i, ((j - 1) * n_basis + 1):(j * n_basis)] = F \ T.(@view X[i, j, :])
+    end
+    # S = A'A/n is read as Var(alpha), so the coefficients are centred:
+    # without this the spatial measures, which centre their argument, would
+    # not be consistent with the variance factor they multiply.
+    A .-= mean(A; dims = 1)
+
+    a = T(sum(W))
+    a > 0 || throw(ArgumentError("stpca: the weight matrix sums to zero"))
+    M = if measure === :geary
+        G = _geary_matrix(W)
+        (T(n - 1) / (2 * n * a)) .* (A' * ((G .+ G') ./ 2) * A)
+    else
+        Wd = Matrix(W)
+        (one(T) / a) .* (A' * ((Wd .+ Wd') ./ 2) * A)
+    end
+    M .= (M .+ M') ./ 2                      # exact symmetry for `eigen`
+
+    ev = eigen(Symmetric(M))
+    ord = sortperm(ev.values; rev = true)
+    vals = ev.values[ord]
+    vecs = ev.vectors[:, ord]
+
+    S = (A' * A) ./ n
+    scores = A * vecs
+    variance = [dot(vecs[:, k], S * vecs[:, k]) for k in 1:B]
+    autocorr = Vector{T}(undef, B)
+    @inbounds for k in 1:B
+        y = @view scores[:, k]
+        den = dot(y, y)
+        autocorr[k] = den <= zero(T) ? zero(T) :
+            measure === :geary ?
+                (T(n - 1) / (2a)) * _geary_quad(W, y) / den :
+                (T(n) / a) * dot(y, W * y) / den
+    end
+    tot = sum(abs, vals)
+    prop = tot > 0 ? vals ./ tot : zeros(T, B)
+
+    vn = isnothing(varnames) ? ["x$j" for j in 1:p] : varnames
+    length(vn) == p || throw(ArgumentError("stpca: varnames must have one entry " *
+                                           "per feature"))
+    lo, hi = extrema(times)
+    iv = isnothing(interval) ?
+        (let h = (T(hi) - T(lo)) / (nt - 1); (T(lo) - h / 2, T(hi) + h / 2) end) :
+        (T(interval[1]), T(interval[2]))
+
+    return STPCAResult{T}(vals, vecs, scores, variance, autocorr, prop, A,
+                          measure, n_basis, p, iv, vn)
+end
+
+function stpca(X::AbstractMatrix{T}, W::AbstractSparseMatrix{T}; kwargs...) where {T<:AbstractFloat}
+    n, nt = size(X)
+    return stpca(reshape(X, n, 1, nt), W; kwargs...)
+end
+
+# sum_ij w_ij (y_i - y_j)^2, straight from the definition.
+function _geary_quad(W::AbstractSparseMatrix{T}, y::AbstractVector{T}) where {T<:AbstractFloat}
+    acc = zero(T)
+    rows = rowvals(W); vals = nonzeros(W)
+    @inbounds for j in 1:size(W, 2), idx in nzrange(W, j)
+        i = rows[idx]
+        d = y[i] - y[j]
+        acc += vals[idx] * d * d
+    end
+    return acc
+end
+
+"""
+    component_groups(m)
+
+The positive and negative components of `m`, as index vectors into its
+spectrum, in the order the reference reports them.
+
+Under `measure = :moran` the sign of an eigenvalue is a substantive result,
+not a numerical detail: a positive one is a **global** component, where
+linked units carry similar scores, and a negative one is a **local**
+component, where a unit's score is surrounded by unlike ones. The reference
+orders the positive group by decreasing eigenvalue and the negative group by
+decreasing *absolute* eigenvalue — the strongest local structure first — and
+this returns `(positive = …, negative = …)` in that order. `m.values` itself
+is sorted descending throughout, so the negative group appears there in the
+opposite order.
+
+Under `measure = :geary` the construction is non-negative definite, so the
+negative group is empty up to rounding and the whole spectrum is the
+positive one.
+
+!!! note "Zero eigenvalues are in neither group"
+    `B = p · n_basis` directions exist, but at most `min(n - 1, B)` carry
+    variance. The rest have eigenvalues at rounding level and are excluded
+    from both groups by `tol`.
+"""
+function component_groups(m::STPCAResult{T}; tol::Real = 1e-10) where {T}
+    scale = isempty(m.values) ? one(T) : max(maximum(abs, m.values), one(T))
+    cut = T(tol) * scale
+    pos = [k for k in eachindex(m.values) if m.values[k] > cut]
+    neg = [k for k in eachindex(m.values) if m.values[k] < -cut]
+    return (positive = pos, negative = reverse(neg))
+end
+
+"""
+    component_weight(m, k, t)
+
+The vector weighting function `u_k(t)` of component `k`, evaluated at `t`:
+a `length(t) × p` matrix whose column `j` is the weight the component puts
+on feature `j` at each moment.
+
+A spatio-temporal component is a direction in coefficient space, and this
+is what that direction looks like as a function of time — the functional
+analogue of a loading. Feature `j` is the one the component is reading at
+moment `t` when `|u_kj(t)|` is the largest of the `p` entries.
+
+See also [`feature_contributions`](@ref).
+"""
+function component_weight(m::STPCAResult{T}, k::Int, t::AbstractVector{<:Real}) where {T}
+    1 <= k <= length(m.values) ||
+        throw(ArgumentError("component_weight: no component $k; there are " *
+                            "$(length(m.values))"))
+    Phi = fourier_basis(t, m.n_basis; interval = m.interval)
+    out = Matrix{T}(undef, length(t), m.n_features)
+    @inbounds for j in 1:m.n_features
+        g = @view m.vectors[((j - 1) * m.n_basis + 1):(j * m.n_basis), k]
+        out[:, j] = Phi * g
+    end
+    return out
+end
+
+"""
+    feature_contributions(m, k; n_grid = 512)
+
+How much each feature contributes to component `k`, as the share of the
+area under `|u_kj(t)|` over the expansion interval:
+
+```math
+A^*_j = A_j \\Big/ \\sum_{i=1}^p A_i, \\qquad
+A_j = \\int_I |u_{kj}(t)|\\,dt
+```
+
+Returns a `Vector` of `p` shares summing to one, in the order of
+`m.varnames`. The feature with the largest share is the one the component
+is mostly made of, which is the reading the reference reports alongside the
+component scores — a component is only interpretable once you know which of
+the `p` series it is tracking.
+
+The integral is taken by the trapezoid rule on `n_grid` points, since
+`|u_kj|` has corners wherever `u_kj` crosses zero and no closed form.
+
+See also [`component_weight`](@ref).
+"""
+function feature_contributions(m::STPCAResult{T}, k::Int; n_grid::Int = 512) where {T}
+    n_grid >= 2 || throw(ArgumentError("feature_contributions: n_grid must be ≥ 2"))
+    t = range(m.interval[1], m.interval[2]; length = n_grid)
+    U = abs.(component_weight(m, k, collect(t)))
+    h = T(step(t))
+    areas = Vector{T}(undef, m.n_features)
+    @inbounds for j in 1:m.n_features
+        s = zero(T)
+        for i in 1:n_grid
+            s += (i == 1 || i == n_grid ? T(0.5) : one(T)) * U[i, j]
+        end
+        areas[j] = s * h
+    end
+    tot = sum(areas)
+    return tot > 0 ? areas ./ tot : fill(T(NaN), m.n_features)
 end
 
 end # module

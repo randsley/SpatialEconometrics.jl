@@ -148,3 +148,129 @@ step at all, and its single shrinkage parameter is estimated rather than chosen.
   eigenvector spatial filtering. *Journal of Geographical Systems*, 17(4), 311–331.
 
 Function signatures are listed in the [API Reference](@ref).
+
+## Spatio-temporal principal components
+
+ESF and the eigenvector basis above describe one map. `stpca` describes a
+*sequence* of maps: `n` units, each carrying `p` features observed at `T`
+moments, reduced to components that are simultaneously high-variance and
+spatially structured.
+
+```julia
+m = stpca(X, W; measure = :moran, n_basis = 5,
+          times = 0.5:1:16.5, interval = (0.0, 17.0))
+m.scores[:, 1]                  # where each unit sits on the first component
+component_groups(m)             # which components are global, which local
+feature_contributions(m, 1)     # which of the p features the component reads
+```
+
+The construction has two stages. First each unit-feature time series is
+replaced by a continuous function, expanded in `n_basis` orthonormal Fourier
+functions by least squares, which turns `n × p × T` discrete observations
+into an `n × B` coefficient matrix `A` with `B = p · n_basis`. Time enters
+only through that expansion. Second, components are found in the coefficient
+space, where space enters through `W`.
+
+### One eigenproblem, two factors
+
+A functional principal component `U = γ'α` has estimated variance `γ'Sγ`
+with `S = A'A/n`, and produces scores `y = Aγ` across the units. Both the
+variance and the spatial autocorrelation of those scores are ratios of
+quadratic forms in `γ`, and in their product the denominators cancel:
+
+```math
+\hat{\mathrm{Var}}(U)\, I(A\gamma)
+  = \frac{1}{n}\gamma'A'A\gamma \cdot
+    \frac{n}{\sum_{ij}w_{ij}}\frac{\gamma'A'WA\gamma}{\gamma'A'A\gamma}
+  = \gamma' C \gamma,
+\qquad C = \Big(\sum_{ij}w_{ij}\Big)^{-1}\!A'WA
+```
+
+so maximising the product subject to `‖γ‖ = 1` is an eigenproblem, and each
+eigenvalue **is** the value of the objective for its own component — not a
+proxy for it. That identity is what the tests pin: `values[k]` equals
+`variance[k] * autocorr[k]` to 1e-9, with both factors recomputed from
+[`moran_coefficient`](@ref) and `SpatialDiagnostics.geary_c` rather than
+from anything `stpca` computed.
+
+Substituting Geary's `C` for Moran's `I` gives the same algebra with the
+contiguity matrix `B*` in place of `W`:
+
+```math
+E = \frac{n-1}{2na}A'B^*A, \qquad
+B^*_{ij} = \tfrac{1}{2}(B + B')_{ij}, \quad
+y'By = \sum_{ij}w_{ij}(y_i - y_j)^2
+```
+
+### Global and local components
+
+`C` is not a covariance matrix, and nothing requires it to be non-negative
+definite. Under `measure = :moran` its eigenvalues take both signs, and the
+sign is the result: a positive eigenvalue is a **global** component, where
+linked units carry similar scores, and a negative one is a **local**
+component, where a unit's score is surrounded by unlike ones.
+[`component_groups`](@ref) returns the two groups in the reference's order —
+positives by decreasing eigenvalue, negatives by decreasing absolute
+eigenvalue.
+
+Under `measure = :geary` the second factor is a sum of squares, so `E` is
+non-negative definite by construction and the negative group is empty. That
+is a property of the method, not of the data, and the two measures therefore
+answer different questions.
+
+### The two measures do not order the spectrum the same way
+
+Over 800 draws with a known field planted in one feature:
+
+| Planted field | `:moran` first | `:moran` last | `:geary` first | `:geary` last |
+|---|---|---|---|---|
+| smooth (`I ≈ +0.92`), `N = 36` | 86.5% | 0.0% | 0.0% | 7.0% |
+| smooth (`I ≈ +0.96`), `N = 64` | 73.0% | 0.0% | 0.0% | 14.0% |
+| high-contrast (`I ≈ -1.0`), `N = 36` | 0.0% | 86.0% | 33.5% | 0.0% |
+| high-contrast (`I ≈ -1.0`), `N = 64` | 0.0% | 71.5% | 7.0% | 0.0% |
+
+The entry is the share of draws in which the component most correlated with
+the planted field was the first or the last of the spectrum.
+
+Read the `:moran` rows first: the split is sharp and never inverted. A
+smooth field is the leading component or nothing, a high-contrast field is
+the trailing one or nothing, and neither ever landed at the wrong end in 800
+draws.
+
+The `:geary` rows are the warning. Maximising `Var · C` does demote smooth
+structure — a smooth field was never the leading `:geary` component — but it
+does not simply promote the roughest, which led in only 7–34% of draws. The
+objective is a *product*, and a component with moderate `C` and large
+variance outranks one with high `C` and little. Read the `:geary` ordering
+as "variance weighted by dissimilarity", not as "most dissimilar first".
+
+Also worth knowing before quoting a correlation: the planted field is spread
+across several components rather than captured whole. The median correlation
+between it and its best-matching component was 0.56 at `N = 36` and 0.43 at
+`N = 64`. The component ranking is the reliable output; the loading is not a
+recovery of the field.
+
+### Reading a component
+
+A component is a direction in coefficient space, which [`component_weight`](@ref)
+reads back as a function of time: `u_k(t)` is a `length(t) × p` matrix whose
+column `j` is the weight the component puts on feature `j` at each moment.
+[`feature_contributions`](@ref) summarises that over the whole interval as
+the share of the area under `|u_kj(t)|`, so the largest share names the
+series the component is mostly tracking. Both are needed: the scores say
+which units a component separates, and these say what it separated them on.
+
+!!! note "The expansion interval is padded by default"
+    A Fourier basis is periodic. Expanding on exactly `[t₁, t_T]` forces the
+    fitted curve to take the same value at the first and last observation,
+    which the data have no reason to do, so `interval` defaults to `times`
+    padded by half the mean spacing at each end. For annual data at
+    `t = 0.5, 1.5, …, 16.5` that default is `[0, 17]`, which is the interval
+    the reference uses.
+
+!!! warning "The components depend on `W`, and there is no rule for choosing it"
+    Changing `W` changes the components and so changes any clustering built
+    on them. The reference is explicit that no guideline exists for which
+    `W` to use and compares nine of them. Treat the choice as a reported
+    assumption, and vary it — [`select_knn_w`](@ref) chooses `k` for a knn
+    `W` by information criterion if the candidate set is that family.
