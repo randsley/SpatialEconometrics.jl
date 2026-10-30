@@ -15,6 +15,7 @@ export LogDetMethod, ExactLU, ChebyshevApprox,
        panel_spatial_lag!, panel_spatial_lag,
        within_transform!, within_transform,
        effective_dims, has_indiv_fe, has_time_fe,
+       rank_deficient_columns,
        _normcdf, _print_coef_table,
        _chi2_sf, _gamma_series, _gamma_cf, _loggamma
 
@@ -535,6 +536,36 @@ function within_transform(X::AbstractMatrix{T}, N::Int, T_per::Int, fe::FixedEff
         @views within_transform!(X_tilde[:, k], N, T_per, fe)
     end
     return X_tilde
+end
+
+# ─── Numerical rank of a design matrix ───────────────────────────────
+
+# Which columns of `X` a column-pivoted QR puts past the numerical rank.
+#
+# Returns an empty vector when `X` has full column rank, and otherwise the
+# indices -- in the original column order -- of the columns that are linear
+# combinations of the ones the pivoting kept. An exactly singular design is
+# not a numerical hiccup to be ridged away: it means a coefficient is not
+# identified, and the estimator should say so rather than hand back whatever
+# the solver's last pivot produced. That failure mode is findings 16 and 27a.
+#
+# Column pivoting is what makes this a rank test rather than a guess. An
+# unpivoted factorization can leave a tiny diagonal entry anywhere, and
+# whether it comes out positive, negative or exactly zero depends on the
+# LAPACK build; pivoting orders |R[j,j]| non-increasing, so comparing against
+# the leading entry is a conditioning statement that holds across platforms.
+# `tol` of `sqrt(eps)` marks a condition number of roughly 1/sqrt(eps) --
+# about half the available digits gone -- which is the same standard
+# `_chol_or_nothing` applies to an information matrix.
+function rank_deficient_columns(X::AbstractMatrix{T};
+                                tol::Real = sqrt(eps(T))) where {T<:AbstractFloat}
+    K = size(X, 2)
+    K == 0 && return Int[]
+    F = qr(Matrix(X), ColumnNorm())
+    d = abs.(diag(F.R))
+    (isempty(d) || first(d) == zero(T)) && return collect(1:K)
+    r = count(>(T(tol) * first(d)), d)
+    return sort(F.p[(r + 1):end])
 end
 
 # ─── Normal CDF approximation (Abramowitz & Stegun 26.2.17) ──────────

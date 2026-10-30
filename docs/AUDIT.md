@@ -1378,3 +1378,78 @@ Replaced by a gate on the ratio of the Cholesky pivots: a ratio at or below
 standard a score test cares about, while a sound block sits near 1. All three
 entry points now throw on the duplicated-column design on both versions.
 
+
+## Post-audit defects: identification guards
+
+The audit closed on the numbers an estimator reports. These two are about
+what it does when the design makes those numbers meaningless, which the
+ledger above never put a row against. Both were found on 2026-10-30 while
+writing a documentation example, not by the suite.
+
+### 26. `fit_spatial` failed inside LAPACK on a rank-deficient design — FIXED
+
+`X` goes in without an intercept, because every `build_design_matrix`
+prepends one. Pass a constant column anyway and the augmented design has two
+of them; the concentrated likelihood's first least squares then died with
+`SingularException: matrix is singular; factorization failed. Zero pivot
+found at index 2`, from a `\` three frames below the user's call. Nothing in
+that message names the intercept, the column, or the design.
+
+The same applies to a duplicated covariate, to any covariate that is a linear
+combination of the others, and — for `SDM`, whose design is `[1 X WX]` — to a
+`W` for which `W*X` lies in the span of `X`, which is exactly the
+unidentified common-factor case.
+
+Fixed by checking the numerical rank of the augmented design before anything
+is solved, and throwing an `ArgumentError` that names the dependent columns
+and states the intercept rule.
+
+### 27. `fit_gravity` returned 1e12-scale coefficients for an unidentified pair — FIXED
+
+Finding 24's fix added a per-column check: a regressor the fixed effects
+absorb completely leaves a zero column after demeaning, and that now throws.
+It cannot see a **combination**. With origin fixed effects and two columns
+whose sum is a pure origin-level term, each column survives demeaning on its
+own, the demeaned design is rank deficient, and the weighted least squares
+returned
+
+```
+coef = [-7.803811995558151e12, -7.803811995557692e12]   pseudo_R2 = 0.0293
+```
+
+— two enormous values that cancel against each other, next to a pseudo-R²
+that looks like an ordinary bad fit. This is the shape of the `-1.0e53`
+log-distance coefficient recorded against the gravity module before finding
+24; that particular case was cured by the FE-sweeping fix, the class was not.
+A duplicated regressor took the other route and threw `SingularException`
+from inside the solve.
+
+Fixed by checking the numerical rank of the weighted, demeaned design once
+the first IRLS iteration has built it, and throwing an `ArgumentError` naming
+the dependent regressors. The negative binomial goes through the same core,
+so it is covered by the same check.
+
+### The shared gate
+
+Both call `rank_deficient_columns` in `src/SpatialUtils.jl`: a
+column-pivoted QR, with the columns past `tol * |R[1,1]|` reported as
+dependent, `tol = sqrt(eps)`. Pivoting is what makes it a rank test —
+finding 27a is the record of what happens when an unpivoted factorization is
+asked to decide rank, and the ratio-to-leading-pivot form is the same
+conditioning statement `_chol_or_nothing` makes about an information matrix.
+
+Testset 29 pins all of it: the helper against matrices of known rank
+(including a design correlated at 0.9999 and one scaled by `1e6`, neither of
+which may be flagged), the three `fit_spatial` cases plus the `SDM`
+augmented-design case, and for `fit_gravity` the duplicated regressor, the
+absorbed combination, and a control that still fits. Every design in the
+testset is deterministic — no RNG, so nothing depends on the `randn` stream.
+Testset 29 adds 30 assertions, the same 30 on both ends of the support
+range. Suite through `Pkg.test`, extensions absent: 1,235 → 1,265 on Julia
+1.13 and 1,229 → 1,259 on Julia 1.10. The six-assertion difference between
+the two versions is older than this change and sits elsewhere in the suite.
+
+**What this does not cover.** The same trap exists at the other entry points
+— `fit_spatial_error`, `fit_slx`, `fit_sac`, `fit_sdem`, `fit_spatial_panel`
+and the rest build designs the same way and have no rank check. They are
+untouched here, and worth a sweep.

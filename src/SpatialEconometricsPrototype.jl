@@ -11,7 +11,7 @@ using StatsAPI
 import ..SpatialUtils
 import ..SpatialUtils: precompute_chebyshev_traces, chebyshev_logdet,
        precompute_neumann_traces, spatial_trace_powers, g_traces,
-       brent_maximize, _normcdf, _print_coef_table
+       brent_maximize, rank_deficient_columns, _normcdf, _print_coef_table
 
 const LogDetMethod = SpatialUtils.LogDetMethod
 const ExactLU = SpatialUtils.ExactLU
@@ -113,6 +113,27 @@ function build_design_matrix(::SDM, X::AbstractMatrix{T}, W::AbstractSparseMatri
     return X_aug, names_aug
 end
 
+# The concentrated likelihood solves two least squares problems in `X_aug`,
+# and `\` on a rank-deficient design fails inside LAPACK with a message
+# about a zero pivot -- which says nothing about the design that caused it.
+# The commonest cause by far is an `X` that already carries its own intercept,
+# since every `build_design_matrix` prepends one; next commonest is a W for
+# which `W*X` lands in the span of `X`, which makes an SDM unidentified.
+function _check_design_rank(X_aug::AbstractMatrix{T},
+                            coefnames::Vector{String}) where {T<:AbstractFloat}
+    bad = rank_deficient_columns(X_aug)
+    isempty(bad) && return nothing
+    # `coefnames` ends with the spatial parameter, which is not a column.
+    colnames = coefnames[1:size(X_aug, 2)]
+    named = join(("`" * colnames[j] * "`" for j in bad), ", ")
+    throw(ArgumentError(
+        "fit_spatial: the design matrix is rank deficient -- " * named *
+        " can be written in terms of the other columns, so the coefficients " *
+        "are not identified. `X` must not contain its own intercept (one is " *
+        "added), and no covariate may be a linear combination of the others. " *
+        "For an SDM, check that `W*X` does not lie in the span of `X`."))
+end
+
 """
     fit_spatial(variant, W, X, y; method, varnames, rho_bounds)
 
@@ -127,6 +148,11 @@ alone, which is done by Brent search within `rho_bounds`.
 - `variant`: `SAR` or `SDM`.
 - `W`: `N × N` sparse weight matrix, conventionally row-standardized.
 - `X`: `N × K` covariates, **without** an intercept — one is added.
+  Passing one anyway makes the design rank deficient, and the fit throws an
+  `ArgumentError` naming the offending column rather than failing inside the
+  linear algebra. The same applies to any covariate that is a linear
+  combination of the others, and — for `SDM`, which augments the design with
+  `W*X` — to a `W` for which `W*X` lies in the span of `X`.
 - `y`: response of length `N`.
 
 # Keywords
@@ -182,6 +208,7 @@ function fit_spatial(
 
     vnames = isnothing(varnames) ? ["x$i" for i in 1:K] : varnames
     X_aug, coefnames = build_design_matrix(variant, X, W, vnames)
+    _check_design_rank(X_aug, coefnames)
 
     Wy = W * y
     qr_X = qr(X_aug)

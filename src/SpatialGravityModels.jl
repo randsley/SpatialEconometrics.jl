@@ -7,7 +7,7 @@ using Random
 using Printf
 using StatsAPI
 
-import ..SpatialUtils: _normcdf, _print_coef_table
+import ..SpatialUtils: rank_deficient_columns, _normcdf, _print_coef_table
 
 export GravityVariant, PoissonGravity, NegBinGravity,
        GravityFE, OriginFE, DestinationFE, BilateralFE,
@@ -338,7 +338,11 @@ expanded into dummies, so the number of units is not a constraint.
   Zeros are fine and should be kept.
 - `X`: `N_obs x K` bilateral covariates — log distance, contiguity, common
   language and so on. No intercept, and nothing that varies only by origin
-  or only by destination, since the fixed effects absorb that.
+  or only by destination, since the fixed effects absorb that. That holds
+  for combinations too: if some linear combination of the columns is a pure
+  origin- or destination-level term, those coefficients are not identified
+  and the fit throws an `ArgumentError` instead of returning the enormous
+  offsetting values such a design used to produce.
 - `origin_id`, `dest_id`: integer unit indices per observation.
 
 # Keywords
@@ -506,6 +510,22 @@ function _gravity_irls(y::Vector{T}, X::Matrix{T}, o_ids::Vector{Int},
                         "the fixed effects are swept out, so its coefficient is " *
                         "not identified. Drop it, or use a different `fe`."))
                 end
+            end
+            # The column-by-column check above cannot see a *combination* the
+            # fixed effects absorb: each column survives demeaning on its own
+            # while some linear combination of them does not. That design is
+            # equally unidentified, and it is the quieter failure of the two --
+            # the solve returns coefficients of order 1e12 that cancel against
+            # each other, with a plausible-looking pseudo-R2 beside them.
+            bad = rank_deficient_columns(Diagonal(sqrt.(w)) * X_dm)
+            if !isempty(bad)
+                subject = length(bad) == 1 ? "regressor $(bad[1]) is a" :
+                    "regressors " * join(bad, ", ") * " are a"
+                throw(ArgumentError(
+                    "fit_gravity: " * subject * " linear combination of the " *
+                    "others once the fixed effects are swept out, so the " *
+                    "coefficients are not identified. Drop one, or use a " *
+                    "different `fe`."))
             end
         end
 
