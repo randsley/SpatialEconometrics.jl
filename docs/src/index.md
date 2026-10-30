@@ -28,7 +28,7 @@ A comprehensive spatial econometrics package for Julia, providing maximum likeli
 
 ```julia
 using Pkg
-Pkg.add("SpatialEconometrics")
+Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl")
 ```
 
 ## Quick Example

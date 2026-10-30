@@ -4,7 +4,7 @@
 
 ```julia
 using Pkg
-Pkg.add("SpatialEconometrics")
+Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl")
 ```
 
 ## Basic Workflow

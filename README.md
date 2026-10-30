@@ -9,9 +9,10 @@ models, HAC-robust inference, weight-matrix construction, input-output
 calibration, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** (registration in review) — 492 test assertions across 26
-> testsets (527 with the two package extensions installed), passing on Julia
-> 1.13.2. See [Validation Status](#validation-status) for Monte Carlo results.
+> **Version 0.3.0** — 1,270 test assertions across 53 testsets with the two
+> package extensions installed (1,229 on Julia 1.10, where the extensions are
+> absent), passing on Julia 1.13.2. See
+> [Validation Status](#validation-status) for Monte Carlo results.
 
 **Documentation:** [dev](https://randsley.github.io/SpatialEconometrics.jl/dev/)
 — a `stable` build appears with the first tagged release.
@@ -28,16 +29,11 @@ cross-reference fails CI.
 
 ```julia
 using Pkg
-Pkg.add("SpatialEconometrics")
+Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl")
 ```
 
-> Registration in the General registry is still in review, so `Pkg.add` by name
-> does not resolve yet. Until it merges, install from the repository:
->
-> ```julia
-> using Pkg
-> Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl")
-> ```
+> The package is installed from this repository, so `Pkg.add` by name does not
+> resolve it.
 
 To work on the package itself, develop a local checkout and run the suite:
 
@@ -214,7 +210,7 @@ our own because:
 SpatialEconometrics/
 ├── src/            # 23 modules: the umbrella plus 22 submodules
 ├── ext/            # Makie and Turing package extensions
-├── test/           # runtests.jl — 26 testsets
+├── test/           # runtests.jl — 53 testsets
 ├── examples/       # 19 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
 └── validation/     # Monte Carlo output referenced below

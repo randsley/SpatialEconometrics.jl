@@ -1,6 +1,6 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.3.0 (registered) → 0.4.0 (on `master`, unreleased)
+> **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
 > 22 submodules, 1,270 test assertions in 53 testsets with both package
 > extensions installed, 20 examples, 9 notebooks, 2 package extensions,
@@ -715,7 +715,7 @@ Rows above the rule are measured; rows below are estimates.
 
 | Milestone | Modules | Test assertions | Lines of `src/` |
 |---|---|---|---|
-| **v0.3.0** (registered) | 13 | 54 | ~6,500 |
+| **v0.3.0** | 13 | 54 | ~6,500 |
 | **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
 | **master** (+ Phase 6B items 1–2) | 22 | 1,270 | 13,995 |
 | — | | | |
