@@ -1591,6 +1591,52 @@ standard a score test cares about, while a sound block sits near 1. All three
 entry points now throw on the duplicated-column design on both versions.
 
 
+## Post-audit defects: an accidental quadratic in `row_standardize!`
+
+Found on 2026-10-30 by the benchmark suite built for roadmap item #10, not
+by the test suite, which had asserted the right answer about this function
+for its whole life.
+
+### 29. `row_standardize!` was O(N · nnz) — FIXED
+
+For each of the `N` rows in turn it scanned **every nonzero in the whole
+matrix**, twice — once to accumulate that row's sum and once to divide by
+it — testing `rows[idx] == i` and skipping the rest. The work is therefore
+`2 · N · nnz` where `2 · nnz` suffices, and the penalty grows with `N`:
+
+| `N` | `nnz` | before | after | |
+|---|---|---|---|---|
+| 900 | 3,480 | 4.02 ms | 0.0094 ms | 428× |
+| 3,600 | 14,160 | 62.3 ms | 0.055 ms | 1,124× |
+| 8,100 | 32,040 | 310.5 ms | 0.185 ms | 1,677× |
+| 14,400 | 57,120 | — | 0.333 ms | |
+
+Accumulating the row sums into a vector in one pass and dividing in a second
+is the whole fix. Both versions visit a given row's entries in increasing
+column order, so the summation order is unchanged and the output is
+**bit-identical** — verified on six matrices including a rook lattice, a
+queen lattice, knn and distance weights, a matrix with an empty row, and one
+with negative entries, comparing `nonzeros` and `rowvals` for exact
+equality, and confirmed again by the full suite returning the same 1,566
+passes with every pinned value intact.
+
+**Why no test caught it.** Every assertion about `row_standardize` was about
+its *output* — rows sum to one, empty rows stay zero, `nnz` is preserved —
+and all of them passed before and after. Asymptotic cost is not a property
+of the output, so no output assertion can see it. Testset 32 now carries a
+wall-clock bound at `N = 8100`: 50 ms, which is 260× above the linear
+version's cost and 6× below the quadratic one's. That margin is what makes a
+timing assertion safe on a shared runner — a tighter bound would be
+measuring the runner rather than the code.
+
+**The general lesson, which is the reason this is in the ledger.** The audit
+closed on *values*: every finding ended in a test pinning a number against a
+closed form or an independent implementation. Complexity is invisible to
+that standard, and `row_standardize` sits under almost every example,
+benchmark and test in the package, so the cost was being paid everywhere and
+measured nowhere. A benchmark suite is not only for tuning; for this class
+of defect it is the only instrument that detects it at all.
+
 ## Post-audit defects: identification guards
 
 The audit closed on the numbers an estimator reports. These two are about

@@ -185,20 +185,18 @@ Rows with no neighbors are left as zeros.
 function row_standardize!(W::AbstractSparseMatrix)
     N = size(W, 1)
     rows = rowvals(W); vals = nonzeros(W)
-    for i in 1:N
-        rs = 0.0
-        for col in 1:size(W, 2)
-            for idx in nzrange(W, col)
-                rows[idx] == i && (rs += abs(vals[idx]))
-            end
-        end
-        if rs > 0.0
-            for col in 1:size(W, 2)
-                for idx in nzrange(W, col)
-                    rows[idx] == i && (vals[idx] /= rs)
-                end
-            end
-        end
+    # Two passes over the nonzeros, not one pass per row: accumulating the
+    # row sums into a vector costs O(nnz) where rescanning the whole matrix
+    # for each row in turn costs O(N * nnz). Both visit a given row's entries
+    # in increasing column order, so the summation order -- and therefore the
+    # result, to the last bit -- is unchanged.
+    rowsums = zeros(eltype(vals), N)
+    @inbounds for idx in eachindex(vals)
+        rowsums[rows[idx]] += abs(vals[idx])
+    end
+    @inbounds for idx in eachindex(vals)
+        rs = rowsums[rows[idx]]
+        rs > 0 && (vals[idx] /= rs)
     end
     return W
 end

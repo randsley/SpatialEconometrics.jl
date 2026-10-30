@@ -4905,4 +4905,45 @@ vcov(m::HausMock) = m.V
         end
     end
 
+    @testset "32. Performance invariants" begin
+        # Correctness tests do not notice an accidental quadratic: the old
+        # `row_standardize!` rescanned every nonzero in the matrix once per
+        # row, so it was O(N * nnz) rather than O(nnz), and every assertion
+        # about its output passed throughout. What catches that is a bound
+        # on how long it may take.
+
+        @testset "32a. row_standardize is linear in the nonzeros" begin
+            for side in (20, 40)
+                W = SparseMatrixCSC{Float64, Int}(make_rook_weights(side))
+                Wr = row_standardize(W)
+                rs = vec(sum(Wr; dims = 2))
+                @test all(x -> isapprox(x, 1.0; atol = 1e-12), rs)
+                @test nnz(Wr) == nnz(W)
+                @test W == SparseMatrixCSC{Float64, Int}(make_rook_weights(side))
+            end
+
+            # A row with no neighbours stays zero rather than dividing by it.
+            Wgap = sparse([1, 1, 2], [2, 3, 1], [1.0, 2.0, 3.0], 4, 4)
+            Wg = row_standardize(Wgap)
+            @test vec(sum(Wg; dims = 2)) ≈ [1.0, 1.0, 0.0, 0.0]
+
+            # The row sum is of absolute values, so a signed W normalises by
+            # magnitude -- which is what the original did, and what the
+            # linear rewrite has to keep doing.
+            Wneg = sparse([1, 2, 2], [2, 1, 3], [-1.0, 2.0, -3.0], 3, 3)
+            @test nonzeros(row_standardize(Wneg)) ≈ [2 / 5, -1.0, -3 / 5]
+
+            # The timing bound. At N = 8100 the quadratic version took 310 ms
+            # and the linear one takes 0.19 ms, so 50 ms sits 260x above the
+            # new cost and 6x below the old. That margin is what makes a
+            # wall-clock assertion safe to run on a shared CI runner; a
+            # tighter bound would be measuring the runner, not the code.
+            Wbig = SparseMatrixCSC{Float64, Int}(make_rook_weights(90))
+            @test size(Wbig, 1) == 8100
+            row_standardize(Wbig)                      # compile first
+            t = @elapsed row_standardize(Wbig)
+            @test t < 0.05
+        end
+    end
+
 end
