@@ -5,9 +5,11 @@
 > 22 submodules, 1,691 test assertions in 48 top-level testsets on Julia
 > 1.13.2 and 1,685 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
 > extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5, 6 and 6B are
-> complete except item #10 (Performance)**, which is the next piece of work.
-> Tier 3 is untouched, and the correctness audit in `docs/AUDIT.md` is closed
-> — findings 1–25, nothing outstanding.
+> complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> reduced on measured grounds and may be revisited; the next piece of work
+> is the GWR compact local design, then Phase 7A. Tier 3 is untouched, and
+> the correctness audit in `docs/AUDIT.md` is closed — findings 1–25, with
+> 29–31 added afterwards from the benchmark suite.
 >
 > Items #15 and #16, and every block marked **Planned additions**, were added
 > after that audit closed. They are the extend half of clean → fix → extend,
@@ -509,11 +511,11 @@ signature became the pair `regression_table` / `to_latex`.
 |---|---|
 | Multithreaded GWR — ✅ **delivered** | `Threads.@threads` over local regressions in `fit_gwr`. Not a linear speedup: 4.0–6.3× on 16 cores, held back by an `O(N²)` allocation and a dense local design, both recorded in `benchmark/README.md` |
 | Sparse Chebyshev — ✅ **bounded, not replaced** | The recursion still densifies, because on a sparse `W` that is the fast path; `max_fill_bytes` now caps the peak and finishes the remaining orders a column block at a time. Keeping sparsity throughout would be 4–25× slower on a lattice |
-| GPU spatial lag | CUDA.jl kernel for `W * y` when N > 50,000 — weight matrix stays on GPU |
-| Out-of-core panels | Arrow.jl / DuckDB.jl streaming for `fit_spatial_panel` — process partitioned Parquet files without loading full NT matrix |
-| Precompiled sysimage | PackageCompiler.jl sysimage recipe for zero-latency interactive use |
+| GPU spatial lag — ⏸️ **parked** | CUDA.jl kernel for `W * y` when N > 50,000. Targets the log-determinant path, measured at under 2% of a fit, and adds a weakdep to do it |
+| Out-of-core panels — ⏸️ **parked** | Arrow.jl / DuckDB.jl streaming for `fit_spatial_panel`. A memory axis rather than a speed one, and two more weakdeps with no measured demand |
+| Precompiled sysimage — ⏸️ **deferred** | PackageCompiler.jl recipe for zero-latency interactive use. Cheap and dependency-free; deferred on scheduling, not merit |
 | Benchmark suite — ✅ **delivered** | `benchmark/`: BenchmarkTools.jl suite across N sizes, W densities and Chebyshev orders, with `--compare` against a saved baseline |
-| Matrix-free log-determinant | Stochastic Lanczos quadrature for `log det(I − ρW)` when `N` is large enough that the Chebyshev path's error bound stops being the binding constraint — Aune et al. (2014); Barry & Pace (1999) |
+| Matrix-free log-determinant — ⏸️ **parked** | Stochastic Lanczos quadrature for `log det(I − ρW)` — Aune et al. (2014); Barry & Pace (1999). Still the right tool at the `N` where Chebyshev fill-in binds, but that is beyond anything benchmarked, and the whole path is under 2% of a fit |
 
 The GWR and MGWR degrees of freedom are **not** part of this item: the
 Hutchinson trace estimator and the recursive back-fitting accumulator are
@@ -522,10 +524,57 @@ already in `src/GWREstimation.jl` (`_mgwr_enp_hutchinson`, `df_method` of
 each `enp`. What remains here is the same idea applied to the spatial
 log-determinant, where only the Chebyshev approximation exists today.
 
-**Status:** 🚧 In progress — the benchmark suite, the trace-powers rewrite, threaded GWR, the `knn_weights` selection loop, the reused log-determinant factorisation and the Chebyshev memory ceiling are delivered
-(`benchmark/`, run with `julia --project=benchmark -t auto benchmark/run.jl`),
-and what it measured has re-ordered the rest of this item. See
-`benchmark/README.md` for the numbers and `docs/AUDIT.md` finding 29.
+**Status:** ✅ **Closed 2026-10-30, scope reduced on measured grounds** —
+may be revisited. Six passes delivered: the benchmark suite, the
+trace-powers rewrite, threaded GWR, the `knn_weights` selection loop, the
+reused log-determinant factorisation and the Chebyshev memory ceiling.
+`benchmark/README.md` has every before-and-after number and
+`docs/AUDIT.md` findings 29–31 the ledger.
+
+| Delivered | Result |
+|---|---|
+| Benchmark suite (`benchmark/`) | `julia --project=benchmark -t auto benchmark/run.jl`, `--compare` against a saved baseline |
+| `row_standardize!` was O(N · nnz) | 1,677× at `N = 8100`, output bit-identical (finding 29) |
+| `precompute_neumann_traces` relaid out | 3.4–12.2× on the probe branch, **1.8–2.7× on `fit_spatial`** at `N ≥ 3600` (finding 30) |
+| `fit_gwr` threaded, two allocation faults fixed | **4.0–6.3×** on 16 cores, 1.6–2.0× on one, bit-identical (finding 31) |
+| `log_marginal_likelihood` reuses its symbolic factorisation | 1.4–1.5×, all 200 log-determinants bit-identical (finding 31) |
+| Chebyshev recursion given a memory ceiling | `max_fill_bytes`, 128 MiB default, blocked fallback (finding 31) |
+
+**Why it closes short of its own deliverables list.** Three of the seven —
+GPU spatial lag, matrix-free log-determinant, out-of-core panels — were
+written before anything was measured, and measurement does not support
+them. The first two target `log det(I − ρW)`, which is **under 2% of
+`fit_spatial`**: `brent_maximize` calls the concentrated likelihood six
+times, so no implementation of either can return more than about 2%, and
+the GPU one adds a CUDA.jl weakdep to do it. Out-of-core panels addresses
+a different axis — memory for panels larger than RAM, not speed — and
+carries two more weakdeps with no measured demand behind it. They are
+parked here rather than deleted; the profile that would justify them is a
+much larger `N` on a much denser `W` than anything benchmarked.
+
+The precompiled sysimage recipe is deferred too, on scheduling rather than
+on merit: it costs little and has no dependencies, and it is worth doing
+when interactive latency is the complaint.
+
+**What measurement actually found, which the item never mentioned.** 71–92%
+of a fit was `spatial_trace_powers`; the dominant cost of GWR was
+allocation rather than parallelism; two of the five findings from the first
+pass were wrong and had to be withdrawn — `knn_weights` is O(N log N), not
+O(N²), and the Chebyshev "461 MiB" was cumulative allocation rather than a
+peak. Both corrections are in `docs/AUDIT.md` finding 31. The general
+lesson is in finding 29: a benchmark suite is not only for tuning, and for
+a defect in asymptotic cost it is the only instrument that sees it at all.
+
+**One optimisation carried forward rather than parked** — the GWR compact
+local design, listed as priority 12 under Development Phases. `fit_gwr`
+builds a dense `N × K` weighted design per observation when only `bw` rows
+are nonzero, about 4.5× wasted arithmetic at `FixedBandwidth(8.0)` on a
+30×30 grid, and it compounds with the threading now in place. It is carried
+forward and not closed with the rest of this item because the measurement
+supports it, unlike the three above. It is not inside this item because a
+compact design reorders the QR's rows and so moves reported coefficients
+in their last bits — the same trade as findings 30 and 31, but it deserves
+its own pass rather than being folded into a closure.
 
 **What the first measurements changed.** Three of the seven deliverables
 above — sparse Chebyshev, GPU spatial lag, matrix-free log-determinant —
@@ -563,18 +612,33 @@ and its degrees to be symmetrised into a fast real eigenproblem, and
 `spatial_trace_powers` only ever receives the standardised `W`.
 
 
-**Files to add:** Existing modules + new `src/SpatialGPU.jl` (extension). `benchmark/` is delivered.
+**Files touched:** `benchmark/` (new, delivered), `src/SpatialUtils.jl`,
+`src/SpatialWeights.jl`, `src/GWREstimation.jl`,
+`src/SpatialModelSelection.jl`, testset 32. `src/SpatialGPU.jl` was never
+created, the GPU deliverable being parked.
 
-**Dependencies:** Optional CUDA.jl (weakdep), optional Arrow.jl (weakdep), optional DuckDB.jl (weakdep)
+**Dependencies:** none added. The three weakdeps this item once planned —
+CUDA.jl, Arrow.jl, DuckDB.jl — went unused, which is part of why it closed
+where it did.
 
-**Estimated complexity:** ~600 lines across multiple files
+**Actual complexity:** ~390 lines of `src/` and ~270 of tests, against an
+estimate of ~600 for a scope that included three deliverables now parked.
 
-**Verification note:** all six deliverables are testable on the current
-development machine — 16 logical cores, an RTX 3080 (compute capability 8.6,
-16 GB VRAM, `CUDA.functional()` confirmed) and ample free disk for a panel that
-genuinely exceeds the 32 GB of RAM. CI runners have no GPU, so the CUDA paths
-must be gated on `CUDA.functional()` behind a package extension, following the
-pattern the Turing and Makie extensions already use.
+**Verification note, kept for if this is revisited:** the parked
+deliverables are all testable on the current development machine — 16
+logical cores, an RTX 3080 (compute capability 8.6, 16 GB VRAM,
+`CUDA.functional()` confirmed) and ample free disk for a panel that
+genuinely exceeds the 32 GB of RAM. CI runners have no GPU, so any CUDA
+path must be gated on `CUDA.functional()` behind a package extension,
+following the pattern the Turing and Makie extensions already use.
+
+Everything delivered was verified on Julia 1.13.2 **and** 1.10.12, since
+`randn(::MersenneTwister)` streams differ between minor releases. Each
+optimisation was held to a stated standard: bit-identical where exactness
+was the point (`row_standardize!`, the log-determinant sweep, `fit_gwr`,
+`knn_weights` across 144 configurations), and roundoff-with-the-reordering
+-named where it was not (the trace kernel at 7e-14, the Chebyshev fallback
+at 1e-14, both against estimator errors of order 6%).
 
 ---
 
@@ -731,13 +795,13 @@ cleanest demonstration that the package's machinery is not about geography.
 | 8 | Interoperability (#9) | ~500 | 308 | 🟡 Tables and GeoDa I/O done; GeoDataFrames and R interop not started |
 | | **Phase 5 total** | **~1,750** | | |
 
-### Phase 6 — 🟡 Two of three
+### Phase 6 — ✅ Complete
 
 | Priority | Item | Est. | Actual | Status |
 |---|---|---|---|---|
 | 9 | Spatial Probit / Logit (#4) | ~500 | 700 | ✅ |
 | 10 | Spatial Filtering (#7) | ~350 | 718 | ✅ |
-| 11 | Performance (#10) | ~600 | — | ⬜ **Next up** |
+| 11 | Performance (#10) | ~600 | 390 | ✅ Closed with scope reduced; three deliverables parked, see #10 |
 | | **Phase 6 total** | **~1,450** | | |
 
 ### Phase 6B — ✅ Specification search & `W` selection
@@ -754,12 +818,23 @@ Tier 3 builds rather than inside them.
 | ~~15~~ | ✅ Spatio-temporal principal components (#7) | 400 | Delivered: `stpca` under Moran's I and Geary's C, testset 31, recovery rates in `docs/AUDIT.md` |
 | | **Phase 6B total** | **~1,200** | |
 
+### Phase 6C — ⬜ GWR compact local design
+
+One optimisation carried forward out of #10 rather than parked with the
+rest, because it is the one the measurements support. It sits on its own
+because it changes reported numbers, which a closure note should not.
+
+| Priority | Item | Est. Lines | Rationale |
+|---|---|---|---|
+| 12 | GWR compact local design (#10) | ~250 | `fit_gwr` and `fit_mgwr` build a dense `N × K` weighted design per observation when only `bw` rows are nonzero — about 4.5× wasted arithmetic at `FixedBandwidth(8.0)` on a 30×30 grid, compounding with the threading already delivered. A compact design reorders the QR's rows, so coefficients move in their last bits: same trade as findings 30 and 31, and it needs the same treatment — a stated standard, a reference implementation to check against, and a ledger entry |
+| | **Phase 6C total** | **~250** | |
+
 ### Phase 7A — ⬜ Networks & causal policy evaluation
 
 | Priority | Item | Est. Lines | Rationale |
 |---|---|---|---|
-| 16 | Spatial Networks (#11) | ~400 | Extends beyond geography |
-| 17 | Spatial Causal Inference (#15) | ~600 | Direct vs spillover treatment effects |
+| 13 | Spatial Causal Inference (#15) | ~600 | Direct vs spillover treatment effects, which is what applied users ask for, and it builds on `spatial_effects` — already written and audited |
+| 14 | Spatial Networks (#11) | ~400 | Extends beyond geography. Cheaper than #15 but mostly reframes what `W` may represent rather than adding inference, so it goes second |
 | | **Phase 7A total** | **~1,000** | |
 
 ### Phase 7B — ⬜ Spatio-temporal, common factors & semiparametrics
@@ -782,21 +857,24 @@ Tier 3 builds rather than inside them.
 
 ### Size: Actuals and Projections
 
-Rows above the rule are measured; rows below are estimates.
+Rows above the rule are measured; rows below are estimates. v0.4.0 has
+crossed the rule: it is not a projection any more, it is what `master`
+holds today, and the figures it once projected — ~1,200 assertions and
+~13,800 lines — were passed some time ago.
 
 | Milestone | Modules | Test assertions | Lines of `src/` |
 |---|---|---|---|
 | **v0.3.0** | 13 | 54 | ~6,500 |
-| **master** (Phases 4–6 bar #10, audit closed) | 22 | 1,156 | 13,331 |
+| **master** (Phases 4–6 before #10, audit closed) | 22 | 1,156 | 13,331 |
 | **master** (+ Phase 6B items 1–2) | 22 | 1,270 | 13,995 |
 | **master** (+ Phase 6B item 14, identification guards) | 22 | 1,374 | 14,843 |
 | **master** (+ Phase 6B item 15, so 6B complete) | 22 | 1,566 | 15,271 |
 | **master** (+ #10 benchmarks, finding 29) | 22 | 1,576 | 15,269 |
 | **master** (+ #10 trace kernel, finding 30) | 22 | 1,600 | 15,367 |
 | **master** (+ #10 GWR, knn, logdet, Chebyshev; finding 31) | 22 | 1,691 | 15,653 |
+| **v0.4.0** (= master today, unreleased) | 22 | 1,691 | 15,653 |
 | — | | | |
-| **v0.4.0** (next release) | 22 | ~1,200 | ~13,800 |
-| **v1.0.0** (Phases 6B–8) | 27–29 | ~1,600 | ~19,000 |
+| **v1.0.0** (Phases 6C–8) | 27–29 | ~2,400 | ~21,000 |
 
 Measured on master: 22 submodules plus the umbrella across 15,653 lines of
 `src/`, 5,215 lines of tests, 2,884 lines of examples across 22 scripts,
