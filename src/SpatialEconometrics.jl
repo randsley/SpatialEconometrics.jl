@@ -33,6 +33,7 @@ include("SpatialSimulation.jl")
 include("SpatialTables.jl")
 include("SpatialDiscreteChoice.jl")
 include("SpatialFiltering.jl")
+include("SpatialCausal.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -56,6 +57,7 @@ const SimMod        = SpatialSimulation
 const TablesMod     = SpatialTables
 const DiscreteMod   = SpatialDiscreteChoice
 const FilterMod     = SpatialFiltering
+const CausalMod     = SpatialCausal
 
 import .SpatialUtils: SpatialVariant, SAR, SDM, SARAR,
        FixedEffectsSpec, NoFE, IndivFE, TimeFE, TwoWayFE,
@@ -66,7 +68,7 @@ import .DynamicSpatialPanelEconometrics: DynamicSpatialPanelModel, DynamicSpatia
 import .SpatialGS2SLSPanel: GS2SLSModel, fit_gs2sls_panel
 import .DynamicPanelSystemGMM: GMMVariant, DifferenceGMM, SystemGMM, SystemGMMModel, fit_dynamic_gmm
 import .StructuralMacroCalibration: CalibrationResult, balance_gras, balance_gras_full, balance_generalized_ce, sam_leontief_multipliers
-import .SpatialHAC: KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel, DistanceMetric, EuclideanDistance, HaversineDistance, AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC, vcov_driscoll_kraay, vcov_conley, RobustInferenceTable
+import .SpatialHAC: KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel, DistanceMetric, EuclideanDistance, HaversineDistance, AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC, ClusterRobustVCOV, vcov_driscoll_kraay, vcov_conley, vcov_cluster, RobustInferenceTable
 import .SpatialDiagnostics: MoranResult, LISAResult, LMTestResult, GearyCResult, ScoreTestResult, moran_global, moran_local, geary_c, lm_test_lag, lm_test_error, lm_test_robust_lag, lm_test_robust_error, lm_tests, lm_test_sdm, lm_test_durbin, lm_test_robust_durbin, lm_test_robust_lag_durbin, lm_test_durbin_terms, sdm_tests
 import .SpatialErrorModel: SpatialErrorRegressionModel, SpatialErrorPanelModel, fit_spatial_error
 import .GWREstimation: GWRModel, MGWRModel, fit_gwr, fit_mgwr, BandwidthType, FixedBandwidth, AdaptiveBandwidth, KernelFunction, GaussianKernel, BisquareKernel, ExponentialKernel
@@ -80,6 +82,7 @@ import .SpatialRegimeModels: SpatialRegimeModel, fit_spatial_regime, ExogenousRe
 import .SpatialSimulation: SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP, simulate_spatial, MonteCarloConfig, monte_carlo_spatial, MonteCarloResult, PowerAnalysisResult, power_analysis
 import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to_markdown, regression_table
 import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianSpatialProbitModel, fit_bayesian_spatial_probit, SpatialOrderedProbitModel, fit_spatial_ordered_probit, SpatialProbitEffects, marginal_effects
+import .SpatialCausal: ExposureMap, exposure, ring_exposure, InterferenceReport, check_interference, SpatialDiDResult, fit_spatial_did
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf, STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups
 
 """
@@ -459,8 +462,8 @@ export
     LeeYuTransformation, DirectQML, GMMVariant, DifferenceGMM, SystemGMM,
     KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel,
     DistanceMetric, EuclideanDistance, HaversineDistance,
-    AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC,
-    vcov_driscoll_kraay, vcov_conley, robust_vcov, RobustInferenceTable, robust_coeftable,
+    AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC, ClusterRobustVCOV,
+    vcov_driscoll_kraay, vcov_conley, vcov_cluster, robust_vcov, RobustInferenceTable, robust_coeftable,
     @formula, slag, fe, endo, ParsedSpatialFormula, extract_panel_permutation,
     fit_spatial, fit_spatial_panel, fit_dynamic_spatial_panel, fit_gs2sls_panel, fit_dynamic_gmm, fit_spatial_error, fit_gwr, fit_mgwr,
     GWRModel, MGWRModel, BandwidthType, FixedBandwidth, AdaptiveBandwidth, KernelFunction, GaussianKernel, BisquareKernel, ExponentialKernel,
@@ -509,6 +512,10 @@ export
     ESFModel, fit_esf, selected_eigenvectors,
     REESFModel, fit_re_esf,
     STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups,
+    # SpatialCausal
+    ExposureMap, exposure, ring_exposure,
+    InterferenceReport, check_interference,
+    SpatialDiDResult, fit_spatial_did,
     # Extension entry points (methods live in ext/)
     AbstractBayesianSpatialResult,
     bayesian_sar, bayesian_sdm, bayesian_sem,

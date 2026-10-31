@@ -1,6 +1,7 @@
 # Robust Inference
 
-Driscoll-Kraay and Conley spatial HAC covariance estimators.
+Driscoll-Kraay, Conley spatial HAC and one-way cluster-robust
+covariance estimators.
 
 ```@meta
 CurrentModule = SpatialEconometrics
@@ -9,6 +10,7 @@ CurrentModule = SpatialEconometrics
 ```@docs
 AbstractRobustVCOV
 BartlettKernel
+ClusterRobustVCOV
 ConleySpatialHAC
 DistanceMetric
 DriscollKraayVCOV
@@ -19,6 +21,7 @@ ParzenKernel
 QuadraticSpectralKernel
 RobustInferenceTable
 UniformKernel
+vcov_cluster
 vcov_conley
 vcov_driscoll_kraay
 ```

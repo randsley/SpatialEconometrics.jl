@@ -1259,6 +1259,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-23 | `sdm_tests` — the five Koley & Bera Durbin score statistics | 20000 replications, `N = 81`: mean = df to within 2.6%, variance = 2df to within 1.9%, size 0.047–0.054 at the 5% level and 0.009–0.010 at the 1% | Verified correct |
 | 2026-10-24 | `select_knn_w` — choosing `k` for a knn `W` by AIC | not a test statistic, so the gate is the selection error rate: 300 draws generated at `k = 6`, `k` searched over `2:20`, exact recovery 42.3% / 57.3% / 77.0% at `N = 100 / 200 / 400` against 5.3% by chance, median `k̂ = 6` throughout | Verified correct |
 | 2026-10-30 | `bayes_spec_probs` / `sdem_roadmap` — posterior model probabilities over specifications and `W` | not a test statistic, so the gate is the selection error rate: 200 draws from each of six specifications, all six compared on the generating `W`, recovery 81.5–95.5% at `N = 100` and 92.5–100% at `N = 256` against 16.7% by chance; the global-versus-local reach right in 90.5–100% of draws | Verified correct |
+| 2026-10-30 | `fit_spatial_did` / `vcov_cluster` — spatial difference-in-differences and its covariance | two gates, since neither is a test statistic. Coverage of a nominal 95% interval, 2,000 reps, errors `(I − 0.6W)^{-1}ε`: clustering 95.0%, OLS 96.5%, Conley 94.5% at cutoff 1.5 falling to 85.3% at 6.0 — and falling identically at `ρ = 0`, so the decay is finite-sample bias, not the correction working. The estimator itself is exact where it can be: `5.3e-15` on a noiseless two-period design. Staggered adoption under heterogeneous effects is biased 17–67% with an unpredictable sign, measured across four designs and pinned | Verified correct; staggered caveat documented |
 | 2026-10-30 | `stpca` — spatio-temporal principal components | a decomposition, not a statistic, so the gate is again the error rate: 200 draws per cell with a known field planted in one feature, `:moran` puts a smooth field first in 73–87% and a high-contrast field last in 72–86%, with 0 of 800 draws at the wrong end; the eigenvalue identity `λ = Var(U)·I(Aγ)` is checked against independently implemented statistics to 5.0e-14 | Verified correct |
 
 ### `sdm_tests` — four checks, in testset 27
@@ -1527,6 +1528,142 @@ paper's section 5, which tests the significance of the positive and negative
 groups jointly, is **not** implemented: it is a test statistic, so it falls
 under the standing rule and needs its own null distribution before it can be
 believed.
+
+
+### `fit_spatial_did` and `vcov_cluster` — in testset 34
+
+Phase 7A's first module, `src/SpatialCausal.jl`. Two things in it fall under
+the standing rule — a covariance estimator and an estimator whose
+staggered-design behaviour had to be characterised rather than assumed — and
+both came out differently from the plan.
+
+**The exact part is exact.** The two-period design first-differences to an
+ordinary least squares problem, so the gate is algebra and not a tolerance:
+generated noiselessly, `att_direct` returns `τ` to 5.3e-15, the two
+spillovers to 1.8e-15 and 7.6e-17, and `att_total_treated == att_direct +
+att_spill_treated` holds **exactly**, both being the same linear form in
+`θ̂`. The staggered path under homogeneous effects is the same story at
+4.7e-15. There was no reason to accept less: every reported quantity is
+`a'θ̂` for a fixed `a`, so its variance is `a'Σa` and needs no delta method.
+
+**The covariance default was reversed by measurement.** The plan chose
+Conley on the reasoning that treatment in a spillover design is spatially
+correlated by construction, so a spatial HAC is the matching instrument.
+Coverage of a nominal 95% interval on `att_direct`, 2,000 replications,
+`N = 144`, errors generated as `(I − 0.6W)^{-1}ε`:
+
+| Estimator | Coverage | mean SE / MC sd |
+|---|---|---|
+| cluster on unit | 95.0% | 1.025 |
+| OLS | 96.5% | 1.068 |
+| Conley, cutoff 1.5 | 94.5% | 1.005 |
+| Conley, cutoff 2.5 | 92.5% | 0.948 |
+| Conley, cutoff 4.0 | 90.5% | 0.893 |
+| Conley, cutoff 6.0 | 85.3% | 0.785 |
+
+Checked across nine configurations — treated block, scattered, half-grid and
+alternating stripes, at `ρ = 0`, `0.6`, `0.9`, at `N = 144` and `400` — the
+ordering never changed: clustering stayed in `93.0–97.0%`, and Conley fell
+monotonically with the cutoff to `82%` at the widest.
+
+Two measurements settle *why*, and neither was guessed.
+
+1. **Conley degrades identically with no spatial correlation present**
+   (`93.0% → 83.9%` across the same cutoffs at `ρ = 0`). So the decay is the
+   finite-sample cost of estimating more pair covariances, not the
+   correction working. `psd_fix = false` reproduces every figure to three
+   decimals, so it is not the PSD projection either — the meat is already
+   positive semi-definite here.
+2. **The exposure column absorbs the dependence before it reaches the
+   standard error.** Including `WD` identifies `τ` off the contrast between
+   a unit and its neighbours, and that contrast differences out the error
+   component they share — which is exactly the spatially correlated part.
+   `cor(D, WD)` runs 0.93–0.99 in these designs, and OLS's `SE/MC sd` barely
+   moves between `ρ = 0` and `ρ = 0.9` (1.010 to 1.207). In the one design
+   where `cor(D, WD) = 0` exactly, alternating stripes, every estimator
+   over-covers.
+
+The default is therefore `:cluster`, and the docstring carries the table
+rather than the reasoning that lost. A spatial HAC is still right for a
+spatially correlated regressor and `:conley` remains available, with the
+instruction to report more than one cutoff and prefer the narrow end.
+
+**What clustering is actually doing, stated because it is a trap.** In the
+first-differenced two-period design there is one observation per unit, so
+clustering on unit is a singleton-cluster design and reduces to the
+heteroskedasticity-robust (HC1) form. Testset 34f asserts that coincidence
+directly against the HC1 formula rather than leaving the docstring's claim
+unchecked. It performs well for that reason, not because it is absorbing
+serial or spatial correlation, neither of which survives the differencing.
+
+**Staggered adoption: characterised, and worse than the textbook warning.**
+Two-way fixed effects with heterogeneous effects is known not to recover a
+weighted average effect (Goodman-Bacon). The usual statement is that the
+estimate can leave the convex hull of the cohort effects. On these designs
+**it never did** — the hull spans `[1.0, 8.0]` in the dynamic cases, which
+makes that a weak guarantee rather than a reassuring one. The bias is the
+thing to report, and with no noise every gap below is bias:
+
+| Cohort layout | Effect profile | True ATT | `att_direct` | Error |
+|---|---|---|---|---|
+| contiguous bands | constant per cohort | 1.667 | 2.781 | +67% |
+| contiguous bands | growing with exposure | 4.167 | **1.805** | −57% |
+| interleaved | constant per cohort | 1.662 | 2.000 | +20% |
+| interleaved | growing with exposure | 4.155 | 3.440 | −17% |
+
+The sign is not predictable, which is the part a user most needs to know.
+And the spatial dimension makes it worse rather than better, specifically
+for this estimator: when adoption cohorts are spatially contiguous — which
+is how rollouts actually happen — cohort identity is nearly collinear with
+the exposure column, so `WD` absorbs cohort heterogeneity and `att_direct`
+moves to compensate. `1.805` against a true `4.167` in that cell, where the
+same profile with interleaved cohorts gives `3.440` and dropping the
+exposure column entirely gives `3.600`. All eight figures are pinned in
+testset 34e, so the docstring's warning cannot drift away from the code.
+
+**`vcov_cluster` against its formula.** A covariance is a second-order
+quantity, which is where audit findings 1–7 lived, so it is checked
+against the sandwich written out independently in the test rather than only
+through the estimator that calls it: agreement to 1e-12, the
+`G/(G−1)·(n−1)/(n−K)` correction isolated by comparing with
+`dof_correction = false`, invariance to row permutation to 1e-10,
+non-integer group labels, and the singleton-cluster reduction to HC1. One
+group and a saturated design both divide by zero in the correction and are
+rejected by name instead of returning `Inf`.
+
+**Identification is checked, not assumed.** `δ` is identified only by
+controls that differ in exposure. `check_interference` reports the count of
+unexposed controls, `var(E | D = 0)`, `cor(D, E)` and the two exposure
+means, and it needs no outcome, so it can be run before fitting. Where the
+design is outright rank deficient — a checkerboard treatment on a rook
+lattice makes exposure exactly 1 for every control and 0 for every treated
+unit — the existing `check_design_rank` refuses it by column name. That
+reuse is the whole guard; nothing new was written for it.
+
+**Scope, and what is deliberately absent.** Item #15 lists four
+deliverables. Two are delivered. Spatial synthetic control is a constrained
+optimisation rather than a regression, and the shift-share exogeneity tests
+are test statistics that each owe a null-distribution Monte Carlo under this
+very rule. Bundling three estimator families into one commit is the shape
+that produced findings 13–16, so they are a separate pass.
+
+Suite 2,233 on Julia 1.13.2 with Makie and Turing installed and 2,194 on
+1.10.12 with both absent, zero failures either way. 910 lines in
+`src/SpatialCausal.jl` and 120 in `SpatialHAC.jl`.
+
+**A bookkeeping correction found on the way, worth recording because it
+briefly looked like a regression.** Testset 34 contributes **162
+assertions on both versions** — it is version-neutral — yet the two suite
+totals first came back 39 apart against a documented gap of 6. Running the
+suite verbose on each version accounted for all of it: testset 11b is 12
+against 6, which is the genuine version-dependence and unchanged, and the
+remaining 33 is Makie and Turing being installed in one environment and
+not the other — testsets 25 and 26 contributing 11 and 24 assertions
+against one broken marker each. Nothing had regressed; the earlier note
+said the counts were taken with the extensions absent but not that the
+extension difference is five times the cross-version one, so a figure
+quoted from the wrong environment was unreadable. `ROADMAP.md` now names
+the environment beside each number.
 
 ## A whole class of fragile assertion: pinning a random draw
 

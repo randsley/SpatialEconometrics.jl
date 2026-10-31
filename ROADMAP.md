@@ -2,18 +2,22 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 22 submodules, 2,036 test assertions in 49 top-level testsets on Julia
-> 1.13.2 and 2,030 on Julia 1.10.12, 22 examples, 12 notebooks, 2 package
-> extensions, CI/CD and 48 Documenter.jl pages. **Phases 4, 5, 6 and 6B are
-> complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> 23 submodules, 2,233 test assertions in 50 top-level testsets on Julia
+> 1.13.2 with both package extensions installed and 2,194 on Julia 1.10.12
+> without them, 23 examples, 12 notebooks, 2 package extensions, CI/CD and
+> 50 Documenter.jl pages. **Phases 4, 5, 6 and 6B are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
-> compact local design, is delivered; the next piece of work is Phase 7A. Tier 3 is untouched, and
-> the correctness audit in `docs/AUDIT.md` is closed — findings 1–25, with
-> 29–31 added afterwards from the benchmark suite.
+> compact local design, is delivered. **Phase 7A is underway:** item #15's
+> exposure mapping and spatial difference-in-differences landed on
+> 2026-10-30, leaving its synthetic control and shift-share rows plus item
+> #11 (Networks). Tier 3 is otherwise untouched, and the correctness audit
+> in `docs/AUDIT.md` is closed — findings 1–25, with 29–32 added afterwards
+> from the benchmark suite and Phase 6C.
 >
 > Items #15 and #16, and every block marked **Planned additions**, were added
-> after that audit closed. They are the extend half of clean → fix → extend,
-> and none of them is started.
+> after that audit closed. They are the extend half of clean → fix → extend.
+> #15 is now half delivered — exposure mapping and spatial difference-in-
+> differences — and everything else in that group is still unstarted.
 >
 > This roadmap outlines planned additions organized by impact tier and development phase. Each item includes the motivation, key deliverables, estimated complexity, and relevant references.
 
@@ -271,40 +275,69 @@ design.
 
 | Feature | Description | Reference |
 |---|---|---|
-| Spatial difference-in-differences | Decompose a policy effect into direct ATT and spillover ATT through an exposure mapping on `D` and `WD`; staggered rollout with spatial lags | Delgado & Florax (2015); Chagas et al. (2016) |
+| ~~Spatial difference-in-differences~~ — **delivered**, see `fit_spatial_did` | Direct ATT and spillover ATT through an exposure mapping on `D` and `WD`, two-period and staggered. Four effects rather than three: the spillover onto the treated and onto the controls are evaluated at different exposure means and are not interchangeable | Delgado & Florax (2015); Chagas et al. (2016) |
 | Spatial synthetic control | Donor-weight optimisation penalised by geographic or economic distance, so the synthetic unit is not assembled from the treated unit's own neighbours | Cerqua et al. (2022) |
 | Spatial shift-share diagnostics | Exogeneity and spatial-correlation tests for local exposure shares and regional industry weights | Borusyak et al. (2022); Adao et al. (2019) |
-| Exposure mapping utilities | Build and validate `D`, `WD`, ring and distance-band exposures; check the no-interference-beyond-`W` assumption | — |
+| ~~Exposure mapping utilities~~ — **delivered**, see `exposure` / `ring_exposure` / `check_interference` | `D`, `W^k D`, ring and distance-band exposures. The assumption check is the substantive part: `δ` is identified only by controls that differ in exposure, which is a property of the design and `W` alone and so is checkable before any fit | — |
 
-**Sketch:**
+**Status:** 🟡 **Half delivered, 2026-10-30** — exposure mapping and
+spatial DiD are in `src/SpatialCausal.jl` (910 lines). Docs:
+`docs/src/models/causal.md`. Example: `examples/23_spatial_causal.jl`.
+Tests: 178 assertions in testset 34. Ledger: `docs/AUDIT.md`, under the
+standing rule.
+
+**Delivered API:**
 
 ```julia
-struct SpatialDiDResult{T} <: StatsAPI.RegressionModel
-    att_direct::T
-    att_indirect::T
-    att_total::T
-    vcov::Matrix{T}
-    exposure::Matrix{T}
-end
-
-fit_spatial_did(y, treat, post, W, X; clusters = :unit) -> SpatialDiDResult
+exposure(D, W; order = 1, standardize = true)   -> ExposureMap
+ring_exposure(D, coords, d_min, d_max)          -> ExposureMap
+check_interference(em)                          -> InterferenceReport
+fit_spatial_did(y, treat, W; X, vcov, coords, dist_cutoff, order)
+    -> SpatialDiDResult
 ```
 
-**New file:** `src/SpatialCausal.jl` (~600 lines)
+`treat` is a length-`N` indicator for two periods or an `N × T` path for a
+staggered rollout, which is what selects the estimator. Four effects are
+reported — `att_direct`, `att_spill_treated`, `att_spill_control`,
+`att_total_treated` — each a fixed linear combination of `θ̂`, so their
+standard errors are exact.
 
-**Dependencies:** None new. `SpatialHAC.jl` already supplies two of the
-three covariance estimators this needs — `vcov_conley` (spatial HAC) and
-`vcov_driscoll_kraay` — but **not** a cluster-robust one, so the
-`clusters` keyword in the sketch above either adds one or maps onto those
-two. Decide that before writing the signature.
+**The `clusters` decision, resolved by measurement rather than by
+reasoning.** The open question here was whether to add a cluster-robust
+covariance or map the keyword onto the two existing estimators.
+`ClusterRobustVCOV` and `vcov_cluster` were added to `src/SpatialHAC.jl`
+(+120 lines) — and then the default went to clustering rather than to
+Conley, which is the opposite of what was planned. Conley's coverage
+*degrades* monotonically as the cutoff widens, and it does so identically
+when there is no spatial correlation at all, so the decay is the
+finite-sample cost of estimating more pair covariances rather than the
+correction working. The reason the spatial correction matters less than
+expected is the exposure column itself: including `WD` identifies `τ` off
+the contrast between a unit and its neighbours, which differences out the
+error component they share. Nine configurations, the full table and the
+`ρ = 0` control are in `docs/AUDIT.md`.
 
-**Estimated complexity:** ~600 lines
+**Verification:** the two-period design first-differences to an exact OLS
+problem, so the standard is algebra and not a tolerance — `5.3e-15` on
+`att_direct` from a noiseless design, and
+`att_total_treated == att_direct + att_spill_treated` exactly. The
+staggered path is `4.7e-15` under homogeneous effects and **badly biased
+under heterogeneous ones**: 17% to 67% across four designs, with a sign
+that is not predictable, worst when adoption cohorts are spatially
+contiguous because cohort identity is then nearly collinear with the
+exposure column. All eight figures are pinned in testset 34e so the
+docstring's warning cannot drift from the code.
 
-**Verification note:** the direct/indirect decomposition has a closed form
-under a known exposure mapping and a known DGP, so the audit standard
-applies directly — generate from a two-period spillover design, and check
-`att_direct` and `att_indirect` against the algebra rather than against a
-recovery tolerance.
+**Not delivered, deliberately:** spatial synthetic control (a constrained
+optimisation rather than a regression) and the shift-share exogeneity
+diagnostics (test statistics, which each owe a null-distribution Monte
+Carlo under the standing rule). Bundling three estimator families into one
+commit is the shape that produced audit findings 13–16, so they are a
+separate pass.
+
+**Actual complexity:** 910 lines of `src/SpatialCausal.jl` plus 120 in
+`SpatialHAC.jl`, against an estimate of ~600 for a scope that included the
+two deliverables above.
 
 ---
 
@@ -847,13 +880,22 @@ column per sweep rather than the local designs. Cheapening that means not
 re-scanning a bandwidth that has stopped moving, which changes which fixed
 point the back-fitting reaches — a decision, not a tidy-up.
 
-### Phase 7A — ⬜ Networks & causal policy evaluation
+### Phase 7A — 🟡 Networks & causal policy evaluation
 
-| Priority | Item | Est. Lines | Rationale |
+| Priority | Item | Est. Lines | Status |
 |---|---|---|---|
-| 13 | Spatial Causal Inference (#15) | ~600 | Direct vs spillover treatment effects, which is what applied users ask for, and it builds on `spatial_effects` — already written and audited |
-| 14 | Spatial Networks (#11) | ~400 | Extends beyond geography. Cheaper than #15 but mostly reframes what `W` may represent rather than adding inference, so it goes second |
+| 13 | Spatial Causal Inference (#15) | ~600 | 🟡 **Exposure mapping and spatial DiD delivered**, 2026-10-30, 1,030 lines across `SpatialCausal.jl` and `SpatialHAC.jl`. Synthetic control and shift-share diagnostics outstanding |
+| 14 | Spatial Networks (#11) | ~400 | ⬜ Extends beyond geography. Cheaper than #15 but mostly reframes what `W` may represent rather than adding inference, so it goes second |
 | | **Phase 7A total** | **~1,000** | |
+
+The #15 row's original rationale said it "builds on `spatial_effects` —
+already written and audited". That turned out to be half true and is worth
+recording: what is reusable is the *pattern* — a delta method over a closed
+form with a swappable covariance — not the function, which hard-codes the
+panel coefficient layout (intercept offset, `ρ` last, `K = P_cov` or
+`P_cov/2`) that a DiD design does not have. In the event the two-period
+decomposition needed no delta method at all, every reported effect being
+linear in `θ̂`.
 
 ### Phase 7B — ⬜ Spatio-temporal, common factors & semiparametrics
 
@@ -891,22 +933,36 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #10 trace kernel, finding 30) | 22 | 1,600 | 15,367 |
 | **master** (+ #10 GWR, knn, logdet, Chebyshev; finding 31) | 22 | 1,691 | 15,653 |
 | **master** (+ Phase 6C, finding 32) | 22 | 2,036 | 15,904 |
-| **v0.4.0** (= master today, unreleased) | 22 | 2,036 | 15,904 |
+| **master** (+ #15 exposure mapping and spatial DiD) | 23 | 2,233 † | 16,949 |
+| **v0.4.0** (= master today, unreleased) | 23 | 2,233 † | 16,949 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 27–29 | ~2,400 | ~21,000 |
 
-Measured on master: 22 submodules plus the umbrella across 15,904 lines of
-`src/`, 5,467 lines of tests, 2,884 lines of examples across 22 scripts,
-398 lines of package extensions, 48 documentation pages and 12 notebooks
+Measured on master: 23 submodules plus the umbrella across 16,949 lines of
+`src/`, 6,101 lines of tests, 3,094 lines of examples across 23 scripts,
+398 lines of package extensions, 50 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
-The assertion counts above are measured with Makie and Turing absent, so the
-two package-extension testsets skip: 2,036 on Julia 1.13.2 and 2,030 on
-Julia 1.10.12. The six-assertion difference is version-dependent testsets,
+**State the environment with the assertion count.** The figures above are
+2,233 on Julia 1.13.2 with Makie and Turing **installed**, where testsets 25
+and 26 contribute 11 and 24 assertions, and 2,194 on Julia 1.10.12 with both
+**absent**, where each reports a single broken marker instead of running.
+That extension difference is 33 assertions — five times the genuine
+cross-version difference described below — so a count quoted without its
+environment can look like a regression when nothing has regressed.
+
+The six-assertion difference is version-dependent testsets,
 not the change log — it predates Phase 6B and is unchanged by it: items 14
 and 15 added 88 and 192 assertions, every one of which passes identically on
 both versions. Rows measured before 2026-10-30 counted the extension
 testsets too, which is why the step from 1,270 is larger than 280.
+
+† The last two rows count the extension testsets; the Phase 6C row above
+them does not. So the step from 2,036 to 2,233 is **not** testset 34's
+size: that testset is 162 assertions and runs identically on both Julia
+versions, and the other 35 is testsets 25 and 26 running rather than
+reporting a marker. Comparing two rows of this table means checking they
+were measured the same way first.
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed

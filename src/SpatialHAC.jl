@@ -8,8 +8,8 @@ using StatsAPI
 
 export KernelType, BartlettKernel, ParzenKernel, QuadraticSpectralKernel, UniformKernel,
        DistanceMetric, EuclideanDistance, HaversineDistance,
-       AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC,
-       vcov_driscoll_kraay, vcov_conley,
+       AbstractRobustVCOV, DriscollKraayVCOV, ConleySpatialHAC, ClusterRobustVCOV,
+       vcov_driscoll_kraay, vcov_conley, vcov_cluster,
        RobustInferenceTable
 
 """
@@ -250,6 +250,59 @@ struct ConleySpatialHAC{T<:AbstractFloat, M<:DistanceMetric, KS<:KernelType, KT<
 end
 
 """
+    ClusterRobustVCOV(groups; dof_correction = true)
+
+One-way cluster-robust covariance: arbitrary correlation within a group,
+independence across groups.
+
+The workhorse of the difference-in-differences literature, where `groups`
+is the unit identifier and the within-unit correlation being absorbed is
+serial. It is offered here for that convention, and because
+`fit_spatial_did` would otherwise have a `vcov` keyword with
+nothing behind it.
+
+!!! warning "What this does not absorb"
+    Independence *across* groups is what geographic spillovers violate, so
+    this estimator does nothing about spatial dependence between units in
+    different clusters. Clustering on unit in a cross-section is a
+    particular trap: each group is then a single observation and the
+    estimator silently reduces to the heteroskedasticity-robust (HC1)
+    form. That is not always the wrong answer — on the spillover
+    difference-in-differences designs measured in the
+    `fit_spatial_did` docstring it has the best coverage of the
+    three estimators offered, because the exposure regressor absorbs the
+    spatial correlation before it reaches the standard error — but it is
+    worth knowing that is what you are getting rather than assuming the
+    clustering is doing the work.
+
+# Arguments
+- `groups`: length-`n` vector of group labels, one per observation, of any
+  type that supports `==` and `hash`. Order is irrelevant; labels need not
+  be contiguous integers.
+
+# Keywords
+- `dof_correction`: apply `G/(G-1) · (n-1)/(n-K)`, the standard
+  finite-sample scaling. Off gives the asymptotic form.
+
+# Examples
+```julia
+fit_spatial_did(y, D, post, W; vcov = ClusterRobustVCOV(unit_ids))
+```
+
+# References
+Cameron, A. C. & Miller, D. L. (2015). A practitioner's guide to
+cluster-robust inference. *Journal of Human Resources*, 50(2).
+"""
+struct ClusterRobustVCOV{G} <: AbstractRobustVCOV
+    groups::Vector{G}
+    dof_correction::Bool
+    function ClusterRobustVCOV(groups::AbstractVector{G}; dof_correction::Bool=true) where {G}
+        isempty(groups) && throw(ArgumentError("`groups` is empty: nothing to cluster on"))
+        return new{G}(collect(groups), dof_correction)
+    end
+end
+
+"""
     vcov_driscoll_kraay(Z, residuals, N, T_per; bread_inv = nothing, spec = DriscollKraayVCOV())
 
 Driscoll-Kraay covariance from a score matrix directly.
@@ -391,6 +444,71 @@ function vcov_conley(Z::AbstractMatrix{T}, residuals::AbstractVector{T}, N::Int,
     if spec.psd_fix
         eig = eigen(Symmetric(S_meat))
         S_meat = eig.vectors * Diagonal(max.(eig.values, zero(T))) * eig.vectors'
+    end
+
+    B_inv = isnothing(bread_inv) ? inv(Symmetric(Z' * Z)) : bread_inv
+    return Symmetric(B_inv * S_meat * B_inv') |> Matrix
+end
+
+"""
+    vcov_cluster(Z, residuals, spec; bread_inv = nothing)
+
+One-way cluster-robust covariance from a score matrix directly.
+
+The sandwich `B⁻¹ (Σ_g S_g S_g') B⁻¹`, where `S_g = Σ_{i∈g} z_i e_i` sums
+the scores within a group. See [`ClusterRobustVCOV`](@ref) for what this
+estimator does and does not absorb — in particular, not spatial
+dependence.
+
+# Arguments
+- `Z`: `n x K` regressor or score matrix.
+- `residuals`: length-`n` residual vector.
+- `spec`: a [`ClusterRobustVCOV`](@ref) carrying the group labels, whose
+  length must match `n`.
+
+# Keywords
+- `bread_inv`: the `(Z'Z)⁻¹`-analogue for the sandwich. `nothing` uses the
+  OLS form.
+
+!!! note "The number of groups is the sample size that matters"
+    The asymptotics are in `G`, not `n`. With few groups the estimate is
+    badly downward-biased however large `n` is, and the
+    `dof_correction` scaling does not repair it. `G < 20` or so calls for a
+    different method entirely rather than this one with a correction.
+"""
+function vcov_cluster(Z::AbstractMatrix{T}, residuals::AbstractVector{T}, spec::ClusterRobustVCOV;
+                      bread_inv::Union{Nothing, AbstractMatrix{T}}=nothing) where {T<:AbstractFloat}
+    n, K = size(Z)
+    length(residuals) == n || throw(DimensionMismatch("`residuals` has $(length(residuals)) entries, `Z` has $n rows"))
+    length(spec.groups) == n || throw(DimensionMismatch("`groups` has $(length(spec.groups)) entries, `Z` has $n rows"))
+
+    # Sum scores within group. One pass, with the group's slot looked up
+    # rather than assuming the labels are 1:G or even sortable.
+    slot = Dict{eltype(spec.groups), Int}()
+    for g in spec.groups
+        haskey(slot, g) || (slot[g] = length(slot) + 1)
+    end
+    G = length(slot)
+
+    S = zeros(T, K, G)
+    @inbounds for i in 1:n
+        c = slot[spec.groups[i]]
+        e_i = residuals[i]
+        for p in 1:K
+            S[p, c] += Z[i, p] * e_i
+        end
+    end
+
+    S_meat = S * S'
+
+    if spec.dof_correction
+        # G/(G-1) · (n-1)/(n-K), the standard scaling. Guarded because a
+        # one-group design and a saturated one both divide by zero, and
+        # both are user error worth naming rather than an Inf to debug.
+        G > 1 || throw(ArgumentError("cluster-robust covariance needs at least 2 groups, got $G"))
+        n > K || throw(ArgumentError("cluster-robust covariance needs n > K, got n = $n, K = $K"))
+        c_adj = T(G) / T(G - 1) * T(n - 1) / T(n - K)
+        S_meat .*= c_adj
     end
 
     B_inv = isnothing(bread_inv) ? inv(Symmetric(Z' * Z)) : bread_inv

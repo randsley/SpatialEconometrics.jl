@@ -45,6 +45,7 @@ makedocs(
             "Regime Models" => "models/regime.md",
             "Discrete Choice" => "models/discrete_choice.md",
             "Spatial Filtering" => "models/filtering.md",
+            "Causal Inference" => "models/causal.md",
         ],
         "Diagnostics" => [
             "Spatial Diagnostics" => "diagnostics/spatial.md",
@@ -70,6 +71,7 @@ makedocs(
                 "Spatial Regime Models" => "api/regime.md",
                 "Spatial Discrete Choice" => "api/discrete_choice.md",
                 "Spatial Filtering" => "api/filtering.md",
+                "Spatial Causal Inference" => "api/causal.md",
                 "Geographically Weighted Regression" => "api/gwr.md",
             ],
             "Panels" => [
