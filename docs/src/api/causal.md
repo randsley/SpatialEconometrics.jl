@@ -1,8 +1,9 @@
 # Spatial Causal Inference
 
 Treatment effects when one unit's treatment reaches its neighbours:
-exposure mapping, and difference-in-differences decomposed into a direct
-and a spillover effect.
+exposure mapping, difference-in-differences decomposed into a direct and
+a spillover effect, and synthetic control with a spillover-screened donor
+pool.
 
 ```@meta
 CurrentModule = SpatialEconometrics
@@ -16,4 +17,11 @@ InterferenceReport
 check_interference
 SpatialDiDResult
 fit_spatial_did
+SyntheticControlResult
+fit_synthetic_control
+donor_weights
+PlaceboTest
+placebo_test
+SpilloverGaps
+spillover_gaps
 ```

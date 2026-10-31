@@ -1261,6 +1261,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-30 | `bayes_spec_probs` / `sdem_roadmap` — posterior model probabilities over specifications and `W` | not a test statistic, so the gate is the selection error rate: 200 draws from each of six specifications, all six compared on the generating `W`, recovery 81.5–95.5% at `N = 100` and 92.5–100% at `N = 256` against 16.7% by chance; the global-versus-local reach right in 90.5–100% of draws | Verified correct |
 | 2026-10-30 | `fit_spatial_did` / `vcov_cluster` — spatial difference-in-differences and its covariance | two gates, since neither is a test statistic. Coverage of a nominal 95% interval, 2,000 reps, errors `(I − 0.6W)^{-1}ε`: clustering 95.0%, OLS 96.5%, Conley 94.5% at cutoff 1.5 falling to 85.3% at 6.0 — and falling identically at `ρ = 0`, so the decay is finite-sample bias, not the correction working. The estimator itself is exact where it can be: `5.3e-15` on a noiseless two-period design. Staggered adoption under heterogeneous effects is biased 17–67% with an unpredictable sign, measured across four designs and pinned | Verified correct; staggered caveat documented |
 | 2026-10-30 | `stpca` — spatio-temporal principal components | a decomposition, not a statistic, so the gate is again the error rate: 200 draws per cell with a known field planted in one feature, `:moran` puts a smooth field first in 73–87% and a high-contrast field last in 72–86%, with 0 of 800 draws at the wrong end; the eigenvalue identity `λ = Var(U)·I(Aγ)` is checked against independently implemented statistics to 5.0e-14 | Verified correct |
+| 2026-10-31 | `fit_synthetic_control` / `placebo_test` — spatial synthetic control and its permutation inference | two gates. The p-value is a test statistic: no effect anywhere, 7×7 lattice, 44 clean donors, exact permutation, 1,000 reps — size 0.046 / 0.095 at nominal 5% / 10% at `ρ = 0`, 0.045 / 0.094 at `ρ = 0.6`, and 0.068 / 0.125 at `ρ = 0.9`, so it is correctly sized up to moderate spatial correlation and over-rejects by about a third of nominal at strong correlation. The estimator is checked against the exact optimum by support enumeration rather than a tolerance: objective to 3.55e-15, weights to 1.31e-14. Donor-pool contamination is an algebraic identity, pinned to 1e-12 | Verified correct; `ρ = 0.9` over-rejection and the p-value granularity floor documented |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -2114,7 +2115,13 @@ testset is deterministic — no RNG, so nothing depends on the `randn` stream.
 Testset 29 adds 30 assertions, the same 30 on both ends of the support
 range. Suite through `Pkg.test`, extensions absent: 1,235 → 1,265 on Julia
 1.13 and 1,229 → 1,259 on Julia 1.10. The six-assertion difference between
-the two versions is older than this change and sits elsewhere in the suite.
+the two runs is older than this change and sits elsewhere in the suite.
+
+> **Corrected 2026-10-31.** That difference was not between the two
+> *versions*. The 1.10 figures here were measured in a `src`-and-`test`-only
+> scratch copy, which omits `notebooks/data/columbus.csv` and so skips the
+> six assertions testset 11b gates on it. Per-testset counts are identical
+> on 1.13.2 and 1.10.12. See the `fit_synthetic_control` entry below.
 
 ### 28. The same trap at every other entry point — FIXED
 
@@ -2171,3 +2178,203 @@ Julia 1.13 and 1,259 → 1,280 on Julia 1.10, both through `Pkg.test`.
 
 **No false positives.** The 1,264 assertions that predate this pass all still
 hold: not one legitimate design anywhere in the suite trips a guard.
+
+### `fit_synthetic_control` and `placebo_test` — in testset 35
+
+Phase 7A's second causal module, appended to `src/SpatialCausal.jl`. Two
+things fall under the standing rule — a permutation p-value, and an
+estimator whose donor-pool behaviour had to be characterised rather than
+assumed — and one of them came out against the plan.
+
+**A citation was withdrawn before anything was built.** The roadmap cited
+Cerqua et al. (2022) for this row, and already flagged it as unverified —
+reached through a secondary summary rather than the source. It does not
+exist as described: there is no Cerqua 2022 spatial synthetic control
+paper (the nearest real work, Cerqua & Pellegrini 2017, is on a different
+problem). The reference set is now Abadie, Diamond & Hainmueller (2010),
+Abadie & L'Hour (2021) for the penalised estimator, Abadie (2021), and Di
+Stefano & Mellace (2024) for donor-pool contamination — each checked
+against the published record. This is the second roadmap citation to fail
+verification on contact, and the standing instruction to check before use
+earned its place.
+
+**The weights are checked against the exact optimum, not a tolerance.**
+The donor weights solve a convex quadratic program over the unit simplex.
+For a small donor pool the exact optimum is computable independently by
+enumerating all `2^J − 1` supports and solving the equality-constrained
+least squares on each — written out in the test rather than borrowed from
+`src/`, so the reference is genuinely independent. Over 500 random
+problems with `J ≤ T0`, where the optimum is unique:
+
+| Quantity | Worst case |
+|---|---|
+| objective excess over the exact optimum | 3.55e-15 |
+| deviation in the weights themselves | 1.31e-14 |
+| relative KKT gap | 9.68e-15 |
+| KKT violation off the support | 0.00e+00 |
+
+With `J > T0` — more donors than pre-periods, which is the realistic
+case — the solution set is a face rather than a point, so only the
+objective is well defined; it agrees to 1.78e-15 while the weights
+legitimately differ. That non-uniqueness is not a defect to be papered
+over, it is the argument for the penalty, and the docstring says so.
+
+An exact convex combination is recovered to 1.58e-13 and the gap
+identity `gap == y − Σ w y` holds at 0.00e+00, being a definition.
+`λ → ∞` drove the support into the minimum-distance donor set in 200 of
+200 problems. The simplex projection satisfies its own characterisation to
+1.11e-16 and was never beaten by random search over the simplex.
+
+**The solver's stopping rule had to change, and the plan was wrong about
+the failure mode.** The plan specified a step-length tolerance and a throw
+on non-convergence. Both were wrong. When the donor pool exceeds the
+predictor set the iterate drifts along the flat directions of a
+rank-deficient `G` long after the objective has settled, so a step-length
+test never fires — the realistic default path ran to `maxiter` at a KKT
+gap of 3.6e-06. Throwing there would have made the ordinary unpenalised
+fit fail on a legitimately non-unique problem. The rule is now the KKT
+gap, relative to the gradient scale, with O'Donoghue–Candès adaptive
+restart; the same case now converges to 1e-14 in 29,610 iterations and 48
+ms. The certificate is reported in the result (`kkt_gap`,
+`kkt_violation`) rather than converted into an exception, because
+unconverged weights are otherwise indistinguishable from converged ones.
+
+A false start worth recording: the first restart implementation rejected
+the candidate point instead of merely dropping the momentum, so once near
+the optimum floating-point noise restarted it on every iteration and
+accuracy fell from 2.5e-14 to 4.4e-08. Adaptive restart must always accept
+the iterate; the threshold on the objective increase must be relative.
+
+**Donor-pool contamination is an identity, not a tendency.** The plan
+intended to show that screening the donor pool reduces bias on average.
+The first attempt at that failed its own test — the all-donor fit was
+*closer* to the truth (0.0139 against 0.0161 on a true effect of 3.0) —
+and the reason was a defect in the simulation, not the estimator: iid
+factor loadings make a treated unit's neighbours no more similar to it
+than any other unit, so the fit has no reason to select them, and
+contamination it never ingests cannot bias it. How much screening matters
+depends entirely on how much weight the contaminated units would
+otherwise carry, which depends on whether characteristics are spatially
+smooth, as real ones are:
+
+| Loadings | screened bias | all-donor bias | weight on contaminated |
+|---|---|---|---|
+| iid | −0.0022 | −0.0157 | 0.049 |
+| smoothed ×1 | −0.0009 | −0.0355 | 0.117 |
+| smoothed ×3 | −0.0014 | −0.0603 | 0.196 |
+| smoothed ×6 | −0.0022 | −0.0606 | 0.194 |
+
+200 replications per row, true effect 3.0, spillover 1.2, `N = 81`. The
+screened fit is unbiased throughout; the all-donor bias tracks the weight
+it puts on contaminated donors. Holding that weight fixed, the bias is
+exactly linear in the spillover: 0.0, −0.0308, −0.0603, −0.1192 at
+spillovers of 0, 0.6, 1.2 and 2.4.
+
+That linearity is not an empirical regularity, which is why the test
+asserts the identity instead. The spillover falls in the post-treatment
+periods only, so the weights — fitted pre-period — are untouched by it:
+adding a spillover changes them by **0.00e+00**. Hence
+
+```
+att(contaminated pool) = att(clean pool) − Σ_{j} w_j · E_j · spillover
+```
+
+holds exactly, and testset 35f pins it to 1e-12 at four spillover sizes
+on a design where the trap is unavoidable — the treated unit's path is an
+exact half-and-half combination of two of its own neighbours, which are
+themselves exact copies of two far corners. The unscreened fit takes 0.5
+from each neighbour, reaches a pre-period RMSPE of 2.45e-15, and returns
+2.500000000000002 against a true 3.0.
+
+**The part a user most needs: the contaminated fit looks better.** Its
+pre-period fit is *superior* (2.45e-15 against the screened fit's
+1.77e-03 in the pinned design; 0.045 against 0.097 in
+`examples/24_synthetic_control.jl`, where it carries 90.1% of its weight
+on treated territory and is wrong by −0.433 against the screened fit's
++0.005). The contamination is post-treatment, so it is invisible in the
+pre-period by construction. A pre-period fit diagnostic cannot detect this
+failure at all, and the docstring no longer implies that checking it is
+enough.
+
+**The placebo p-value's size, measured.** No treatment effect anywhere,
+7×7 rook lattice, `T = 16` with `T0 = 12`, an interior treated unit so 4
+neighbours are excluded and 44 clean donors remain. The permutation is
+exact over 44 assignments, so the smallest attainable p-value is
+`1/45 = 0.0222`. Errors `(I − ρW)^{-1}ε`, 1,000 replications per row:
+
+| `ρ` | `p ≤ 0.022` | `p ≤ 0.05` | `p ≤ 0.10` | mean `p` |
+|---|---|---|---|---|
+| 0.0 | 0.023 | 0.046 | 0.095 | 0.503 |
+| 0.6 | 0.017 | 0.045 | 0.094 | 0.492 |
+| 0.9 | 0.041 | 0.068 | 0.125 | 0.438 |
+
+**The plan expected this to fail and it largely does not.** Permutation
+inference assumes exchangeable units and spatial correlation breaks that,
+so over-rejection was the predicted outcome. At `ρ = 0` and `ρ = 0.6` the
+test is correctly sized and the mean p-value is 0.50, which is what
+exchangeability predicts. Only at `ρ = 0.9` does it over-reject, by about
+a third of the nominal level (6.8% against 5%, 12.5% against 10%, each
+roughly 2.6 standard errors above nominal at this replication count). The
+mechanism is the statistic: the post/pre RMSPE *ratio* scales the gap by
+the pre-period fit, so a unit with a larger error variance has a larger
+numerator and denominator both, and spatial dependence largely divides
+out. The docstring carries the table and the `ρ = 0.9` caveat.
+
+The binding limitation is granularity rather than size, and it is
+reported rather than left to be discovered: the smallest attainable
+p-value is `1/(1+R)`, so one treated unit with 18 donors cannot return
+below 0.053 and cannot reject at 5% whatever the effect.
+`min_attainable_p` is a field.
+
+**Spillovers on the excluded neighbours, and when not to believe them.**
+Screening removes neighbours because the policy reached them, which makes
+their gaps an estimand. In the pinned design two of the four neighbours
+are exactly reproducible from the clean pool and return the spillover to
+1e-10; the other two cannot be fitted at all, with a pre-period RMSPE
+larger by more than ten orders of magnitude, and their gaps are not
+spillovers. The unweighted mean over all four is consequently off: 0.545
+against a true 0.500 on Julia 1.13.2, and 0.589 on 1.10.12 — the two
+unfittable gaps follow the `randn` stream, which differs between minor
+versions, while the two fittable ones return `0.500000000000` on both.
+The test pins the exact pair and bounds the aggregate, rather than
+pinning a figure that is an artefact of the version. `SpilloverGaps` therefore reports `rmspe_pre` per
+unit and the documentation says to read it first; the function does not
+silently drop units, since which ones are credible is the user's
+judgement and not a threshold this package should pick.
+
+**No standard errors, deliberately.** `SyntheticControlResult` defines
+`coef`, `coefnames`, `nobs` and `residuals` but not `vcov` or
+`stderror`, and the test asserts that calling them raises `MethodError`.
+The weights are a constrained optimum rather than an estimator with a
+sampling distribution of known form. Four of the first twelve audit
+findings were a variance slot filled with a constant; declining to
+furnish a variance at all is the same lesson applied earlier.
+
+**`V = I` on standardised predictors, not a nested search.** Classic
+synthetic control searches over a predictor-weighting matrix `V` in an
+outer loop. That problem is documented as non-unique, so two equally good
+`V` give different weights and different counterfactuals — which would
+make the estimate irreproducible and the exactness gates above
+unstateable. The simplification is recorded in the docstring as a
+simplification, with the reason.
+
+**Suite.** 2,430 assertions with Makie and Turing installed and 2,395
+with both absent, zero failures either way, testset 35 contributing 197. A
+by-product of checking those figures: running the suite verbose on each
+version and diffing the per-testset counts shows **every one of the 51
+testsets reporting an identical count on Julia 1.13.2 and 1.10.12**. The
+six-assertion cross-version gap this repository has documented since the
+audit does not exist. It was a **working-tree** gap: testset 11b gates six
+assertions on `isfile(joinpath(@__DIR__, "..", "notebooks",
+"data", "columbus.csv"))`, so it reports 12 in the repository and 6 in a
+`src`-and-`test`-only copy. Dependency resolution was tested as a candidate
+and refuted — copying the local `Manifest.toml` across does not reproduce
+the 2,395. The CSV is tracked, so **CI has it and sees 2,395** with the
+extensions absent. The same `@__DIR__` dependence is why a verbose variant
+must be run from inside `test/`: run from a scratchpad it skips the block
+and undercounts by exactly six. `ROADMAP.md` records the correction.
+
+**Scope.** Item #15 now has three of four deliverables. Spatial
+shift-share exogeneity diagnostics remain: they are test statistics, so
+each owes a null-distribution Monte Carlo under this rule, and they are a
+separate pass for the same reason this one was.

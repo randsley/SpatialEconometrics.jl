@@ -12,7 +12,7 @@ sparse linear algebra, multiple dispatch and automatic differentiation.
 <div class="se-badges">
   <span class="se-badge se-badge-accent">v0.3.0</span>
   <span class="se-badge">23 submodules</span>
-  <span class="se-badge">2,233 tests</span>
+  <span class="se-badge">2,430 tests</span>
   <span class="se-badge">Julia 1.10+</span>
   <span class="se-badge">MIT</span>
 </div>

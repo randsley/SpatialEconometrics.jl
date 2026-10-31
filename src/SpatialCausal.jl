@@ -12,10 +12,17 @@ import ..SpatialUtils: check_design_rank, _print_coef_table
 import ..SpatialHAC: AbstractRobustVCOV, ConleySpatialHAC, ClusterRobustVCOV,
        DriscollKraayVCOV, vcov_conley, vcov_cluster, vcov_driscoll_kraay
 import ..SpatialWeights: band_weights, row_standardize
+import ..SpatialHAC: DistanceMetric, EuclideanDistance, HaversineDistance,
+       pairwise_distance
+import Random
+import Random: AbstractRNG
 
 export ExposureMap, exposure, ring_exposure,
        InterferenceReport, check_interference,
-       SpatialDiDResult, fit_spatial_did
+       SpatialDiDResult, fit_spatial_did,
+       SyntheticControlResult, fit_synthetic_control, donor_weights,
+       PlaceboTest, placebo_test,
+       SpilloverGaps, spillover_gaps
 
 # ═══════════════════════════════════════════════════════════════════════
 # Exposure Mapping
@@ -905,6 +912,1015 @@ function Base.show(io::IO, m::SpatialDiDResult{T}) where {T}
     println(io, "  Underlying regression")
     println(io, "  " * "─"^66)
     _print_coef_table(io, m.coefnames, m.coef, StatsAPI.stderror(m))
+end
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Synthetic Control
+# ═══════════════════════════════════════════════════════════════════════
+
+# ─── Projection onto the unit simplex ────────────────────────────────
+
+# Euclidean projection of `w` onto {w >= 0, sum(w) == 1}, in place.
+#
+# The projection subtracts one common threshold θ from every coordinate
+# and clips at zero, so the only unknown is θ. Sorting descending and
+# accumulating finds the size of the support, and θ follows from the
+# requirement that the surviving coordinates sum to one. O(J log J),
+# exact up to floating point, and no inner iteration — which matters
+# because the projected-gradient loop below calls it every step.
+function _project_simplex!(w::AbstractVector{T}) where {T<:AbstractFloat}
+    J = length(w)
+    J == 0 && throw(ArgumentError("_project_simplex!: empty weight vector."))
+    if J == 1
+        w[1] = one(T)
+        return w
+    end
+    u = sort(w; rev = true)
+    css = zero(T)
+    θ = zero(T)
+    @inbounds for j in 1:J
+        css += u[j]
+        tj = (css - one(T)) / T(j)
+        if u[j] - tj > zero(T)
+            θ = tj
+        else
+            break
+        end
+    end
+    @inbounds for j in 1:J
+        w[j] = max(w[j] - θ, zero(T))
+    end
+    return w
+end
+
+# ─── The penalised synthetic control program ─────────────────────────
+
+# minimise  (x1 - X0 w)'(x1 - X0 w) + λ Σ_j d_j w_j   s.t.  w ≥ 0, Σ w = 1
+#
+# Convex quadratic over the unit simplex, solved by accelerated projected
+# gradient (FISTA) with the exact Lipschitz constant L = 2 σ_max(X0'X0),
+# so the step size is derived rather than tuned. FISTA is not monotone, so
+# a plain projected-gradient polish follows; the returned point is then
+# certified by its own KKT gap rather than trusted.
+#
+# Returns `(w, objective, iterations, kkt_gap, kkt_violation)`. At an
+# optimum the gradient is equal across the support and no smaller off it,
+# so both diagnostics are ~0. They are carried into the result instead of
+# discarded: weights that did not converge look exactly like weights that
+# did, unless something is reported.
+function _solve_pensynth(X0::Matrix{T}, x1::Vector{T}, d::Vector{T}, λ::T;
+                         tol::T = T(1e-14),
+                         maxiter::Int = 50_000) where {T<:AbstractFloat}
+    J = size(X0, 2)
+    G = X0' * X0
+    b = X0' * x1
+    L = T(2) * opnorm(G)
+    L > zero(T) || (L = one(T))
+    step = one(T) / L
+
+    w  = fill(one(T) / T(J), J)
+    z  = copy(w)
+    wp = copy(w)
+    g  = similar(w)
+    tk = one(T)
+    iters = maxiter
+    fw = _pensynth_obj(G, b, d, λ, w, x1)
+
+    # The stopping rule is the KKT gap, not the step length. When the
+    # donor pool is larger than the predictor set — the usual case — `G`
+    # is rank deficient, the solution set is a face rather than a point,
+    # and the iterate keeps drifting along the flat directions long after
+    # the objective has stopped moving. A step-length test never fires
+    # there; the gradient condition is the quantity that actually
+    # characterises the optimum.
+    gscale = max(one(T), maximum(abs, b), λ * maximum(abs, d))
+    check_every = 10
+
+    for k in 1:maxiter
+        mul!(g, G, z)
+        @. g = T(2) * (g - b) + λ * d
+        @. wp = z - step * g
+        _project_simplex!(wp)
+
+        fp = _pensynth_obj(G, b, d, λ, wp, x1)
+        tk1 = T(0.5) * (one(T) + sqrt(one(T) + T(4) * tk^2))
+        @. z = wp + ((tk - one(T)) / tk1) * (wp - w)
+        # Adaptive restart (O'Donoghue & Candès). FISTA is not monotone,
+        # and on an ill-conditioned problem the momentum overshoots and
+        # oscillates; dropping it when the objective genuinely rises
+        # recovers the fast rate. The candidate is always accepted — it
+        # is the iterate sequence — and the threshold is relative, since
+        # near the optimum the objective moves by rounding alone and an
+        # exact comparison restarts forever.
+        if fp > fw * (one(T) + T(1e-12)) + T(1e-300)
+            tk1 = one(T)
+            copyto!(z, wp)
+        end
+        copyto!(w, wp)
+        fw = fp
+        tk = tk1
+
+        if k % check_every == 0 || k == maxiter
+            kg, kv = _pensynth_kkt(G, b, d, λ, w, g)
+            if max(kg, kv) <= tol * gscale
+                iters = k
+                break
+            end
+        end
+    end
+
+    # Monotone polish. Plain projected gradient from the final point
+    # cannot increase the objective, so this only ever helps.
+    for _ in 1:2_000
+        mul!(g, G, w)
+        @. g = T(2) * (g - b) + λ * d
+        @. wp = w - step * g
+        _project_simplex!(wp)
+        if _pensynth_obj(G, b, d, λ, wp, x1) > fw
+            break
+        end
+        if maximum(abs, wp .- w) < eps(T)
+            copyto!(w, wp)
+            break
+        end
+        copyto!(w, wp)
+        fw = _pensynth_obj(G, b, d, λ, w, x1)
+    end
+
+    sw = sum(w)
+    sw > zero(T) && (w ./= sw)
+
+    kkt, viol = _pensynth_kkt(G, b, d, λ, w, g)
+    f = sum(abs2, x1 .- X0 * w) + λ * dot(d, w)
+    return w, f, iters, kkt / gscale, viol / gscale
+end
+
+# Objective  ||x1 - X0 w||^2 + λ d'w, formed through `G` and `b` so the
+# inner loop does not touch `X0` every call.
+function _pensynth_obj(G::Matrix{T}, b::Vector{T}, d::Vector{T}, λ::T,
+                       w::Vector{T}, x1::Vector{T}) where {T<:AbstractFloat}
+    return dot(w, G, w) - T(2) * dot(b, w) + dot(x1, x1) + λ * dot(d, w)
+end
+
+# The optimality certificate. At a constrained optimum the gradient is
+# equal across the donors carrying weight and no smaller on those at
+# zero, so `(gap, violation)` both vanish. `g` is used as scratch.
+function _pensynth_kkt(G::Matrix{T}, b::Vector{T}, d::Vector{T}, λ::T,
+                       w::Vector{T}, g::Vector{T}) where {T<:AbstractFloat}
+    mul!(g, G, w)
+    @. g = T(2) * (g - b) + λ * d
+    sup = w .> T(1e-10)
+    any(sup) || return zero(T), zero(T)
+    gs_max = maximum(g[sup])
+    gap = gs_max - minimum(g[sup])
+    viol = all(sup) ? zero(T) : max(zero(T), gs_max - minimum(g[.!sup]))
+    return gap, viol
+end
+
+# ─── Treated set ─────────────────────────────────────────────────────
+
+function _treated_indices(treated::AbstractVector{Bool}, N::Int)
+    length(treated) == N || throw(DimensionMismatch(
+        "fit_synthetic_control: `treated` has $(length(treated)) entries but " *
+        "`Y` has $N rows."))
+    return findall(treated)
+end
+
+function _treated_indices(treated::AbstractVector{<:Real}, N::Int)
+    if length(treated) == N && all(v -> v == 0 || v == 1, treated)
+        return findall(!iszero, treated)
+    end
+    all(v -> v == round(v) && 1 <= v <= N, treated) || throw(ArgumentError(
+        "fit_synthetic_control: `treated` is neither a length-$N 0/1 " *
+        "indicator nor a vector of unit indices in 1:$N."))
+    idx = Int.(treated)
+    length(unique(idx)) == length(idx) || throw(ArgumentError(
+        "fit_synthetic_control: `treated` repeats a unit index."))
+    return idx
+end
+
+_treated_indices(treated::Integer, N::Int) =
+    (1 <= treated <= N) ? [Int(treated)] : throw(ArgumentError(
+        "fit_synthetic_control: treated unit $treated is outside 1:$N."))
+
+# ─── Donor pool ──────────────────────────────────────────────────────
+
+# Returns `(donors, excluded_neighbours)`. Treated units are never donors
+# under any rule: a unit cannot help build its own counterfactual, and
+# with several treated units one treated unit's post-period outcome is
+# contaminated by its own treatment.
+function _donor_pool(rule, treated::Vector{Int}, N::Int,
+                     W::Union{Nothing,AbstractSparseMatrix})
+    is_treated = falses(N)
+    is_treated[treated] .= true
+
+    if rule isa AbstractVector
+        cand = Int.(collect(rule))
+        all(j -> 1 <= j <= N, cand) || throw(ArgumentError(
+            "fit_synthetic_control: `donor_pool` contains an index outside 1:$N."))
+        donors = [j for j in unique(cand) if !is_treated[j]]
+        isempty(donors) && throw(ArgumentError(
+            "fit_synthetic_control: the explicit `donor_pool` is empty once " *
+            "treated units are removed."))
+        return donors, Int[]
+    end
+
+    if rule === :all
+        donors = [j for j in 1:N if !is_treated[j]]
+        isempty(donors) && throw(ArgumentError(
+            "fit_synthetic_control: every one of the $N units is treated, so " *
+            "there is no donor to build a counterfactual from. A synthetic " *
+            "control needs untreated units."))
+        return donors, Int[]
+    end
+
+    rule === :exclude_neighbours || throw(ArgumentError(
+        "fit_synthetic_control: `donor_pool` must be `:exclude_neighbours`, " *
+        "`:all`, or a vector of unit indices; got `$rule`."))
+
+    W === nothing && throw(ArgumentError(
+        "fit_synthetic_control: `donor_pool = :exclude_neighbours` needs `W` " *
+        "to know which units neighbour a treated one. Pass `W`, or set " *
+        "`donor_pool = :all` to keep every untreated unit — but note that a " *
+        "neighbour of a treated unit is contaminated by the spillover, so " *
+        "`:all` builds the counterfactual partly out of treated territory."))
+
+    # Reuses this module's own exposure mapping: with `D` the treated
+    # indicator, `E = W̃D` is positive exactly on the units that neighbour
+    # a treated one. No separate adjacency walk.
+    D = zeros(Float64, N)
+    D[treated] .= 1.0
+    em = exposure(D, W; order = 1, standardize = true)
+    E = view(em.E, :, 1)
+
+    excluded = [j for j in 1:N if !is_treated[j] && E[j] > 0.0]
+    donors   = [j for j in 1:N if !is_treated[j] && E[j] == 0.0]
+    isempty(donors) && throw(ArgumentError(
+        "fit_synthetic_control: every untreated unit neighbours a treated " *
+        "one, so `donor_pool = :exclude_neighbours` leaves no donors — " *
+        "$(length(excluded)) of $(N - length(treated)) untreated units were " *
+        "excluded. The design cannot separate the policy from its own " *
+        "spillover: either the treatment is too widespread for a synthetic " *
+        "control, or `W` is too dense."))
+    return donors, excluded
+end
+
+# ─── Predictors ──────────────────────────────────────────────────────
+
+# Builds the `K x n` predictor design, units in columns. The default
+# predictor set is the pre-treatment outcome path, which is the usual
+# choice and the one Abadie (2021) recommends when the outcome is
+# measured over a long pre-period.
+#
+# `standardize` scales each predictor row by its standard deviation across
+# the units used. Without it a predictor measured in large units dominates
+# the fit for no substantive reason — this is the role `V` plays in the
+# nested formulation, taken here as `V = I` on standardised predictors so
+# the program stays one convex problem with a reproducible solution.
+function _scm_predictors(::Type{T}, Y::AbstractMatrix, predictors, T0::Int,
+                         used::Vector{Int}, standardize::Bool) where {T}
+    X = if predictors === nothing
+        Matrix{T}(permutedims(T.(Y[used, 1:T0])))        # T0 x n
+    else
+        ndims(predictors) == 2 || throw(ArgumentError(
+            "fit_synthetic_control: `predictors` must be an N x K matrix."))
+        size(predictors, 1) == size(Y, 1) || throw(DimensionMismatch(
+            "fit_synthetic_control: `predictors` has " *
+            "$(size(predictors, 1)) rows but `Y` has $(size(Y, 1))."))
+        Matrix{T}(permutedims(T.(predictors[used, :])))  # K x n
+    end
+    scales = ones(T, size(X, 1))
+    if standardize
+        @inbounds for k in axes(X, 1)
+            s = std(view(X, k, :))
+            if isfinite(s) && s > zero(T)
+                scales[k] = s
+                X[k, :] ./= s
+            end
+        end
+    end
+    return X, scales
+end
+
+# ─── Penalty distances ───────────────────────────────────────────────
+
+# `d[q]` is the distance from treated unit `i` to donor `donors[q]`, which
+# the penalty multiplies. Abadie & L'Hour (2021) penalise pairwise
+# discrepancy to break the non-uniqueness of the unpenalised weights;
+# `:spatial` makes that discrepancy geographic, which is what this package
+# is for.
+function _penalty_distances(::Type{T}, metric::Symbol, i::Int,
+                            donors::Vector{Int}, coords, Xcols::Matrix{T},
+                            col_of::Dict{Int,Int},
+                            dmetric::DistanceMetric) where {T}
+    J = length(donors)
+    metric === :none && return zeros(T, J)
+
+    if metric === :spatial
+        coords === nothing && throw(ArgumentError(
+            "fit_synthetic_control: `penalty_metric = :spatial` needs " *
+            "`coords` (an N x 2 matrix) to measure distance from the treated " *
+            "unit to each donor. Pass `coords`, or use " *
+            "`penalty_metric = :covariate` to penalise predictor distance."))
+        size(coords, 2) == 2 || throw(ArgumentError(
+            "fit_synthetic_control: `coords` must have 2 columns."))
+        d = Vector{T}(undef, J)
+        @inbounds for (q, j) in enumerate(donors)
+            d[q] = T(pairwise_distance(dmetric, T(coords[i, 1]), T(coords[i, 2]),
+                                       T(coords[j, 1]), T(coords[j, 2])))
+        end
+        return d
+    end
+
+    if metric === :covariate
+        d = Vector{T}(undef, J)
+        xi = view(Xcols, :, col_of[i])
+        @inbounds for (q, j) in enumerate(donors)
+            d[q] = sqrt(sum(abs2, xi .- view(Xcols, :, col_of[j])))
+        end
+        return d
+    end
+
+    throw(ArgumentError(
+        "fit_synthetic_control: `penalty_metric` must be `:spatial`, " *
+        "`:covariate` or `:none`; got `$metric`."))
+end
+
+# ─── Result ──────────────────────────────────────────────────────────
+
+"""
+    SyntheticControlResult
+
+The fitted synthetic control for one or more treated units, returned by
+[`fit_synthetic_control`](@ref).
+
+# Fields
+- `weights`: `m x J` donor weights, one row per treated unit. Each row is
+  non-negative and sums to one.
+- `treated`, `donors`: unit indices. `donors` indexes the columns of
+  `weights`.
+- `excluded_neighbours`: untreated units kept out of the donor pool for
+  neighbouring a treated unit. Empty unless `donor_pool =
+  :exclude_neighbours` did some work.
+- `donor_pool_rule`: which rule produced `donors`.
+- `synthetic`, `gaps`: `m x T`. `gaps[k, t]` is treated unit `k`'s outcome
+  minus its synthetic control at `t`, so the pre-period entries measure
+  fit and the post-period entries are the estimated effect.
+- `att_path`: length-`T` mean gap across treated units.
+- `att`: mean of `att_path` over the post-treatment periods.
+- `rmspe_pre`, `rmspe_post`, `ratio`: per treated unit. `ratio` is
+  `rmspe_post / rmspe_pre`, the statistic the placebo test ranks.
+- `ratio_aggregate`: the same ratio formed from `att_path`.
+- `kkt_gap`, `kkt_violation`, `iterations`: solver diagnostics per treated
+  unit. The two KKT numbers certify the weights are at the constrained
+  optimum and should be ~0; see [`fit_synthetic_control`](@ref).
+
+# Why there is no `vcov`
+
+`coef`, `coefnames`, `nobs` and `residuals` are defined; `vcov` and
+`stderror` are **not**, and the omission is deliberate. The weights are
+the solution of a constrained optimisation, not an estimator with a
+sampling distribution of known form, and the gap is a difference between
+one observed path and one constructed path rather than a regression
+coefficient. There is no standard error to report. Inference is the
+permutation test in [`placebo_test`](@ref), with the caveats measured
+there.
+"""
+struct SyntheticControlResult{T<:AbstractFloat} <: StatsAPI.StatisticalModel
+    weights::Matrix{T}
+    treated::Vector{Int}
+    donors::Vector{Int}
+    excluded_neighbours::Vector{Int}
+    donor_pool_rule::Symbol
+    synthetic::Matrix{T}
+    gaps::Matrix{T}
+    att_path::Vector{T}
+    att::T
+    rmspe_pre::Vector{T}
+    rmspe_post::Vector{T}
+    ratio::Vector{T}
+    ratio_aggregate::T
+    kkt_gap::Vector{T}
+    kkt_violation::Vector{T}
+    iterations::Vector{Int}
+    penalty::T
+    penalty_metric::Symbol
+    standardized::Bool
+    n_predictors::Int
+    T0::Int
+    n_units::Int
+    n_periods::Int
+end
+
+"""
+    donor_weights(scm::SyntheticControlResult)
+
+The `m x J` matrix of donor weights, one row per treated unit. Column `q`
+corresponds to `scm.donors[q]`.
+"""
+donor_weights(scm::SyntheticControlResult) = scm.weights
+
+StatsAPI.coef(scm::SyntheticControlResult) = scm.weights
+StatsAPI.coefnames(scm::SyntheticControlResult) =
+    ["unit $(j)" for j in scm.donors]
+StatsAPI.nobs(scm::SyntheticControlResult) =
+    length(scm.treated) * scm.n_predictors
+StatsAPI.residuals(scm::SyntheticControlResult) =
+    scm.gaps[:, 1:scm.T0]
+
+# ─── The estimator ───────────────────────────────────────────────────
+
+"""
+    fit_synthetic_control(Y, treated, T0; W = nothing, coords = nothing,
+                          predictors = nothing, standardize = true,
+                          donor_pool = :exclude_neighbours,
+                          penalty = 0.0, penalty_metric = :spatial,
+                          metric = EuclideanDistance(),
+                          tol = 1e-12, maxiter = 20_000)
+
+Synthetic control for a comparative case study, with the donor pool
+screened for spillover contamination and the donor weights optionally
+penalised by distance.
+
+# The estimator
+
+For treated unit `i`, weights `w` over the donor pool solve
+
+```
+minimise   (x_i - X0 w)'(x_i - X0 w) + λ Σ_j d_ij w_j
+subject to w ≥ 0,  Σ_j w_j = 1
+```
+
+where `x_i` collects `i`'s pre-treatment predictors, `X0` the donors', and
+`d_ij` is the distance from `i` to donor `j`. The synthetic control is
+`Σ_j w_j y_jt` and the gap `y_it - Σ_j w_j y_jt` is the estimated effect
+after `T0`. With several treated units each gets its own weights and the
+`att` is the mean of their post-period gaps.
+
+The program is convex with a unique minimum whenever `X0` has full column
+rank on the active face, and it is solved to its own KKT certificate
+rather than to an iteration budget — see `kkt_gap` below.
+
+# Why the donor pool is screened
+
+This is the part that makes the method spatial, and it is not cosmetic. If
+the policy spills over, the treated unit's neighbours are themselves
+affected, and the unpenalised fit will happily build the counterfactual
+out of them because they track the treated unit best in the pre-period.
+The spillover then lands inside the comparison and the gap understates the
+effect. `donor_pool = :exclude_neighbours` (the default) removes any
+untreated unit adjacent to a treated one under `W`, reusing
+[`exposure`](@ref) to find them, and records which units went and why.
+
+`donor_pool = :all` keeps everyone, which is the conventional choice and
+is wrong whenever the spillover is real. The cost is measured in
+`examples/24_synthetic_control.jl` and pinned in the test suite.
+
+# Why the penalty
+
+The unpenalised weights are frequently **not unique**, especially when the
+donor pool is larger than the pre-period is long — the usual case. Several
+weight vectors then fit the pre-period identically and imply different
+counterfactuals, and which one a solver returns is an accident of the
+algorithm. Abadie & L'Hour (2021) break the tie with a penalty on pairwise
+discrepancy between the treated unit and each donor it draws on.
+
+`penalty_metric = :spatial` makes that discrepancy geographic distance
+(needs `coords`; `metric = HaversineDistance()` for lon/lat), `:covariate`
+uses standardised predictor distance, `:none` sets `λ = 0`. Raising `λ`
+moves the solution toward the single nearest donor; `λ = 0` is the
+unpenalised program.
+
+# Arguments
+- `Y`: `N x T` outcomes, units by periods — the same layout as
+  [`fit_spatial_did`](@ref).
+- `treated`: a unit index, a vector of indices, or a length-`N` 0/1 or
+  `Bool` indicator.
+- `T0`: the last pre-treatment period. Periods `T0+1:T` are the
+  post-treatment window.
+
+# Keywords
+- `W`: `N x N` sparse weights, required by the default `donor_pool`.
+- `coords`: `N x 2`, required by `penalty_metric = :spatial`.
+- `predictors`: optional `N x K` pre-treatment predictors. The default is
+  the pre-period outcome path, `Y[:, 1:T0]`.
+- `standardize`: scale each predictor to unit variance before fitting.
+  This is `V = I` on standardised predictors, taken deliberately in place
+  of a nested search over `V`: the nested form is non-unique, so two
+  equally good `V` give different weights and the result stops being
+  reproducible.
+- `penalty`, `penalty_metric`, `metric`: as above.
+- `tol`, `maxiter`: solver controls.
+
+# Fit diagnostics, and reading them honestly
+
+`rmspe_pre` is the pre-period root mean squared gap. A synthetic control
+with a poor pre-period fit says nothing about the post period, and
+`ratio = rmspe_post / rmspe_pre` is the statistic to look at rather than
+the gap alone — a large gap on a badly fitting unit is not evidence.
+[`placebo_test`](@ref) ranks exactly this ratio.
+
+`kkt_gap` and `kkt_violation` are the solution's own optimality
+certificate: at the constrained optimum the objective gradient is equal
+across the donors with positive weight and no smaller on those at zero.
+Both should be at the `1e-10` level or below. They are reported because
+unconverged weights are otherwise indistinguishable from converged ones.
+
+# Returns
+
+A [`SyntheticControlResult`](@ref). Note that it carries no `vcov` — see
+that type's docstring for why, and [`placebo_test`](@ref) for what to use
+instead.
+
+# Example
+
+```julia
+W = knn_weights(coords, 4)
+scm = fit_synthetic_control(Y, 7, 20; W = W, coords = coords,
+                            penalty = 0.1)
+scm.att                       # mean post-period gap
+pt = placebo_test(scm, Y)     # permutation inference
+spillover_gaps(scm, Y; W = W, coords = coords)
+```
+
+# References
+- Abadie, A., Diamond, A. & Hainmueller, J. (2010). Synthetic control
+  methods for comparative case studies. *JASA*, 105(490), 493-505.
+- Abadie, A. & L'Hour, J. (2021). A penalized synthetic control estimator
+  for disaggregated data. *JASA*, 116(536), 1817-1834.
+- Abadie, A. (2021). Using synthetic controls: feasibility, data
+  requirements, and methodological aspects. *JEL*, 59(2), 391-425.
+"""
+function fit_synthetic_control(Y::AbstractMatrix, treated, T0::Int;
+                               W::Union{Nothing,AbstractSparseMatrix} = nothing,
+                               coords = nothing,
+                               predictors = nothing,
+                               standardize::Bool = true,
+                               donor_pool = :exclude_neighbours,
+                               penalty::Real = 0.0,
+                               penalty_metric::Symbol = :spatial,
+                               metric::DistanceMetric = EuclideanDistance(),
+                               tol::Real = 1e-14,
+                               maxiter::Int = 50_000)
+    T = float(eltype(Y)) <: AbstractFloat ? float(eltype(Y)) : Float64
+    N, T_per = size(Y)
+    N >= 2 || throw(ArgumentError(
+        "fit_synthetic_control: need at least 2 units, got $N."))
+    1 <= T0 < T_per || throw(ArgumentError(
+        "fit_synthetic_control: `T0` must satisfy 1 <= T0 < T = $T_per, got " *
+        "$T0. There must be at least one post-treatment period."))
+
+    tr = _treated_indices(treated, N)
+    isempty(tr) && throw(ArgumentError(
+        "fit_synthetic_control: no treated unit. `treated` selected none."))
+    m = length(tr)
+
+    λ = T(penalty)
+    λ >= zero(T) || throw(ArgumentError(
+        "fit_synthetic_control: `penalty` must be non-negative, got $penalty."))
+    pmetric = (λ == zero(T)) ? :none : penalty_metric
+
+    donors, excluded = _donor_pool(donor_pool, tr, N, W)
+    J = length(donors)
+    rule = donor_pool isa AbstractVector ? :explicit : donor_pool
+
+    # One predictor design over treated units and donors together, so the
+    # standardisation is common to both sides of the comparison.
+    used = vcat(tr, donors)
+    Xall, _ = _scm_predictors(T, Y, predictors, T0, used, standardize)
+    K = size(Xall, 1)
+    col_of = Dict{Int,Int}(u => q for (q, u) in enumerate(used))
+    X0 = Xall[:, (m + 1):(m + J)]
+
+    Yf = T.(Y)
+    Yd = Yf[donors, :]
+
+    weights = Matrix{T}(undef, m, J)
+    synthetic = Matrix{T}(undef, m, T_per)
+    gaps = Matrix{T}(undef, m, T_per)
+    kkt = Vector{T}(undef, m)
+    viol = Vector{T}(undef, m)
+    iters = Vector{Int}(undef, m)
+
+    for (k, i) in enumerate(tr)
+        x1 = Vector{T}(Xall[:, col_of[i]])
+        d = _penalty_distances(T, pmetric, i, donors, coords, Xall, col_of, metric)
+        w, _, it, kg, kv = _solve_pensynth(Matrix{T}(X0), x1, d, λ;
+                                           tol = T(tol), maxiter = maxiter)
+        weights[k, :] .= w
+        syn = Yd' * w                       # length T_per
+        synthetic[k, :] .= syn
+        gaps[k, :] .= view(Yf, i, :) .- syn
+        kkt[k] = kg
+        viol[k] = kv
+        iters[k] = it
+    end
+
+    att_path = vec(mean(gaps; dims = 1))
+    post = (T0 + 1):T_per
+    att = mean(view(att_path, post))
+
+    rmspe_pre = T[sqrt(mean(abs2, view(gaps, k, 1:T0))) for k in 1:m]
+    rmspe_post = T[sqrt(mean(abs2, view(gaps, k, post))) for k in 1:m]
+    ratio = T[rmspe_pre[k] > zero(T) ? rmspe_post[k] / rmspe_pre[k] : T(Inf)
+              for k in 1:m]
+    pre_agg = sqrt(mean(abs2, view(att_path, 1:T0)))
+    post_agg = sqrt(mean(abs2, view(att_path, post)))
+    ratio_agg = pre_agg > zero(T) ? post_agg / pre_agg : T(Inf)
+
+    return SyntheticControlResult{T}(
+        weights, tr, donors, excluded, rule, synthetic, gaps, att_path, att,
+        rmspe_pre, rmspe_post, ratio, ratio_agg, kkt, viol, iters,
+        λ, pmetric, standardize, K, T0, N, T_per)
+end
+
+function Base.show(io::IO, scm::SyntheticControlResult{T}) where {T}
+    m = length(scm.treated)
+    println(io, "Synthetic Control", m == 1 ? "" : " ($m treated units)")
+    println(io, "═"^68)
+    @printf(io, "  N = %d units, T = %d periods (T0 = %d, %d post)\n",
+            scm.n_units, scm.n_periods, scm.T0, scm.n_periods - scm.T0)
+    @printf(io, "  treated: %s\n",
+            m <= 8 ? string(scm.treated) : "$m units")
+    @printf(io, "  donor pool: %d units (%s)\n", length(scm.donors),
+            scm.donor_pool_rule === :exclude_neighbours ?
+                "$(length(scm.excluded_neighbours)) neighbours excluded" :
+                String(scm.donor_pool_rule))
+    if scm.penalty > zero(T)
+        @printf(io, "  penalty: λ = %.4g on %s distance\n",
+                scm.penalty, String(scm.penalty_metric))
+    else
+        println(io, "  penalty: none (λ = 0, weights may not be unique)")
+    end
+    println(io, "")
+    @printf(io, "  ATT (mean post-period gap) = %.6f\n", scm.att)
+    @printf(io, "  pre-period RMSPE  %.6g   post/pre ratio  %.4g\n",
+            mean(scm.rmspe_pre), scm.ratio_aggregate)
+    mk = maximum(scm.kkt_gap)
+    mv = maximum(scm.kkt_violation)
+    @printf(io, "  KKT gap %.2e, violation %.2e, %d-%d iterations%s\n",
+            mk, mv, minimum(scm.iterations), maximum(scm.iterations),
+            (mk > 1e-6 || mv > 1e-6) ? "  ⚠ NOT converged" : "")
+    println(io, "  no standard errors by construction — see `placebo_test`")
+
+    println(io, "")
+    println(io, "  Donor weights" * (m == 1 ? "" : " (treated unit 1)"))
+    println(io, "  " * "─"^66)
+    w = view(scm.weights, 1, :)
+    ord = sortperm(collect(w); rev = true)
+    shown = 0
+    for q in ord
+        w[q] > T(1e-6) || break
+        @printf(io, "  %-20s %10.6f\n", "unit $(scm.donors[q])", w[q])
+        shown += 1
+        shown >= 10 && break
+    end
+    nz = count(>(T(1e-6)), w)
+    nz > shown && @printf(io, "  %-20s %10d more\n", "", nz - shown)
+    @printf(io, "  %-20s %10.6f  (%d of %d donors)\n", "total", sum(w), nz,
+            length(scm.donors))
+end
+
+# ─── Placebo inference ───────────────────────────────────────────────
+
+"""
+    PlaceboTest
+
+The result of [`placebo_test`](@ref): a permutation p-value for a
+synthetic control, with the information needed to read it.
+
+# Fields
+- `p_value`: `(1 + #{ratio_placebo >= ratio_observed}) / (1 + R)`.
+- `ratio_observed`: the fitted units' post/pre RMSPE ratio.
+- `ratio_placebo`: the `R` placebo ratios.
+- `n_placebo`: `R`, the number of placebo assignments used.
+- `exact`: `true` if every possible assignment was enumerated, `false` if
+  they were sampled. An exact permutation p-value and a sampled one are
+  not the same object, so which happened is recorded rather than implied.
+- `n_possible`: the number of distinct assignments, `binomial(J, m)`, as a
+  `Float64` because it overflows `Int` quickly.
+- `min_attainable_p`: `1 / (1 + R)`. The smallest p-value the design can
+  produce, whatever the effect size.
+- `m_treated`, `n_donors`: the assignment's shape.
+"""
+struct PlaceboTest{T<:AbstractFloat}
+    p_value::T
+    ratio_observed::T
+    ratio_placebo::Vector{T}
+    n_placebo::Int
+    exact::Bool
+    n_possible::Float64
+    min_attainable_p::T
+    m_treated::Int
+    n_donors::Int
+end
+
+# Number of m-subsets of J, as a Float64 so it cannot overflow.
+function _n_subsets(J::Int, m::Int)
+    (m < 0 || m > J) && return 0.0
+    r = 1.0
+    for q in 1:m
+        r *= (J - m + q) / q
+        isfinite(r) || return Inf
+    end
+    return r
+end
+
+# All m-subsets of `pool`, in lexicographic order.
+function _enumerate_subsets(pool::Vector{Int}, m::Int)
+    out = Vector{Vector{Int}}()
+    J = length(pool)
+    idx = collect(1:m)
+    while true
+        push!(out, pool[idx])
+        k = m
+        while k >= 1 && idx[k] == J - m + k
+            k -= 1
+        end
+        k == 0 && break
+        idx[k] += 1
+        for q in (k + 1):m
+            idx[q] = idx[q - 1] + 1
+        end
+    end
+    return out
+end
+
+"""
+    placebo_test(scm::SyntheticControlResult, Y; n_placebo = 1000,
+                 rng = Random.default_rng(), kwargs...)
+
+Permutation inference for a synthetic control: reassign the treatment to
+units that were never treated, refit, and ask how unusual the real
+assignment's post/pre RMSPE ratio is.
+
+The statistic is `ratio = rmspe_post / rmspe_pre`, aggregated across the
+treated units, and the p-value is
+
+```
+p = (1 + #{ratio_placebo >= ratio_observed}) / (1 + R)
+```
+
+over `R` placebo assignments. Dividing by the pre-period fit is what makes
+placebo ratios comparable across units: a donor that the synthetic control
+tracks badly before treatment will show a large post-period gap for
+reasons that have nothing to do with any policy.
+
+`Y` must be the same outcome matrix the fit used. Remaining keyword
+arguments are forwarded to [`fit_synthetic_control`](@ref) and must match
+the original call — `W`, `coords`, `predictors`, `penalty` and so on —
+since a placebo fitted under different settings is not a comparison.
+
+# Assignments: enumerated or sampled
+
+With `J` clean donors and `m` treated units there are `binomial(J, m)`
+possible assignments. All of them are enumerated when that number is at
+most `n_placebo`, giving an exact permutation test; otherwise
+`n_placebo` assignments are sampled without replacement using `rng`. The
+result records which happened in its `exact` field.
+
+Placebo units are drawn from the donor pool only. Units excluded for
+neighbouring a treated unit are not eligible: they are contaminated by the
+spillover, so a "placebo" there is not a null.
+
+!!! warning "What this p-value cannot do"
+    The smallest attainable value is `1 / (1 + R)`, and when assignments
+    are enumerated `R = binomial(J, m)` may be small. A single treated
+    unit with 18 donors cannot produce a p-value below 0.053 however large
+    the effect, so it cannot reject at the 5% level at all. The bound is
+    reported as `min_attainable_p` rather than left for a user to
+    rediscover.
+
+!!! warning "Permutation inference assumes exchangeable units"
+    The test treats any unit as equally likely to have been treated.
+    Spatial correlation breaks that, and the rejection rate under the null
+    is measured rather than assumed — see the table below and
+    `docs/AUDIT.md`.
+
+# Measured size under the null
+
+Null distribution measured, not assumed: no treatment effect anywhere, a
+7x7 rook lattice (`N = 49`), `T = 16` with `T0 = 12`, an interior treated
+unit so 4 neighbours are excluded, leaving 44 clean donors. The
+permutation is therefore exact over 44 assignments and the smallest
+attainable p-value is `1/45 = 0.0222`. Errors generated as
+`(I - rho*W)^{-1}e`, 1,000 replications per row.
+
+| `rho` | `p <= 0.022` | `p <= 0.05` | `p <= 0.10` | mean `p` |
+|---|---|---|---|---|
+| 0.0 | 0.023 | 0.046 | 0.095 | 0.503 |
+| 0.6 | 0.017 | 0.045 | 0.094 | 0.492 |
+| 0.9 | 0.041 | 0.068 | 0.125 | 0.438 |
+
+The test is correctly sized with no spatial correlation and with
+moderate correlation — a mean p-value of 0.50 is what exchangeability
+predicts. At `rho = 0.9` it over-rejects by roughly a third of the
+nominal level (6.8% against 5%, 12.5% against 10%, both about 2.6
+standard errors above nominal at 1,000 replications). Treat a p-value
+near the threshold as uninformative when the outcome is strongly
+spatially correlated.
+
+The ratio statistic is what keeps the distortion this small: scaling the
+post-period gap by the pre-period fit makes units comparable even when
+their error variances are not, so spatial dependence largely divides
+out.
+
+# Returns
+
+A [`PlaceboTest`](@ref).
+"""
+function placebo_test(scm::SyntheticControlResult{T}, Y::AbstractMatrix;
+                      n_placebo::Int = 1000,
+                      rng::AbstractRNG = Random.default_rng(),
+                      kwargs...) where {T}
+    size(Y) == (scm.n_units, scm.n_periods) || throw(DimensionMismatch(
+        "placebo_test: `Y` is $(size(Y)) but the fit used " *
+        "$((scm.n_units, scm.n_periods)). Pass the same outcome matrix."))
+    n_placebo >= 1 || throw(ArgumentError(
+        "placebo_test: `n_placebo` must be at least 1, got $n_placebo."))
+
+    m = length(scm.treated)
+    pool = scm.donors
+    J = length(pool)
+    J > m || throw(ArgumentError(
+        "placebo_test: the donor pool has $J units and $m were treated, so " *
+        "there is no placebo assignment to compare against. A permutation " *
+        "test needs more clean donors than treated units."))
+
+    npos = _n_subsets(J, m)
+    exact = npos <= n_placebo
+    assignments = if exact
+        _enumerate_subsets(pool, m)
+    else
+        seen = Set{Vector{Int}}()
+        out = Vector{Vector{Int}}()
+        tries = 0
+        maxtries = 200 * n_placebo
+        while length(out) < n_placebo && tries < maxtries
+            tries += 1
+            s = sort(pool[Random.randperm(rng, J)[1:m]])
+            if !(s in seen)
+                push!(seen, s)
+                push!(out, s)
+            end
+        end
+        out
+    end
+
+    ratios = Vector{T}(undef, length(assignments))
+    for (r, set) in enumerate(assignments)
+        # The placebo pool is the real donor pool minus this placebo's own
+        # units, so a placebo never builds its counterfactual from itself.
+        sub = [j for j in pool if !(j in set)]
+        pscm = fit_synthetic_control(Y, set, scm.T0;
+                                     donor_pool = sub,
+                                     standardize = scm.standardized,
+                                     penalty = scm.penalty,
+                                     penalty_metric = scm.penalty_metric,
+                                     kwargs...)
+        ratios[r] = pscm.ratio_aggregate
+    end
+
+    R = length(ratios)
+    obs = scm.ratio_aggregate
+    p = T((1 + count(>=(obs), ratios)) / (1 + R))
+    return PlaceboTest{T}(p, obs, ratios, R, exact, npos,
+                          T(1 / (1 + R)), m, J)
+end
+
+function Base.show(io::IO, pt::PlaceboTest{T}) where {T}
+    println(io, "Placebo (permutation) test for a synthetic control")
+    println(io, "═"^68)
+    @printf(io, "  statistic: post/pre RMSPE ratio = %.4f\n", pt.ratio_observed)
+    @printf(io, "  assignments: %d %s", pt.n_placebo,
+            pt.exact ? "(all of them — exact permutation test)\n" :
+                       "sampled")
+    pt.exact || @printf(io, " of %.3g possible\n", pt.n_possible)
+    @printf(io, "  %d treated unit%s drawn from %d clean donors\n",
+            pt.m_treated, pt.m_treated == 1 ? "" : "s", pt.n_donors)
+    println(io, "")
+    @printf(io, "  p = %.4f   (smallest attainable: %.4f)\n",
+            pt.p_value, pt.min_attainable_p)
+    if pt.min_attainable_p > T(0.05)
+        println(io, "  ⚠ the donor pool is too small to reject at the 5% level")
+    end
+    q = _quantile_sorted(sort(pt.ratio_placebo), (0.5, 0.9, 0.95))
+    @printf(io, "  placebo ratios: median %.3f, 90th %.3f, 95th %.3f\n",
+            q[1], q[2], q[3])
+end
+
+# Linear-interpolated quantiles of an already sorted vector. Local so the
+# module does not depend on Statistics' quantile for three numbers in a
+# show method.
+function _quantile_sorted(v::AbstractVector{T}, ps) where {T}
+    n = length(v)
+    n == 0 && return map(_ -> T(NaN), ps)
+    return map(ps) do p
+        h = (n - 1) * T(p) + one(T)
+        lo = clamp(floor(Int, h), 1, n)
+        hi = clamp(lo + 1, 1, n)
+        v[lo] + (h - lo) * (v[hi] - v[lo])
+    end
+end
+
+# ─── Spillover gaps on the excluded neighbours ───────────────────────
+
+"""
+    SpilloverGaps
+
+What the policy did to the treated units' neighbours, returned by
+[`spillover_gaps`](@ref).
+
+# Fields
+- `units`: the neighbour units, in the order of `gaps`' rows.
+- `gaps`: `k x T`, each row a neighbour's outcome minus its synthetic
+  control built from the clean donor pool.
+- `spillover_path`: length-`T` mean gap across neighbours.
+- `spillover`: mean of `spillover_path` over the post-treatment periods —
+  the estimated spillover effect.
+- `rmspe_pre`: per-neighbour pre-period fit, to be read before the
+  spillover is believed.
+- `donors`: the donor pool used, the same clean pool as the main fit.
+"""
+struct SpilloverGaps{T<:AbstractFloat}
+    units::Vector{Int}
+    gaps::Matrix{T}
+    spillover_path::Vector{T}
+    spillover::T
+    rmspe_pre::Vector{T}
+    donors::Vector{Int}
+end
+
+"""
+    spillover_gaps(scm::SyntheticControlResult, Y; kwargs...)
+
+Estimate the spillover onto the units the donor pool excluded.
+
+[`fit_synthetic_control`](@ref) with `donor_pool = :exclude_neighbours`
+drops every untreated unit adjacent to a treated one, because the
+spillover contaminates them. That contamination is itself the quantity a
+spatial policy evaluation wants. This function synthesises each excluded
+neighbour from the **same clean donor pool** and reads its gap as the
+estimated spillover — the synthetic control counterpart of
+`att_spill_control` in [`fit_spatial_did`](@ref).
+
+The neighbour is not treated, so under no spillover its gap should be
+noise around zero; a systematic post-period gap is the spillover. The same
+caution applies as for the main fit: check `rmspe_pre` before believing a
+gap, and use [`placebo_test`](@ref) on the main fit to calibrate what gap
+sizes arise by chance.
+
+`Y` must be the outcome matrix the fit used. Remaining keyword arguments
+are forwarded to [`fit_synthetic_control`](@ref) and should match the
+original call.
+
+Errors if the fit excluded no neighbours — there is then nothing to
+report, and returning an empty result would read as "no spillover" rather
+than "not asked".
+"""
+function spillover_gaps(scm::SyntheticControlResult{T}, Y::AbstractMatrix;
+                        kwargs...) where {T}
+    size(Y) == (scm.n_units, scm.n_periods) || throw(DimensionMismatch(
+        "spillover_gaps: `Y` is $(size(Y)) but the fit used " *
+        "$((scm.n_units, scm.n_periods)). Pass the same outcome matrix."))
+    isempty(scm.excluded_neighbours) && throw(ArgumentError(
+        "spillover_gaps: the fit excluded no neighbours, so there is no " *
+        "spillover to estimate. This needs " *
+        "`donor_pool = :exclude_neighbours` (the default) and at least one " *
+        "untreated unit adjacent to a treated one under `W`."))
+
+    units = scm.excluded_neighbours
+    k = length(units)
+    gaps = Matrix{T}(undef, k, scm.n_periods)
+    rmspe_pre = Vector{T}(undef, k)
+
+    for (q, u) in enumerate(units)
+        s = fit_synthetic_control(Y, u, scm.T0;
+                                  donor_pool = scm.donors,
+                                  standardize = scm.standardized,
+                                  penalty = scm.penalty,
+                                  penalty_metric = scm.penalty_metric,
+                                  kwargs...)
+        gaps[q, :] .= view(s.gaps, 1, :)
+        rmspe_pre[q] = s.rmspe_pre[1]
+    end
+
+    path = vec(mean(gaps; dims = 1))
+    post = (scm.T0 + 1):scm.n_periods
+    return SpilloverGaps{T}(units, gaps, path, mean(view(path, post)),
+                            rmspe_pre, scm.donors)
+end
+
+function Base.show(io::IO, sg::SpilloverGaps{T}) where {T}
+    println(io, "Spillover onto excluded neighbours")
+    println(io, "═"^68)
+    @printf(io, "  %d neighbour unit%s, synthesised from %d clean donors\n",
+            length(sg.units), length(sg.units) == 1 ? "" : "s",
+            length(sg.donors))
+    @printf(io, "  estimated spillover (mean post-period gap) = %.6f\n",
+            sg.spillover)
+    @printf(io, "  mean pre-period RMSPE = %.6g\n", mean(sg.rmspe_pre))
 end
 
 end # module

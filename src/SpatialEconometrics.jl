@@ -82,7 +82,7 @@ import .SpatialRegimeModels: SpatialRegimeModel, fit_spatial_regime, ExogenousRe
 import .SpatialSimulation: SpatialDGP, SAR_DGP, SEM_DGP, SDM_DGP, SLX_DGP, SAC_DGP, SDEM_DGP, simulate_spatial, MonteCarloConfig, monte_carlo_spatial, MonteCarloResult, PowerAnalysisResult, power_analysis
 import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to_markdown, regression_table
 import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianSpatialProbitModel, fit_bayesian_spatial_probit, SpatialOrderedProbitModel, fit_spatial_ordered_probit, SpatialProbitEffects, marginal_effects
-import .SpatialCausal: ExposureMap, exposure, ring_exposure, InterferenceReport, check_interference, SpatialDiDResult, fit_spatial_did
+import .SpatialCausal: ExposureMap, exposure, ring_exposure, InterferenceReport, check_interference, SpatialDiDResult, fit_spatial_did, SyntheticControlResult, fit_synthetic_control, donor_weights, PlaceboTest, placebo_test, SpilloverGaps, spillover_gaps
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf, STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups
 
 """
@@ -516,6 +516,9 @@ export
     ExposureMap, exposure, ring_exposure,
     InterferenceReport, check_interference,
     SpatialDiDResult, fit_spatial_did,
+    SyntheticControlResult, fit_synthetic_control, donor_weights,
+    PlaceboTest, placebo_test,
+    SpilloverGaps, spillover_gaps,
     # Extension entry points (methods live in ext/)
     AbstractBayesianSpatialResult,
     bayesian_sar, bayesian_sdm, bayesian_sem,

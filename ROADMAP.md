@@ -2,14 +2,16 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 23 submodules, 2,233 test assertions in 50 top-level testsets on Julia
-> 1.13.2 with both package extensions installed and 2,194 on Julia 1.10.12
-> without them, 23 examples, 12 notebooks, 2 package extensions, CI/CD and
+> 23 submodules, 2,430 test assertions in 51 top-level testsets with both
+> package extensions installed and 2,395 without them — the same counts on
+> Julia 1.13.2 and 1.10.12, since the difference is the extensions and not
+> the version. 24 examples, 12 notebooks, 2 package extensions, CI/CD and
 > 50 Documenter.jl pages. **Phases 4, 5, 6 and 6B are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A is underway:** item #15's
 > exposure mapping and spatial difference-in-differences landed on
-> 2026-10-30, leaving its synthetic control and shift-share rows plus item
+> 2026-10-30 and its spatial synthetic control on 2026-10-31, leaving its
+> shift-share row plus item
 > #11 (Networks). Tier 3 is otherwise untouched, and the correctness audit
 > in `docs/AUDIT.md` is closed — findings 1–25, with 29–32 added afterwards
 > from the benchmark suite and Phase 6C.
@@ -276,15 +278,17 @@ design.
 | Feature | Description | Reference |
 |---|---|---|
 | ~~Spatial difference-in-differences~~ — **delivered**, see `fit_spatial_did` | Direct ATT and spillover ATT through an exposure mapping on `D` and `WD`, two-period and staggered. Four effects rather than three: the spillover onto the treated and onto the controls are evaluated at different exposure means and are not interchangeable | Delgado & Florax (2015); Chagas et al. (2016) |
-| Spatial synthetic control | Donor-weight optimisation penalised by geographic or economic distance, so the synthetic unit is not assembled from the treated unit's own neighbours | Cerqua et al. (2022) |
+| ~~Spatial synthetic control~~ — **delivered**, see `fit_synthetic_control` | Donor-weight optimisation on the unit simplex, penalised by geographic or economic distance, with the donor pool screened so the synthetic unit is not assembled from the treated unit's own neighbours. Permutation inference, and the neighbours' own gaps read back as an estimated spillover | Abadie, Diamond & Hainmueller (2010); Abadie & L'Hour (2021) |
 | Spatial shift-share diagnostics | Exogeneity and spatial-correlation tests for local exposure shares and regional industry weights | Borusyak et al. (2022); Adao et al. (2019) |
 | ~~Exposure mapping utilities~~ — **delivered**, see `exposure` / `ring_exposure` / `check_interference` | `D`, `W^k D`, ring and distance-band exposures. The assumption check is the substantive part: `δ` is identified only by controls that differ in exposure, which is a property of the design and `W` alone and so is checkable before any fit | — |
 
-**Status:** 🟡 **Half delivered, 2026-10-30** — exposure mapping and
-spatial DiD are in `src/SpatialCausal.jl` (910 lines). Docs:
-`docs/src/models/causal.md`. Example: `examples/23_spatial_causal.jl`.
-Tests: 178 assertions in testset 34. Ledger: `docs/AUDIT.md`, under the
-standing rule.
+**Status:** 🟡 **Three of four delivered** — exposure mapping and
+spatial DiD on 2026-10-30, spatial synthetic control on 2026-10-31, all in
+`src/SpatialCausal.jl` (1,920 lines). Docs:
+`docs/src/models/causal.md`. Examples: `examples/23_spatial_causal.jl`,
+`examples/24_synthetic_control.jl`. Tests: 162 assertions in testset 34 and
+197 in testset 35. Ledger: `docs/AUDIT.md`, under the standing rule.
+Only the shift-share diagnostics remain.
 
 **Delivered API:**
 
@@ -294,6 +298,12 @@ ring_exposure(D, coords, d_min, d_max)          -> ExposureMap
 check_interference(em)                          -> InterferenceReport
 fit_spatial_did(y, treat, W; X, vcov, coords, dist_cutoff, order)
     -> SpatialDiDResult
+
+fit_synthetic_control(Y, treated, T0; W, coords, predictors, donor_pool,
+                      penalty, penalty_metric, metric)
+    -> SyntheticControlResult
+placebo_test(scm, Y; n_placebo, rng, kwargs...)  -> PlaceboTest
+spillover_gaps(scm, Y; kwargs...)                -> SpilloverGaps
 ```
 
 `treat` is a length-`N` indicator for two periods or an `N × T` path for a
@@ -328,12 +338,54 @@ contiguous because cohort identity is then nearly collinear with the
 exposure column. All eight figures are pinned in testset 34e so the
 docstring's warning cannot drift from the code.
 
-**Not delivered, deliberately:** spatial synthetic control (a constrained
-optimisation rather than a regression) and the shift-share exogeneity
-diagnostics (test statistics, which each owe a null-distribution Monte
-Carlo under the standing rule). Bundling three estimator families into one
-commit is the shape that produced audit findings 13–16, so they are a
-separate pass.
+**Synthetic control, delivered 2026-10-31.** `treated` takes one unit or
+many; each gets its own weights and the ATT is the mean of their
+post-period gaps. `V = I` on standardised predictors rather than a nested
+search over `V`, deliberately: the outer problem is non-unique, so two
+equally good `V` imply different counterfactuals and the estimate stops
+being reproducible.
+
+**Verification is the exact optimum, not a tolerance.** The weights solve a
+convex QP over the unit simplex, and for a small donor pool the optimum is
+computable independently by enumerating all `2^J − 1` supports. Over 500
+random problems with a unique optimum the objective agrees to `3.55e-15`
+and the weights to `1.31e-14`, with a relative KKT gap of `9.68e-15` and no
+violation. Where there are more donors than pre-periods the solution set is
+a face, so only the objective is defined — that non-uniqueness is the
+argument for the penalty rather than a defect.
+
+**Donor-pool contamination turned out to be an identity.** The spillover
+falls in the post-treatment periods only, so the weights — fitted
+pre-period — are unchanged by it to `0.00e+00`. Hence
+`att(contaminated) = att(clean) − Σ w_j · E_j · spillover` exactly, pinned to
+`1e-12` at four spillover sizes. **And the contaminated fit has the
+*better* pre-period fit** — 0.045 against 0.097 in the example, while
+carrying 90.1% of its weight on treated territory and being wrong by
+−0.433 against the screened fit's +0.005. A pre-period fit diagnostic
+cannot detect this failure, because the contamination is post-treatment by
+construction.
+
+**The placebo test is better behaved than the plan assumed.** Permutation
+inference needs exchangeable units and spatial correlation breaks that, so
+over-rejection was expected. Measured over 1,000 replications with no
+effect anywhere, it is correctly sized at `ρ = 0` and `ρ = 0.6` (0.046 and
+0.045 at nominal 5%, mean p-value 0.50) and over-rejects by about a third
+of nominal only at `ρ = 0.9` (0.068). The ratio statistic is why: scaling
+the gap by the pre-period fit makes spatial dependence largely divide out.
+The binding limit is granularity instead — the smallest attainable
+p-value is `1/(1+R)`, so one treated unit with 18 donors cannot reject at
+5% whatever the effect, and `min_attainable_p` reports it.
+
+**A citation was withdrawn.** This row cited Cerqua et al. (2022), already
+flagged below as unverified. It does not exist as described; the reference
+set is now Abadie, Diamond & Hainmueller (2010), Abadie & L'Hour (2021),
+Abadie (2021) and Di Stefano & Mellace (2024), each checked against the
+published record.
+
+**Not delivered, deliberately:** the shift-share exogeneity diagnostics.
+They are test statistics, so each owes a null-distribution Monte Carlo
+under the standing rule, and bundling estimator families into one commit is
+the shape that produced audit findings 13–16.
 
 **Actual complexity:** 910 lines of `src/SpatialCausal.jl` plus 120 in
 `SpatialHAC.jl`, against an estimate of ~600 for a scope that included the
@@ -884,7 +936,7 @@ point the back-fitting reaches — a decision, not a tidy-up.
 
 | Priority | Item | Est. Lines | Status |
 |---|---|---|---|
-| 13 | Spatial Causal Inference (#15) | ~600 | 🟡 **Exposure mapping and spatial DiD delivered**, 2026-10-30, 1,030 lines across `SpatialCausal.jl` and `SpatialHAC.jl`. Synthetic control and shift-share diagnostics outstanding |
+| 13 | Spatial Causal Inference (#15) | ~600 | 🟡 **Three of four delivered.** Exposure mapping and spatial DiD 2026-10-30; spatial synthetic control, its permutation inference and the neighbour spillover read-out 2026-10-31. 2,040 lines across `SpatialCausal.jl` and `SpatialHAC.jl` against an estimate of ~600 for a scope that excluded two of these. Shift-share diagnostics outstanding |
 | 14 | Spatial Networks (#11) | ~400 | ⬜ Extends beyond geography. Cheaper than #15 but mostly reframes what `W` may represent rather than adding inference, so it goes second |
 | | **Phase 7A total** | **~1,000** | |
 
@@ -896,6 +948,16 @@ panel coefficient layout (intercept offset, `ρ` last, `K = P_cov` or
 `P_cov/2`) that a DiD design does not have. In the event the two-period
 decomposition needed no delta method at all, every reported effect being
 linear in `θ̂`.
+
+The synthetic control pass reused more than expected, and from a different
+place: `exposure` (written for the DiD) finds the neighbours to screen out
+of the donor pool, and `SpatialHAC`'s `pairwise_distance` with its
+`EuclideanDistance` / `HaversineDistance` types supplies the penalty metric,
+so lon/lat data works without new code. What it could **not** reuse was an
+optimiser — the package has no Optim or JuMP dependency and none was added;
+the simplex-constrained program is solved by accelerated projected gradient
+with an exact Lipschitz step, about 110 lines, and verified against an
+independent support enumeration.
 
 ### Phase 7B — ⬜ Spatio-temporal, common factors & semiparametrics
 
@@ -934,35 +996,76 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #10 GWR, knn, logdet, Chebyshev; finding 31) | 22 | 1,691 | 15,653 |
 | **master** (+ Phase 6C, finding 32) | 22 | 2,036 | 15,904 |
 | **master** (+ #15 exposure mapping and spatial DiD) | 23 | 2,233 † | 16,949 |
-| **v0.4.0** (= master today, unreleased) | 23 | 2,233 † | 16,949 |
+| **master** (+ #15 spatial synthetic control) | 23 | 2,430 † | 17,962 |
+| **v0.4.0** (= master today, unreleased) | 23 | 2,430 † | 17,962 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 27–29 | ~2,400 | ~21,000 |
 
-Measured on master: 23 submodules plus the umbrella across 16,949 lines of
-`src/`, 6,101 lines of tests, 3,094 lines of examples across 23 scripts,
+Measured on master: 23 submodules plus the umbrella across 17,962 lines of
+`src/`, 6,773 lines of tests, 3,297 lines of examples across 24 scripts,
 398 lines of package extensions, 50 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 **State the environment with the assertion count.** The figures above are
-2,233 on Julia 1.13.2 with Makie and Turing **installed**, where testsets 25
-and 26 contribute 11 and 24 assertions, and 2,194 on Julia 1.10.12 with both
-**absent**, where each reports a single broken marker instead of running.
-That extension difference is 33 assertions — five times the genuine
-cross-version difference described below — so a count quoted without its
-environment can look like a regression when nothing has regressed.
+2,430 with Makie and Turing **installed**, where testsets 25 and 26
+contribute 11 and 24 assertions, and 2,395 with both **absent**, where each
+reports a single broken marker instead of running. Both were measured in the
+repository working tree, which matters — see the correction below. That
+difference is 35 passing assertions — 2,395 + 11 + 24 = 2,430, the two
+broken markers being replaced rather than added, which is why the arithmetic
+is 35 and not 33. A count quoted without its environment can therefore look
+like a regression when nothing has regressed.
 
-The six-assertion difference is version-dependent testsets,
-not the change log — it predates Phase 6B and is unchanged by it: items 14
-and 15 added 88 and 192 assertions, every one of which passes identically on
-both versions. Rows measured before 2026-10-30 counted the extension
-testsets too, which is why the step from 1,270 is larger than 280.
+**Corrected on 2026-10-31: there is no cross-version assertion difference.**
+Earlier revisions of this section described a genuine six-assertion gap
+between Julia 1.13.2 and 1.10.12. Measurement says otherwise. Running the
+suite verbose on each version and diffing the per-testset counts — the
+diagnostic this section has always prescribed — every one of the 51
+testsets reports an **identical** count on 1.13.2 and 1.10.12; the diff is
+timings only. The extension testsets are the sole source of count
+variation.
 
-† The last two rows count the extension testsets; the Phase 6C row above
+Where the old six-assertion figure came from is now settled, and it was
+never the Julia version. `Pkg.test()` in the repository working tree
+reports 2,395; the same command on a copy holding only `Project.toml`,
+`Manifest.toml`, `src/`, `test/` and `ext/` reports 2,389, on either Julia
+version. Two candidate explanations were tested and **both refuted** — not
+the version (per-testset counts are identical across 1.13.2 and 1.10.12),
+and not dependency resolution (copying the local `Manifest.toml` across
+does not reproduce the 2,395). The cause is the **working tree**, and the
+six assertions are named: testset 11b gates a block on
+
+```julia
+csv = joinpath(@__DIR__, "..", "notebooks", "data", "columbus.csv")
+if isfile(csv)
+```
+
+and that block holds exactly six assertions — one `@test_logs` guarding
+`fit_mgwr` against convergence warnings, and five `@test`s on the fit. So
+testset 11b reports **12 in the repository and 6 in a `src`-and-`test`-only
+copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it: the
+extensions-absent figure CI sees is **2,395**, not 2,389.
+
+Two consequences for anyone measuring this suite. A scratch copy must
+include `notebooks/data/` to be comparable with the repository at all. And
+a verbose variant has to be run from `test/` **inside** the repository: run
+the same script from a scratchpad and `@__DIR__` moves with it, the
+`isfile` check fails, and the block skips silently — which is exactly how
+the earlier 2,424 figure in this section came to be six too low.
+
+Note also that `--project=<dir>` does not hide the extensions: `@v1.13`
+stays on `LOAD_PATH`, so Makie and Turing load from the default environment
+anyway. `Pkg.test()` is the only entry point that genuinely excludes them.
+
+† The last three rows count the extension testsets; the Phase 6C row above
 them does not. So the step from 2,036 to 2,233 is **not** testset 34's
-size: that testset is 162 assertions and runs identically on both Julia
-versions, and the other 35 is testsets 25 and 26 running rather than
-reporting a marker. Comparing two rows of this table means checking they
-were measured the same way first.
+size: that testset is 162 assertions, and the other 35 is testsets 25 and 26
+running rather than reporting a marker. The step from 2,233 to 2,430 **is**
+testset 35's size exactly, 197. That it comes out exact is itself the check:
+an earlier revision of this table recorded 2,430 as 2,424 and so read the
+step as 191, and the missing six were the Columbus block described above,
+skipped because the measuring script ran from outside `test/`. Comparing two
+rows of this table means checking they were measured the same way first.
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed
@@ -1033,10 +1136,12 @@ development line rather than across three releases.
 - Wang, C., Kockelman, K. M., & Wang, X. (2013). The spatial dimensions of land use change dynamics in the Austin, Texas Metropolitan Area. *Transportation Research Record*, 2397(1), 131–142.
 - Yu, H., Fotheringham, A. S., Li, Z., Oshan, T., Kang, W., & Wolf, L. J. (2020). Inference in multiscale geographically weighted regression. *Geographical Analysis*, 52(1), 87–106.
 
-**Citations to verify before use.** Two entries reached this roadmap through
-a secondary summary rather than the source: Cerqua et al. (2022) for spatial
-synthetic control (cited in [#15](#15-spatial-causal-inference--policy-evaluation)
-but not confirmed against the published record), and the 2025–26 *Spatial
+**Citations to verify before use — one of them has now failed.** Cerqua et
+al. (2022) was listed here for spatial synthetic control and has been
+**withdrawn**: checked against the published record on 2026-10-31, it does
+not exist as described, and item #15 now cites Abadie, Diamond &
+Hainmueller (2010), Abadie & L'Hour (2021), Abadie (2021) and Di Stefano &
+Mellace (2024) instead. That leaves the 2025–26 *Spatial
 Economic Analysis* volume 21(2) papers — Anselin, Serenini & Amaral on
 specification search; Bijwaard & Schluter on interdependent hazards;
 Kotowska & Toroj on spatial difference-in-differences; Moreno Jimenez on
