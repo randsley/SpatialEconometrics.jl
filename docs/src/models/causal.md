@@ -304,13 +304,195 @@ gaps are not spillovers. The unweighted average over all four is
 consequently off, and the fix is reading the diagnostic rather than the
 function silently discarding units.
 
-## What is not here yet
+## Shift-share designs
 
-Roadmap item #15 also lists spatial shift-share exogeneity diagnostics,
-which are not implemented. They are test statistics, so each owes a
-null-distribution Monte Carlo before it can be believed, under the
-standing rule in `docs/AUDIT.md`, and they are a different estimator
-family from the two above.
+A shift-share, or Bartik, regressor is built from common shocks and
+region-specific exposure:
+
+```math
+X_i = \sum_{k} w_{ik} \, g_k
+```
+
+with ``w_{ik}`` region ``i``'s share of industry ``k`` and ``g_k`` the
+industry's national shock. It is used directly, or as an instrument for an
+endogenous regional variable — the canonical Bartik design.
+
+This belongs in a spatial package for a reason that is almost the opposite
+of the rest of it. Everywhere else here, dependence travels through
+geography and the fix is a spatial weight matrix. Here it travels through
+**shared industry mix**: two regions with the same industries have
+mechanically correlated values of ``X``, and therefore correlated
+residuals, no matter how far apart they are. Two counties on opposite
+coasts with identical industrial structure are as dependent as neighbours,
+and a spatial HAC correction cannot see it.
+
+### Build the design, then ask how big it really is
+
+```julia
+design = shift_share_design(W, g)          # W is N x K, g is length K
+conc   = exposure_concentration(design)
+conc.effective_shocks                       # compare with conc.n_shocks
+```
+
+Borusyak, Hull & Jaravel's identification argument requires a Herfindahl
+condition on average exposure, ``\sum_k \hat{s}_k^2 \to 0``: no finite set
+of shocks may drive the estimate. `effective_shocks` is the reciprocal of
+that sum, reported because a count is easier to read.
+
+**Read it first.** The asymptotics in this design are in the number of
+shocks, not the number of regions, and every inference below degrades
+together as the effective count falls. A study with 300 regions and 400
+industries whose effective count is 12 is a twelve-observation study.
+
+### The design has ``K`` observations, not ``N``
+
+```julia
+agg = shock_aggregate(design, y)
+agg.beta_equiv == fit_shift_share(y, design).beta   # to machine precision
+```
+
+Borusyak, Hull & Jaravel (2022, eq. 4) show the shift-share estimate is
+*numerically identical* to an exposure-weighted estimate computed from `K`
+shock-level observations:
+
+```math
+\hat{\beta} = \frac{\sum_k \hat{s}_k g_k \bar{y}_k}{\sum_k \hat{s}_k g_k \bar{x}_k}
+```
+
+This is an identity, not an approximation, and it is the clearest statement
+of where the information in the design actually is.
+
+### Standard errors
+
+```julia
+fit = fit_shift_share(y, design)                    # vcov = :akm by default
+fit = fit_shift_share(y, design; treatment = t)     # the IV design
+```
+
+Adão, Kolesár & Morales (2019) show by placebo that conventional standard
+errors in this design reject a true null in **up to 55% of samples** at the
+5% level. Their estimator (eq. 29) is
+
+```math
+\mathrm{se}(\hat{\beta}) = \frac{\sqrt{\sum_k \mathring{X}_k^2 \hat{R}_k^2}}{\sum_i \tilde{X}_i^2},
+\qquad \hat{R}_k = \sum_i w_{ik}\,\hat{\varepsilon}_i
+```
+
+where ``\tilde{X}`` is the regressor with controls partialled out and
+``\mathring{X}`` is the vector of coefficients from regressing
+``\tilde{X}`` on the share matrix. ``\mathring{X}`` is **not** the shock
+vector ``g``; the two coincide only with no controls and a square
+invertible share matrix.
+
+Coverage of a nominal 95% interval, measured over 2,000 replications with
+`N = 300`, shares and residuals fixed and the shocks resampled — the
+framework the estimator is derived in. "Sector frac" is the fraction of
+residual variance carried by an industry-level component:
+
+| Effective shocks | Sector frac | AKM | HC1 | cluster on top industry |
+|---:|---:|---:|---:|---:|
+| 99.9 | 0.00 | 0.930 | 0.950 | 0.947 |
+| 99.9 | 0.40 | 0.938 | 0.902 | 0.894 |
+| 99.9 | 0.82 | **0.936** | **0.732** | 0.720 |
+| 99.9 | 1.00 | 0.937 | 0.664 | 0.658 |
+| 50.0 | 0.82 | 0.919 | 0.632 | 0.619 |
+| 20.0 | 0.77 | 0.864 | 0.426 | 0.404 |
+| 37.9 | 0.90 | 0.827 | **0.289** | 0.241 |
+
+Three things worth taking from it.
+
+The failure is real and large. HC1 rejects a true null in up to **71%** of
+samples on these designs — worse than the paper's headline figure, on a
+design built to be realistic rather than adversarial.
+
+**Clustering on each region's dominant industry does not fix it.** That is
+the intuitive repair, and the cluster column tracks HC1 almost exactly,
+because the dependence runs through the entire share vector rather than
+through any one industry. This is worth stating plainly because the
+cluster-robust machinery is available elsewhere in this package and would
+be the natural thing to reach for.
+
+**The AKM standard error itself degrades when shocks are few**, to 0.864 at
+20 effective shocks and 0.827 at 38 with concentrated exposure. Adão,
+Kolesár & Morales anticipate this: eq. 29 generalises a cluster-robust
+formula and inherits its downward bias from estimation noise in the
+residuals, which is why they also propose a null-imposed interval (their
+Remark 6). **That variant is not implemented here.** Where
+`exposure_concentration` reports few effective shocks, treat the interval
+as optimistic.
+
+Note also the first row: with no industry component at all, AKM costs a
+little — 0.930 against HC1's 0.950. That is the price of robustness when it
+is not needed, and it is small.
+
+### Exogeneity
+
+```julia
+bal = balance_test(design, hcat(pretrend, demographics))
+```
+
+The identifying assumption is quasi-random assignment of the **shocks**,
+not of the shares — shares are allowed to be endogenous. So the balance
+test belongs at shock level: form the exposure-weighted average of each
+residualised characteristic and regress it on the shock, weighting by
+average exposure (Borusyak, Hull & Jaravel 2022, §4.3). Conventional robust
+standard errors are valid there, which is the practical payoff of the
+equivalence above.
+
+Measured size, 2,000 replications, with the characteristic itself carrying
+an industry component so that it is structured rather than iid:
+
+| Effective shocks | 10% | 5% | 1% | joint, 4 characteristics at 5% |
+|---:|---:|---:|---:|---:|
+| 99.9 | 0.108 | 0.056 | 0.010 | 0.088 |
+| 50.0 | 0.115 | 0.064 | 0.018 | 0.147 |
+| 20.0 | 0.170 | 0.109 | 0.043 | 0.324 |
+| 13.0 | 0.278 | 0.170 | 0.072 | — |
+| 9.1 | 0.335 | **0.232** | 0.114 | — |
+
+The test is correctly sized only when the effective number of shocks is
+large. At 9 effective shocks it rejects a true null 23% of the time at a
+nominal 5%, and the joint test degrades faster still since it estimates an
+``M \times M`` covariance from as many observations as there are shocks.
+
+The consequence is uncomfortable and worth saying: **in a concentrated
+design, a passed balance test is close to uninformative.** It is reported
+with a warning rather than left to be read as reassurance.
+
+### Which industries identify the estimate
+
+```julia
+rot = rotemberg_weights(y, treatment, design)
+rot.order[1:5]        # the industries worth defending
+```
+
+Goldsmith-Pinkham, Sorkin & Swift (2020, Prop. 3) decompose the estimate
+into one just-identified estimate per industry:
+
+```math
+\hat{\beta} = \sum_k \hat{\alpha}_k \hat{\beta}_k, \qquad \sum_k \hat{\alpha}_k = 1
+```
+
+Both the unit sum and the decomposition hold exactly. **Negative weights
+are expected** — the paper says so explicitly, and under constant effects
+they pose no conceptual problem — so they are reported rather than
+suppressed.
+
+The use is blunt: if five industries carry most of the weight mass, the
+study rests on those five, and they are the ones whose exogeneity a reader
+should interrogate.
+
+### Spatial autocorrelation, and why it is not the issue
+
+```julia
+shift_share_moran(design, W_spatial; fit = fit)
+```
+
+Industry shares cluster geographically, so Moran's I on them is almost
+always significant. That is normal and not a defect. What the diagnostic is
+for is documenting the spatial structure while making clear that a spatial
+correction is the wrong tool: use `vcov = :akm` for inference and this for
+description.
 
 ## References
 
@@ -323,6 +505,12 @@ family from the two above.
   treatment timing. *Journal of Econometrics*, 225(2).
 - Cameron, A. C. & Miller, D. L. (2015). A practitioner's guide to
   cluster-robust inference. *Journal of Human Resources*, 50(2).
+- Borusyak, K., Hull, P. & Jaravel, X. (2022). Quasi-experimental
+  shift-share research designs. *Review of Economic Studies*, 89(1).
+- Adão, R., Kolesár, M. & Morales, E. (2019). Shift-share designs: theory
+  and inference. *Quarterly Journal of Economics*, 134(4).
+- Goldsmith-Pinkham, P., Sorkin, I. & Swift, H. (2020). Bartik instruments:
+  what, when, why, and how. *American Economic Review*, 110(8).
 - Abadie, A., Diamond, A. & Hainmueller, J. (2010). Synthetic control
   methods for comparative case studies: estimating the effect of
   California's tobacco control program. *Journal of the American

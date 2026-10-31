@@ -1262,6 +1262,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-30 | `fit_spatial_did` / `vcov_cluster` — spatial difference-in-differences and its covariance | two gates, since neither is a test statistic. Coverage of a nominal 95% interval, 2,000 reps, errors `(I − 0.6W)^{-1}ε`: clustering 95.0%, OLS 96.5%, Conley 94.5% at cutoff 1.5 falling to 85.3% at 6.0 — and falling identically at `ρ = 0`, so the decay is finite-sample bias, not the correction working. The estimator itself is exact where it can be: `5.3e-15` on a noiseless two-period design. Staggered adoption under heterogeneous effects is biased 17–67% with an unpredictable sign, measured across four designs and pinned | Verified correct; staggered caveat documented |
 | 2026-10-30 | `stpca` — spatio-temporal principal components | a decomposition, not a statistic, so the gate is again the error rate: 200 draws per cell with a known field planted in one feature, `:moran` puts a smooth field first in 73–87% and a high-contrast field last in 72–86%, with 0 of 800 draws at the wrong end; the eigenvalue identity `λ = Var(U)·I(Aγ)` is checked against independently implemented statistics to 5.0e-14 | Verified correct |
 | 2026-10-31 | `fit_synthetic_control` / `placebo_test` — spatial synthetic control and its permutation inference | two gates. The p-value is a test statistic: no effect anywhere, 7×7 lattice, 44 clean donors, exact permutation, 1,000 reps — size 0.046 / 0.095 at nominal 5% / 10% at `ρ = 0`, 0.045 / 0.094 at `ρ = 0.6`, and 0.068 / 0.125 at `ρ = 0.9`, so it is correctly sized up to moderate spatial correlation and over-rejects by about a third of nominal at strong correlation. The estimator is checked against the exact optimum by support enumeration rather than a tolerance: objective to 3.55e-15, weights to 1.31e-14. Donor-pool contamination is an algebraic identity, pinned to 1e-12 | Verified correct; `ρ = 0.9` over-rejection and the p-value granularity floor documented |
+| 2026-10-31 | `fit_shift_share` / `balance_test` — shift-share designs, the AKM standard error and the shock-level balance test | two gates. Coverage of a nominal 95% interval, 2,000 reps, shares and residuals fixed with the shocks resampled: AKM 0.936 against HC1 0.732 at 100 effective shocks with a strong industry component, and HC1 rejecting a true null in up to 71% of samples — the failure the estimator exists for, reproduced. Clustering on each region's largest industry tracks HC1 (0.720) rather than fixing it. AKM itself falls to 0.864 at 20 effective shocks and 0.827 at 38 with concentrated exposure. The balance test is a test statistic: size 0.056 / 0.108 at nominal 5% / 10% at 100 effective shocks, 0.109 at 20 and 0.232 at 9, and the joint test over four characteristics reaches 0.324 at 20. Three published identities are pinned at machine precision rather than by tolerance: the Borusyak-Hull-Jaravel shock-level equivalence to 2.3e-13, the Goldsmith-Pinkham-Sorkin-Swift decomposition to 2.6e-13, and the reduction of the AKM variance to a cluster-robust one under full specialisation to 3.0e-15 | Verified correct; the few-shock degradation of both the interval and the balance test documented under warnings |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -2359,22 +2360,181 @@ unstateable. The simplification is recorded in the docstring as a
 simplification, with the reason.
 
 **Suite.** 2,430 assertions with Makie and Turing installed and 2,395
-with both absent, zero failures either way, testset 35 contributing 197. A
-by-product of checking those figures: running the suite verbose on each
-version and diffing the per-testset counts shows **every one of the 51
+with both absent, zero failures either way, testset 35 contributing 197 —
+the figures as measured on 2026-10-31, when this entry was written and the
+suite had 51 testsets. They are left as measured; the current totals are in
+`ROADMAP.md`. A by-product of checking them: running the suite verbose on
+each version and diffing the per-testset counts shows **every one of the 51
 testsets reporting an identical count on Julia 1.13.2 and 1.10.12**. The
-six-assertion cross-version gap this repository has documented since the
+six-assertion cross-version gap this repository had documented since the
 audit does not exist. It was a **working-tree** gap: testset 11b gates six
 assertions on `isfile(joinpath(@__DIR__, "..", "notebooks",
 "data", "columbus.csv"))`, so it reports 12 in the repository and 6 in a
 `src`-and-`test`-only copy. Dependency resolution was tested as a candidate
 and refuted — copying the local `Manifest.toml` across does not reproduce
-the 2,395. The CSV is tracked, so **CI has it and sees 2,395** with the
-extensions absent. The same `@__DIR__` dependence is why a verbose variant
+the 2,395. The CSV is tracked, so **CI has it and sees the in-repository
+figure** with the extensions absent, never the copy's. The same `@__DIR__` dependence is why a verbose variant
 must be run from inside `test/`: run from a scratchpad it skips the block
 and undercounts by exactly six. `ROADMAP.md` records the correction.
 
-**Scope.** Item #15 now has three of four deliverables. Spatial
-shift-share exogeneity diagnostics remain: they are test statistics, so
-each owes a null-distribution Monte Carlo under this rule, and they are a
-separate pass for the same reason this one was.
+**Scope.** At the time of this entry item #15 had three of four
+deliverables. Spatial shift-share exogeneity diagnostics were the fourth,
+and are delivered in the entry below, which closes the item.
+
+
+### `fit_shift_share` and `balance_test` — in testset 36
+
+Shift-share is the one design in this package where the dependence does not
+travel through space. The regressor is built as `X_i = Σ_k w_ik g_k`, so two
+regions with the same industry mix have mechanically correlated residuals
+however far apart they are, and every spatial correction in this package is
+answering the wrong question about it. That is the premise, and it is worth
+stating because the natural instinct — reach for `vcov_cluster`, or for
+Conley — is measured below and does not work.
+
+**Every formula was read from the primary sources rather than recalled**,
+with `pdftotext` on the published papers. This was not ceremony. The
+shock-level projection in Adão, Kolesár & Morales's Remark 5 step 2 is the
+vector of coefficients from regressing the *residualised* regressor on the
+share matrix, and recall would have substituted the shock vector `g`. The
+two differ whenever there are controls, which is always, since an intercept
+is a control. Testset 36e pins the actual relationship.
+
+#### Three published identities, pinned at machine precision
+
+Each is an identity in its source, so a tolerance would be the wrong gate
+and the agreement is checked at machine precision over randomised designs
+with controls present.
+
+| Identity | Source | Max relative error |
+|---|---|---|
+| Shift-share estimate = exposure-weighted shock-level estimate, direct | BHJ eq. 4 | 2.29e-13 |
+| The same, IV design | BHJ eq. 4 | 2.26e-13 |
+| Exposure-weighted aggregates of a residual have weighted mean zero | BHJ fn. 6 | 2.04e-16 |
+| Rotemberg weights sum to one | GPSS Prop. 3 | 1.42e-14 |
+| `Σ_k α̂_k β̂_k` equals the shift-share IV estimate | GPSS Prop. 3 | 2.64e-13 |
+| AKM variance = cluster-robust variance under full specialisation | AKM §4.2 | 2.97e-15 |
+| `X̊` solves the normal equations on the share matrix | AKM Remark 5 | 2.99e-15 |
+| `X̊ = g − mean(X)/c` when shares sum to `c` | derived | 1.85e-15 |
+
+The sixth is the strongest of them. Under full specialisation — every region
+in exactly one industry — AKM note their variance becomes a cluster-robust
+variance clustering on that industry. The check is against this package's
+own `vcov_cluster` with the degrees-of-freedom correction off, so the
+reference is independently written code rather than a rearrangement of the
+same expression. Agreement at 3e-15 is what licenses the rest.
+
+The eighth was derived in the course of diagnosing a failed gate, and is
+the reason the `X̊` step is believed: with shares summing to `c`, the share
+matrix satisfies `W·(1_K/c) = 1_N`, so the intercept's contribution to the
+projection is exactly `mean(X)/c` in every coordinate.
+
+#### The AKM standard error: coverage
+
+The estimator is derived conditional on the shares and on the potential
+outcomes, with the sampling variation in the shocks (their Remark 4), so
+the study holds the shares and residuals fixed and resamples the shocks.
+2,000 replications, `N = 300`, nominal 95%. "Sector frac" is the fraction
+of residual variance carried by an industry-level component — the
+dependence at issue. The cluster column clusters on each region's
+largest-exposure industry.
+
+| Effective shocks | Sector frac | AKM | HC1 | cluster | med se AKM / sd(β̂) | med se HC1 / sd(β̂) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 99.9 | 0.00 | 0.930 | 0.950 | 0.947 | 0.952 | 0.999 |
+| 99.9 | 0.40 | 0.938 | 0.902 | 0.894 | 0.984 | 0.858 |
+| 99.9 | 0.82 | 0.936 | 0.732 | 0.720 | 0.983 | 0.558 |
+| 99.9 | 1.00 | 0.937 | 0.664 | 0.658 | 0.979 | 0.505 |
+| 199.9 | 0.81 | 0.940 | 0.768 | 0.766 | 0.995 | 0.612 |
+| 50.0 | 0.82 | 0.919 | 0.632 | 0.619 | 0.930 | 0.456 |
+| 20.0 | 0.77 | 0.864 | 0.426 | 0.404 | 0.837 | 0.294 |
+| 37.9 | 0.90 | 0.827 | 0.289 | 0.241 | 0.770 | 0.211 |
+
+Four findings, two of them not what the plan expected.
+
+**The failure is real and larger than advertised.** Adão, Kolesár & Morales
+report conventional standard errors rejecting a true null in up to 55% of
+placebo samples. Here HC1 rejects in **71%** of samples on the concentrated
+design, with the median HC1 standard error only 0.211 of the true sampling
+standard deviation. This is not an adversarial construction; it is a design
+with realistic industry-size dispersion and an industry-level disturbance.
+
+**Clustering on the dominant industry is not a substitute.** This was worth
+measuring because the cluster-robust machinery is already in the package
+and is the obvious thing to try. It tracks HC1 almost exactly across every
+row, and is *worse* than HC1 on the concentrated design (0.241 against
+0.289). The reason is structural: the dependence runs through the whole
+share vector, so assigning each region to one industry discards most of it.
+
+**AKM works where its asymptotics hold, and degrades where they do not.**
+With 100 or 200 effective shocks it holds 0.936–0.940 regardless of how
+much of the residual is sectoral, and its median standard error is within
+2% of the truth. By 20 effective shocks coverage is 0.864, and on the
+concentrated design 0.827. Adão, Kolesár & Morales anticipate exactly this:
+eq. 29 generalises a cluster-robust formula and inherits its downward bias
+from estimation noise in the residuals, which is why they also propose a
+null-imposed interval (their Remark 6). **That variant is not implemented**,
+and the shortfall is documented in the docstring and warned about by
+`exposure_concentration` rather than left for a user to discover.
+
+**The effective-shock count is a useful summary and not a sufficient one.**
+Coverage was *worse* at 37.9 effective shocks with concentrated exposure
+(0.827) than at 50.0 with dispersed exposure (0.919). So the scalar does
+not order designs by reliability on its own, and the audit records that
+rather than implying the diagnostic is a decision rule.
+
+A fifth, minor: with no sectoral component at all, AKM covers 0.930 against
+HC1's 0.950. Robustness is not free, but 2 points is a small premium.
+
+#### The balance test: size under the null
+
+A test statistic, so the standing rule applies. The characteristic is
+independent of the shocks but carries an industry component, so it is
+structured rather than iid — the easy case would prove nothing. 2,000
+replications, `N = 300`.
+
+| Effective shocks | 10% | 5% | 1% | mean p | joint, 4 characteristics at 5% |
+|---:|---:|---:|---:|---:|---:|
+| 99.9 | 0.108 | 0.056 | 0.010 | 0.497 | 0.088 |
+| 50.0 | 0.115 | 0.064 | 0.018 | 0.496 | 0.147 |
+| 20.0 | 0.170 | 0.109 | 0.043 | 0.454 | 0.324 |
+| 13.0 | 0.278 | 0.170 | 0.072 | 0.304 | — |
+| 9.1 | 0.335 | 0.232 | 0.114 | 0.305 | — |
+
+At 100 effective shocks the test is almost exactly sized and the mean
+p-value is 0.497. It degrades monotonically with the effective count: by 20
+it rejects twice as often as nominal, and at 9 it rejects 23% of the time
+at a nominal 5%. The joint test degrades faster still, because it estimates
+an `M × M` covariance across characteristics from as many observations as
+there are shocks; with four characteristics and 20 shocks it rejects 32% of
+the time.
+
+The uncomfortable consequence is recorded rather than smoothed over: **in a
+concentrated design a passed balance test is close to uninformative**, and a
+failed one may be the test failing rather than the design. Both the
+docstring and the `show` method carry the measured rates and point at
+`exposure_concentration`.
+
+This is the same story as the coverage table, which is the point worth
+carrying away from this entry: in a shift-share design the effective number
+of shocks governs every inference simultaneously, and it is the first thing
+to compute, not a footnote.
+
+#### What is deliberately not here
+
+No null-imposed interval (AKM Remark 6, their AKM0), which is the
+documented remedy for the few-shock case measured above. No panel variant
+(their §5.2). No overidentification test across shocks. Each is additive
+and none is implied by the row's scope; the gap that matters is AKM0, and
+it is named in the docstring where the shortfall appears.
+
+**Suite.** 3,051 assertions with the extensions installed and 3,016 with
+both absent, zero failures either way, on both Julia 1.13.2 and 1.10.12.
+Testset 36 contributes 621, and the step from the previous total is exactly
+that, which is the arithmetic check described in `ROADMAP.md`. Both Monte
+Carlo studies above run outside the suite; what is asserted inside it is
+the loose bound that would catch a regression, so the suite does not pin a
+simulated rate.
+
+**Scope.** Item #15 is complete: exposure mapping, spatial DiD, spatial
+synthetic control and shift-share diagnostics.

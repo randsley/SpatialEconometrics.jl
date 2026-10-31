@@ -2,10 +2,10 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 23 submodules, 2,430 test assertions in 51 top-level testsets with both
-> package extensions installed and 2,395 without them — the same counts on
+> 24 submodules, 3,051 test assertions in 52 top-level testsets with both
+> package extensions installed and 3,016 without them — the same counts on
 > Julia 1.13.2 and 1.10.12, since the difference is the extensions and not
-> the version. 24 examples, 12 notebooks, 2 package extensions, CI/CD and
+> the version. 25 examples, 12 notebooks, 2 package extensions, CI/CD and
 > 50 Documenter.jl pages. **Phases 4, 5, 6 and 6B are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A is underway:** item #15's
@@ -279,16 +279,19 @@ design.
 |---|---|---|
 | ~~Spatial difference-in-differences~~ — **delivered**, see `fit_spatial_did` | Direct ATT and spillover ATT through an exposure mapping on `D` and `WD`, two-period and staggered. Four effects rather than three: the spillover onto the treated and onto the controls are evaluated at different exposure means and are not interchangeable | Delgado & Florax (2015); Chagas et al. (2016) |
 | ~~Spatial synthetic control~~ — **delivered**, see `fit_synthetic_control` | Donor-weight optimisation on the unit simplex, penalised by geographic or economic distance, with the donor pool screened so the synthetic unit is not assembled from the treated unit's own neighbours. Permutation inference, and the neighbours' own gaps read back as an estimated spillover | Abadie, Diamond & Hainmueller (2010); Abadie & L'Hour (2021) |
-| Spatial shift-share diagnostics | Exogeneity and spatial-correlation tests for local exposure shares and regional industry weights | Borusyak et al. (2022); Adao et al. (2019) |
+| ~~Spatial shift-share diagnostics~~ — **delivered**, see `fit_shift_share` | Exposure concentration against the Herfindahl condition, the shock-level equivalence transform, a shock-level balance test for exogeneity, Rotemberg weights, Moran's I on the exposure shares, and the Adão-Kolesár-Morales standard error — which is the substantive part, since conventional standard errors reject a true null in up to 71% of samples here | Borusyak, Hull & Jaravel (2022); Adão, Kolesár & Morales (2019); Goldsmith-Pinkham, Sorkin & Swift (2020) |
 | ~~Exposure mapping utilities~~ — **delivered**, see `exposure` / `ring_exposure` / `check_interference` | `D`, `W^k D`, ring and distance-band exposures. The assumption check is the substantive part: `δ` is identified only by controls that differ in exposure, which is a property of the design and `W` alone and so is checkable before any fit | — |
 
-**Status:** 🟡 **Three of four delivered** — exposure mapping and
-spatial DiD on 2026-10-30, spatial synthetic control on 2026-10-31, all in
-`src/SpatialCausal.jl` (1,920 lines). Docs:
-`docs/src/models/causal.md`. Examples: `examples/23_spatial_causal.jl`,
-`examples/24_synthetic_control.jl`. Tests: 162 assertions in testset 34 and
-197 in testset 35. Ledger: `docs/AUDIT.md`, under the standing rule.
-Only the shift-share diagnostics remain.
+**Status:** ✅ **Complete** — exposure mapping and spatial DiD on
+2026-10-30, spatial synthetic control and shift-share diagnostics on
+2026-10-31. `src/SpatialCausal.jl` (1,926 lines) plus the new
+`src/SpatialShiftShare.jl`, which is submodule 24: shift-share dependence
+runs through shared industry exposure rather than through a weight matrix,
+so it is a separate family and not an addition to the spatial-causal file.
+Docs: `docs/src/models/causal.md`. Examples:
+`examples/23_spatial_causal.jl`, `examples/24_synthetic_control.jl`,
+`examples/25_shift_share.jl`. Tests: testsets 34, 35 and 36. Ledger:
+`docs/AUDIT.md`, under the standing rule.
 
 **Delivered API:**
 
@@ -304,6 +307,14 @@ fit_synthetic_control(Y, treated, T0; W, coords, predictors, donor_pool,
     -> SyntheticControlResult
 placebo_test(scm, Y; n_placebo, rng, kwargs...)  -> PlaceboTest
 spillover_gaps(scm, Y; kwargs...)                -> SpilloverGaps
+
+shift_share_design(W, g; controls, shock_names)  -> ShiftShareDesign
+fit_shift_share(y, design; treatment, vcov)      -> ShiftShareFit
+exposure_concentration(design)                   -> ExposureConcentration
+shock_aggregate(design, y; treatment)            -> ShockAggregates
+balance_test(design, r; controls, names)         -> BalanceTest
+rotemberg_weights(y, treatment, design)          -> RotembergWeights
+shift_share_moran(design, W_spatial; fit)        -> ShiftShareMoran
 ```
 
 `treat` is a length-`N` indicator for two periods or an `N × T` path for a
@@ -326,6 +337,50 @@ expected is the exposure column itself: including `WD` identifies `τ` off
 the contrast between a unit and its neighbours, which differences out the
 error component they share. Nine configurations, the full table and the
 `ρ = 0` control are in `docs/AUDIT.md`.
+
+**The shift-share row, and what measurement changed.** Three results are
+worth not relitigating.
+
+*Clustering on the dominant industry does not fix shift-share inference.*
+This was worth measuring precisely because `vcov_cluster` is already in the
+package and is the obvious thing to reach for. Over 2,000 replications it
+tracks HC1 almost exactly — 0.720 against 0.732 coverage of a nominal 95%
+interval — and is *worse* than HC1 on a concentrated design (0.241 against
+0.289). The dependence runs through the whole share vector, so collapsing
+each region onto one industry discards most of it.
+
+*The conventional failure is larger than the paper advertises.* Adão,
+Kolesár & Morales report over-rejection in up to 55% of placebo samples;
+here HC1 rejects a true null in up to **71%**, with its median standard
+error 0.211 of the true sampling standard deviation. The design was built
+to be realistic, not adversarial.
+
+*The AKM standard error degrades when shocks are few, and that is
+documented rather than shipped quietly.* Coverage falls from 0.936 at 100
+effective shocks to 0.864 at 20 and 0.827 at 38 with concentrated exposure.
+The authors anticipate it — eq. 29 generalises a cluster-robust formula and
+inherits its downward bias — and propose a null-imposed interval (their
+Remark 6) which is **not implemented here**. The shortfall is named in the
+docstring and warned about by `exposure_concentration`. The same
+effective-shock count governs the balance test, which rejects a true null
+23% of the time at a nominal 5% when it falls to 9. In a concentrated
+shift-share design a passed balance test is close to uninformative, and the
+docs say so.
+
+A fourth, smaller: the effective-shock count is a useful summary but not a
+sufficient one. Coverage was worse at 37.9 effective shocks with
+concentrated exposure than at 50.0 with dispersed exposure, so the scalar
+does not order designs by reliability on its own.
+
+**A citation was added, and verified first.** Rotemberg weights required
+Goldsmith-Pinkham, Sorkin & Swift (2020), which was not in the verified
+list below. It was checked against the published record *and* against the
+article's own header line (*American Economic Review* 2020, 110(8),
+2586–2624, doi:10.1257/aer.20181047) before use. It holds. Every formula in
+this row was read out of the primary PDFs rather than recalled — which
+caught one that recall would have got wrong: the shock-level projection in
+AKM's Remark 5 is the coefficient vector from regressing the *residualised*
+regressor on the share matrix, not the shock vector `g`.
 
 **Verification:** the two-period design first-differences to an exact OLS
 problem, so the standard is algebra and not a tolerance — `5.3e-15` on
@@ -382,10 +437,12 @@ set is now Abadie, Diamond & Hainmueller (2010), Abadie & L'Hour (2021),
 Abadie (2021) and Di Stefano & Mellace (2024), each checked against the
 published record.
 
-**Not delivered, deliberately:** the shift-share exogeneity diagnostics.
-They are test statistics, so each owes a null-distribution Monte Carlo
-under the standing rule, and bundling estimator families into one commit is
-the shape that produced audit findings 13–16.
+**Not delivered, deliberately:** the null-imposed AKM interval (their
+Remark 6, "AKM0"), the panel variant of the AKM standard error (their
+§5.2), and an overidentification test across shocks. The first is the
+documented remedy for the few-shock under-coverage measured above and is
+the one that matters; it is named in the docstring at the point where the
+shortfall appears, rather than left for a reader to find out.
 
 **Actual complexity:** 910 lines of `src/SpatialCausal.jl` plus 120 in
 `SpatialHAC.jl`, against an estimate of ~600 for a scope that included the
@@ -936,7 +993,7 @@ point the back-fitting reaches — a decision, not a tidy-up.
 
 | Priority | Item | Est. Lines | Status |
 |---|---|---|---|
-| 13 | Spatial Causal Inference (#15) | ~600 | 🟡 **Three of four delivered.** Exposure mapping and spatial DiD 2026-10-30; spatial synthetic control, its permutation inference and the neighbour spillover read-out 2026-10-31. 2,040 lines across `SpatialCausal.jl` and `SpatialHAC.jl` against an estimate of ~600 for a scope that excluded two of these. Shift-share diagnostics outstanding |
+| 13 | Spatial Causal Inference (#15) | ~600 | ✅ **Complete.** Exposure mapping and spatial DiD 2026-10-30; spatial synthetic control and shift-share diagnostics 2026-10-31. About 2,900 lines across `SpatialCausal.jl`, the new `SpatialShiftShare.jl` and `SpatialHAC.jl`, against an estimate of ~600 for a scope that excluded three of these |
 | 14 | Spatial Networks (#11) | ~400 | ⬜ Extends beyond geography. Cheaper than #15 but mostly reframes what `W` may represent rather than adding inference, so it goes second |
 | | **Phase 7A total** | **~1,000** | |
 
@@ -997,21 +1054,22 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ Phase 6C, finding 32) | 22 | 2,036 | 15,904 |
 | **master** (+ #15 exposure mapping and spatial DiD) | 23 | 2,233 † | 16,949 |
 | **master** (+ #15 spatial synthetic control) | 23 | 2,430 † | 17,962 |
-| **v0.4.0** (= master today, unreleased) | 23 | 2,430 † | 17,962 |
+| **master** (+ #15 shift-share, so #15 complete) | 24 | 3,051 † | 19,085 |
+| **v0.4.0** (= master today, unreleased) | 24 | 3,051 † | 19,085 |
 | — | | | |
-| **v1.0.0** (Phases 6C–8) | 27–29 | ~2,400 | ~21,000 |
+| **v1.0.0** (Phases 6C–8) | 27–29 | ~3,300 | ~22,000 |
 
-Measured on master: 23 submodules plus the umbrella across 17,962 lines of
-`src/`, 6,773 lines of tests, 3,297 lines of examples across 24 scripts,
+Measured on master: 24 submodules plus the umbrella across 19,085 lines of
+`src/`, 7,261 lines of tests, 3,536 lines of examples across 25 scripts,
 398 lines of package extensions, 50 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 **State the environment with the assertion count.** The figures above are
-2,430 with Makie and Turing **installed**, where testsets 25 and 26
-contribute 11 and 24 assertions, and 2,395 with both **absent**, where each
+3,051 with Makie and Turing **installed**, where testsets 25 and 26
+contribute 11 and 24 assertions, and 3,016 with both **absent**, where each
 reports a single broken marker instead of running. Both were measured in the
 repository working tree, which matters — see the correction below. That
-difference is 35 passing assertions — 2,395 + 11 + 24 = 2,430, the two
+difference is 35 passing assertions — 3,016 + 11 + 24 = 3,051, the two
 broken markers being replaced rather than added, which is why the arithmetic
 is 35 and not 33. A count quoted without its environment can therefore look
 like a regression when nothing has regressed.
@@ -1026,14 +1084,17 @@ timings only. The extension testsets are the sole source of count
 variation.
 
 Where the old six-assertion figure came from is now settled, and it was
-never the Julia version. `Pkg.test()` in the repository working tree
-reports 2,395; the same command on a copy holding only `Project.toml`,
-`Manifest.toml`, `src/`, `test/` and `ext/` reports 2,389, on either Julia
-version. Two candidate explanations were tested and **both refuted** — not
-the version (per-testset counts are identical across 1.13.2 and 1.10.12),
-and not dependency resolution (copying the local `Manifest.toml` across
-does not reproduce the 2,395). The cause is the **working tree**, and the
-six assertions are named: testset 11b gates a block on
+never the Julia version. The diagnosis was done on 2026-10-31, when the
+suite stood at 2,395 assertions without the extensions; those are the
+figures quoted here, since changing them would destroy the arithmetic that
+identified the cause. `Pkg.test()` in the repository working tree reported
+**2,395**; the same command on a copy holding only `Project.toml`,
+`Manifest.toml`, `src/`, `test/` and `ext/` reported **2,389**, on either
+Julia version. Two candidate explanations were tested and **both refuted**
+— not the version (per-testset counts are identical across 1.13.2 and
+1.10.12), and not dependency resolution (copying the local `Manifest.toml`
+across does not reproduce the 2,395). The cause is the **working tree**,
+and the six assertions are named: testset 11b gates a block on
 
 ```julia
 csv = joinpath(@__DIR__, "..", "notebooks", "data", "columbus.csv")
@@ -1043,8 +1104,9 @@ if isfile(csv)
 and that block holds exactly six assertions — one `@test_logs` guarding
 `fit_mgwr` against convergence warnings, and five `@test`s on the fit. So
 testset 11b reports **12 in the repository and 6 in a `src`-and-`test`-only
-copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it: the
-extensions-absent figure CI sees is **2,395**, not 2,389.
+copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it, and
+the extensions-absent figure CI sees is the in-repository one — 2,395 then,
+3,016 now — never the copy's.
 
 Two consequences for anyone measuring this suite. A scratch copy must
 include `notebooks/data/` to be comparable with the repository at all. And
@@ -1057,15 +1119,19 @@ Note also that `--project=<dir>` does not hide the extensions: `@v1.13`
 stays on `LOAD_PATH`, so Makie and Turing load from the default environment
 anyway. `Pkg.test()` is the only entry point that genuinely excludes them.
 
-† The last three rows count the extension testsets; the Phase 6C row above
+† The last four rows count the extension testsets; the Phase 6C row above
 them does not. So the step from 2,036 to 2,233 is **not** testset 34's
 size: that testset is 162 assertions, and the other 35 is testsets 25 and 26
-running rather than reporting a marker. The step from 2,233 to 2,430 **is**
-testset 35's size exactly, 197. That it comes out exact is itself the check:
-an earlier revision of this table recorded 2,430 as 2,424 and so read the
-step as 191, and the missing six were the Columbus block described above,
-skipped because the measuring script ran from outside `test/`. Comparing two
-rows of this table means checking they were measured the same way first.
+running rather than reporting a marker. Thereafter each step **is** exactly
+the new testset's size: 2,233 to 2,430 is testset 35's 197, and 2,430 to
+3,051 is testset 36's 621.
+
+That the steps come out exact is itself the check, and it has already caught
+one error. An earlier revision of this table recorded 2,430 as 2,424 and so
+read the first step as 191; the missing six were the Columbus block
+described above, skipped because the measuring script ran from outside
+`test/`. Comparing two rows of this table means checking they were measured
+the same way first.
 
 The jump from 527 assertions to 1,156 is the audit, not new features: every
 finding in `docs/AUDIT.md` closed with a test pinning the result to a closed
@@ -1105,6 +1171,7 @@ development line rather than across three releases.
 - Ertur, C., & Musolesi, A. (2017). Weak and strong cross-sectional dependence: A panel data analysis of international technology diffusion. *Journal of Applied Econometrics*, 32(3), 477–503.
 - Fülle, M. J., & Otto, P. (2023). Spatial GARCH models for unknown spatial locations — an application to financial stock returns. *Spatial Economic Analysis*, 19(1), 92–105.
 - Geniaux, G., & Martinetti, D. (2017). A new method for dealing with spatially varying coefficients. *Geographical Analysis*, 50(1), 28–50.
+- Goldsmith-Pinkham, P., Sorkin, I., & Swift, H. (2020). Bartik instruments: What, when, why, and how. *American Economic Review*, 110(8), 2586–2624.
 - Griffith, D. A. (2003). *Spatial Autocorrelation and Spatial Filtering*. Springer.
 - Halleck Vega, S., & Elhorst, J. P. (2015). The SLX model. *Journal of Regional Science*, 55(3), 339–363.
 - Hastie, T., & Tibshirani, R. (1993). Varying-coefficient models. *Journal of the Royal Statistical Society B*, 55(4), 757–796.
@@ -1136,7 +1203,13 @@ development line rather than across three releases.
 - Wang, C., Kockelman, K. M., & Wang, X. (2013). The spatial dimensions of land use change dynamics in the Austin, Texas Metropolitan Area. *Transportation Research Record*, 2397(1), 131–142.
 - Yu, H., Fotheringham, A. S., Li, Z., Oshan, T., Kang, W., & Wolf, L. J. (2020). Inference in multiscale geographically weighted regression. *Geographical Analysis*, 52(1), 87–106.
 
-**Citations to verify before use — one of them has now failed.** Cerqua et
+**Citations to verify before use — one has failed, one has passed.**
+Goldsmith-Pinkham, Sorkin & Swift (2020) was added to the list above on
+2026-10-31 for Rotemberg weights, after being checked against the published
+record and against the article's own header line (*American Economic
+Review* 2020, 110(8), 2586–2624, doi:10.1257/aer.20181047). It holds, which
+is worth recording alongside the failure: the practice catches bad
+citations without condemning good ones. Cerqua et
 al. (2022) was listed here for spatial synthetic control and has been
 **withdrawn**: checked against the published record on 2026-10-31, it does
 not exist as described, and item #15 now cites Abadie, Diamond &

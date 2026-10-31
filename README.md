@@ -9,8 +9,8 @@ models, HAC-robust inference, weight-matrix construction, input-output
 calibration, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** — 2,430 test assertions across 51 top-level testsets
-> with both package extensions installed, and 2,395 without them. Every
+> **Version 0.3.0** — 3,051 test assertions across 52 top-level testsets
+> with both package extensions installed, and 3,016 without them. Every
 > testset reports an identical count on Julia 1.13.2 and 1.10.12. See
 > [Validation Status](#validation-status) for Monte Carlo results.
 
@@ -208,9 +208,9 @@ our own because:
 
 ```text
 SpatialEconometrics/
-├── src/            # 24 modules: the umbrella plus 23 submodules
+├── src/            # 25 modules: the umbrella plus 24 submodules
 ├── ext/            # Makie and Turing package extensions
-├── test/           # runtests.jl — 51 top-level testsets
+├── test/           # runtests.jl — 52 top-level testsets
 ├── examples/       # 24 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
 ├── validation/     # Monte Carlo output referenced below
