@@ -2,17 +2,17 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 24 submodules, 3,051 test assertions in 52 top-level testsets with both
-> package extensions installed and 3,016 without them — the same counts on
+> 25 submodules, 3,217 test assertions in 53 top-level testsets with both
+> package extensions installed and 3,182 without them — the same counts on
 > Julia 1.13.2 and 1.10.12, since the difference is the extensions and not
-> the version. 25 examples, 12 notebooks, 2 package extensions, CI/CD and
-> 50 Documenter.jl pages. **Phases 4, 5, 6 and 6B are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> the version. 26 examples, 12 notebooks, 2 package extensions, CI/CD and
+> 52 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
-> compact local design, is delivered. **Phase 7A is underway:** item #15's
-> exposure mapping and spatial difference-in-differences landed on
-> 2026-10-30 and its spatial synthetic control on 2026-10-31, leaving its
-> shift-share row plus item
-> #11 (Networks). Tier 3 is otherwise untouched, and the correctness audit
+> compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
+> item #15's exposure mapping and spatial difference-in-differences landed
+> on 2026-10-30, its spatial synthetic control and shift-share diagnostics
+> on 2026-10-31, and item #11 (Networks) on 2026-11-01. **Phase 7B is the
+> next open phase.** Tier 3 is otherwise untouched, and the correctness audit
 > in `docs/AUDIT.md` is closed — findings 1–25, with 29–32 added afterwards
 > from the benchmark suite and Phase 6C.
 >
@@ -794,23 +794,52 @@ at 1e-14, both against estimator errors of order 6%).
 
 | Feature | Description | Reference |
 |---|---|---|
-| Network autocorrelation model | `y = ρWy + Xβ + ε` where W is derived from network adjacency (not geography) | Leenders (2002) |
-| Network weight construction | `network_weights(adjacency; normalize=:row)` — from adjacency matrix, edge list, or graph | — |
-| Peer effects model | `y_i = ρ * mean(y_peers) + Xβ + ε` — endogenous vs exogenous peer effects (Manski reflection problem) | Manski (1993); Bramoullé et al. (2009) |
-| Network centrality instruments | Construct instruments from higher-order network structure (friends-of-friends) to address endogeneity | Bramoullé et al. (2009) |
-| Multiplex spatial models | Multiple W matrices representing different interaction channels (trade + migration + FDI) | LeSage & Pace (2009, Ch. 9) |
+| ~~Network weight construction~~ | ~~`network_weights(adjacency; normalize=:row)` — from adjacency matrix, edge list, or graph~~ | — |
+| ~~Network autocorrelation model~~ | ~~`y = ρWy + Xβ + ε` where W is derived from network adjacency (not geography)~~ | Leenders (2002) |
+| ~~Peer effects model~~ | ~~`y_i = ρ * mean(y_peers) + Xβ + ε` — endogenous vs exogenous peer effects (Manski reflection problem)~~ | Manski (1993); Bramoullé et al. (2009) |
+| ~~Network centrality instruments~~ | ~~Construct instruments from higher-order network structure (friends-of-friends) to address endogeneity~~ | Bramoullé et al. (2009) |
+| ~~Multiplex spatial models~~ | ~~Multiple W matrices representing different interaction channels (trade + migration + FDI)~~ | Lee & Liu (2010) |
 
-**Refinement:** the Manski reflection problem and Bramoullé instruments are
-already two of the rows above; what the recent literature adds is making the
-identification check mechanical rather than assumed — automated rank
+**Status:** ✅ **Complete** (2026-11-01). `src/SpatialNetworks.jl`, submodule 25. Docs: `docs/src/models/networks.md`, `docs/src/api/networks.md`. Example: `examples/26_networks.jl`. Tests: testset 37.
+
+**Key functions:**
+- `network_weights(A)` / `network_weights(edges, n)` → `SparseMatrixCSC`
+- `group_weights(sizes; include_self)` → the Manski / Moffitt / Lee group structures
+- `peer_identification(G; fixed_effects)` → `PeerIdentification`
+- `fit_peer_effects(y, X, G; fixed_effects, vcov, instrument_order)` → `PeerEffectsFit`
+- `fit_multiplex_sar(y, X, Ws)` → `MultiplexSAR`
+- `network_moran(fit, W)` → `MoranResult`
+
+**Two corrections to this item, both found by reading the primary sources
+rather than working from the plan.**
+
+*The refinement was imprecise.* It previously read: "automated rank
 validation of the `W²X`, `W³X` instrument set, reported alongside the fit so
-a user sees when the exclusion restriction has nothing to stand on.
+a user sees when the exclusion restriction has nothing to stand on." That is
+a real and useful diagnostic — it is now reported as `first_stage_F` — but
+it is **not** Bramoullé, Djebbari and Fortin's condition. Theirs is a rank
+condition on the *matrices* `I, G, G²` and does not involve `X` at all;
+their footnote 17 gives the check verbatim, as a rank-3 test on
+`[vec(I) vec(G) vec(G²)]`. The two answer different questions —
+identification in population versus instrument power in this sample — and
+both are now reported, separately labelled, because conflating them is how a
+degenerate network gets fitted.
 
-**New file:** `src/SpatialNetworks.jl` (~400 lines)
+*The row's rationale was wrong.* The Phase 7A table said this item "mostly
+reframes what `W` may represent rather than adding inference, so it goes
+second." The reframing is indeed cheap: the network autocorrelation model is
+the existing SAR with a different `W`, and the package's log-determinant
+machinery was already safe for the non-symmetric `W` a directed network
+produces. But the peer-effects row is an *identification* result, not a
+reframing, and it fails on the structures applied work uses most. Scheduling
+it second was still right; the stated reason was not.
 
-**Dependencies:** None for core (W is just a sparse matrix); optional Graphs.jl for graph construction
+**Dependencies:** None. An adjacency is a sparse matrix and an edge list is a
+vector of pairs; Graphs.jl was considered and not added.
 
-**Estimated complexity:** ~400 lines
+**Estimated complexity:** ~400 lines. **Actual: 1,187**, the overrun being
+the multiplex MLE (taken at full maximum likelihood rather than deferred)
+and the identification machinery the estimate did not anticipate.
 
 ---
 
@@ -989,13 +1018,13 @@ column per sweep rather than the local designs. Cheapening that means not
 re-scanning a bandwidth that has stopped moving, which changes which fixed
 point the back-fitting reaches — a decision, not a tidy-up.
 
-### Phase 7A — 🟡 Networks & causal policy evaluation
+### Phase 7A — ✅ Complete
 
 | Priority | Item | Est. Lines | Status |
 |---|---|---|---|
 | 13 | Spatial Causal Inference (#15) | ~600 | ✅ **Complete.** Exposure mapping and spatial DiD 2026-10-30; spatial synthetic control and shift-share diagnostics 2026-10-31. About 2,900 lines across `SpatialCausal.jl`, the new `SpatialShiftShare.jl` and `SpatialHAC.jl`, against an estimate of ~600 for a scope that excluded three of these |
-| 14 | Spatial Networks (#11) | ~400 | ⬜ Extends beyond geography. Cheaper than #15 but mostly reframes what `W` may represent rather than adding inference, so it goes second |
-| | **Phase 7A total** | **~1,000** | |
+| 14 | Spatial Networks (#11) | ~400 | ✅ **Complete** 2026-11-01. 1,187 lines in the new `SpatialNetworks.jl`. The "mostly reframes what `W` may represent rather than adding inference" rationale was wrong — see #11 — though the ordering it produced was right |
+| | **Phase 7A total** | **~1,000** | **Actual: about 4,100 lines across four submodules** |
 
 The #15 row's original rationale said it "builds on `spatial_effects` —
 already written and audited". That turned out to be half true and is worth
@@ -1005,6 +1034,28 @@ panel coefficient layout (intercept offset, `ρ` last, `K = P_cov` or
 `P_cov/2`) that a DiD design does not have. In the event the two-period
 decomposition needed no delta method at all, every reported effect being
 linear in `θ̂`.
+
+The networks pass is the one where reading the source changed the work. The
+plan called the identification check a formality implied by the roadmap's
+own refinement; the refinement turned out to describe a different quantity
+from the published condition, and the published one fails on equal-sized
+groups, on self-included group means whatever the sizes, on two group sizes
+under fixed effects, and on stars. All four are now pinned as integer rank
+facts. Two things were also caught by measurement rather than by reasoning:
+the rank tolerance, whose first value sat below the numerical noise floor
+and reported a degenerate network as identified; and the claim that a robust
+covariance is needed here, which is true only under heteroskedasticity
+around an order of magnitude in spread and is invisible at 1.5x.
+
+Reuse was high and from the expected places for once: `fit_spatial` is the
+network autocorrelation model with a different `W`, `brent_maximize` is the
+inner solver of the multiplex coordinate ascent, `row_standardize` already
+left isolate rows all-zero, and `spatial_trace_powers` was already
+documented as safe for the non-symmetric `W` a directed graph produces. The
+one thing the pass added rather than reused was a fourth copy of a
+chi-squared survival function — in `SpatialShiftShare`, the previous pass,
+spelled `_chisq_sf` so the existing identity test could not see it. Removed,
+and that test now pins module identity rather than name.
 
 The synthetic control pass reused more than expected, and from a different
 place: `exposure` (written for the DiD) finds the neighbours to screen out
@@ -1055,21 +1106,22 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #15 exposure mapping and spatial DiD) | 23 | 2,233 † | 16,949 |
 | **master** (+ #15 spatial synthetic control) | 23 | 2,430 † | 17,962 |
 | **master** (+ #15 shift-share, so #15 complete) | 24 | 3,051 † | 19,085 |
-| **v0.4.0** (= master today, unreleased) | 24 | 3,051 † | 19,085 |
+| **master** (+ #11 networks, so Phase 7A complete) | 25 | 3,217 † | 20,289 |
+| **v0.4.0** (= master today, unreleased) | 25 | 3,217 † | 20,289 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 27–29 | ~3,300 | ~22,000 |
 
-Measured on master: 24 submodules plus the umbrella across 19,085 lines of
-`src/`, 7,261 lines of tests, 3,536 lines of examples across 25 scripts,
-398 lines of package extensions, 50 documentation pages and 12 notebooks
+Measured on master: 25 submodules plus the umbrella across 20,289 lines of
+`src/`, 7,852 lines of tests, 3,781 lines of examples across 26 scripts,
+398 lines of package extensions, 52 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
 **State the environment with the assertion count.** The figures above are
-3,051 with Makie and Turing **installed**, where testsets 25 and 26
-contribute 11 and 24 assertions, and 3,016 with both **absent**, where each
+3,217 with Makie and Turing **installed**, where testsets 25 and 26
+contribute 11 and 24 assertions, and 3,182 with both **absent**, where each
 reports a single broken marker instead of running. Both were measured in the
 repository working tree, which matters — see the correction below. That
-difference is 35 passing assertions — 3,016 + 11 + 24 = 3,051, the two
+difference is 35 passing assertions — 3,182 + 11 + 24 = 3,217, the two
 broken markers being replaced rather than added, which is why the arithmetic
 is 35 and not 33. A count quoted without its environment can therefore look
 like a regression when nothing has regressed.
@@ -1106,7 +1158,7 @@ and that block holds exactly six assertions — one `@test_logs` guarding
 testset 11b reports **12 in the repository and 6 in a `src`-and-`test`-only
 copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it, and
 the extensions-absent figure CI sees is the in-repository one — 2,395 then,
-3,016 now — never the copy's.
+3,182 now — never the copy's.
 
 Two consequences for anyone measuring this suite. A scratch copy must
 include `notebooks/data/` to be comparable with the repository at all. And
@@ -1119,12 +1171,36 @@ Note also that `--project=<dir>` does not hide the extensions: `@v1.13`
 stays on `LOAD_PATH`, so Makie and Turing load from the default environment
 anyway. `Pkg.test()` is the only entry point that genuinely excludes them.
 
-† The last four rows count the extension testsets; the Phase 6C row above
+† The last five rows count the extension testsets; the Phase 6C row above
 them does not. So the step from 2,036 to 2,233 is **not** testset 34's
 size: that testset is 162 assertions, and the other 35 is testsets 25 and 26
-running rather than reporting a marker. Thereafter each step **is** exactly
+running rather than reporting a marker. The next two steps **are** exactly
 the new testset's size: 2,233 to 2,430 is testset 35's 197, and 2,430 to
 3,051 is testset 36's 621.
+
+The last step is **not**, and the discrepancy is the point of keeping the
+check. 3,051 to 3,217 is 166, while testset 37 is 163. The other **3** were
+added to testset 21, which pins the chi-squared survival function to a
+single shared definition: two more module-identity assertions and one that
+the removed duplicate is really gone. So the rule is that a step equals the
+new testset's size *unless an existing testset also changed*, and when it
+does not balance the right response is to find the three rather than to
+adjust the total.
+
+**The same check caught a defect across versions, not just across rows.**
+The networks row first measured 3,215 and 3,180 on 1.13.2 against 3,179 on
+1.10.12 — one assertion fewer, with no failure anywhere. Testset `37e`
+asserted Corollary 1 behind an `if diameter >= 3 && connected` guard over
+an Erdos-Renyi draw, and `MersenneTwister(77)` does not give the same edge
+set on both versions (326 edges against 288); at 288 the draw was
+disconnected, the guard failed, and the assertion did not run. A guarded
+assertion that fails its guard does not fail, it disappears. It is now an
+unconditional implication over deterministic structures, `37e` reports 12
+on both versions, and the totals above are the post-fix ones. See
+`docs/AUDIT.md`. **An assertion count that differs by environment is a
+finding until its mechanism is known** — the extensions difference above is
+documented as two figures because there the mechanism *is* known; this one
+was coverage going missing.
 
 That the steps come out exact is itself the check, and it has already caught
 one error. An earlier revision of this table recorded 2,430 as 2,424 and so
@@ -1182,8 +1258,9 @@ development line rather than across three releases.
 - Kostov, P. (2009). A spatial quantile regression hedonic model of agricultural land prices. *Spatial Economic Analysis*, 4(1), 53–72.
 - Krzyśko, M., Nijkamp, P., Ratajczak, W., Wołyński, W., & Wenerska, B. (2023). Spatio-temporal principal component analysis. *Spatial Economic Analysis*, 19(1), 8–29.
 - Kubara, M., & Kopczewska, K. (2023). Akaike information criterion in choosing the optimal k-nearest neighbours of the spatial weight matrix. *Spatial Economic Analysis*, 19(1), 73–91.
+- Lee, L. F., & Liu, X. (2010). Efficient GMM estimation of high order spatial autoregressive models with autoregressive disturbances. *Econometric Theory*, 26(1), 187–230.
 - Lee, L.-F., & Yu, J. (2012). QML estimation of spatial dynamic panel data models with time varying spatial weights matrices. *Spatial Economic Analysis*, 7(1), 31–74.
-- Leenders, R. T. A. J. (2002). Modeling social influence through network autocorrelation. *Social Networks*, 24(1), 21–47.
+- Leenders, R. T. A. J. (2002). Modeling social influence through network autocorrelation: constructing the weight matrix. *Social Networks*, 24(1), 21–47.
 - LeSage, J. P. (2014). Spatial econometric panel data model specification: A Bayesian approach. *Spatial Statistics*, 9, 122–145.
 - LeSage, J. P. (2015). Software for Bayesian cross section and panel spatial model comparison. *Journal of Geographical Systems*, 17(4), 297–310.
 - LeSage, J., & Pace, R. K. (2009). *Introduction to Spatial Econometrics*. CRC Press.
@@ -1202,6 +1279,21 @@ development line rather than across three releases.
 - Vuong, Q. H. (1989). Likelihood ratio tests for model selection and non-nested hypotheses. *Econometrica*, 57(2), 307–333.
 - Wang, C., Kockelman, K. M., & Wang, X. (2013). The spatial dimensions of land use change dynamics in the Austin, Texas Metropolitan Area. *Transportation Research Record*, 2397(1), 131–142.
 - Yu, H., Fotheringham, A. S., Li, Z., Oshan, T., Kang, W., & Wolf, L. J. (2020). Inference in multiscale geographically weighted regression. *Geographical Analysis*, 52(1), 87–106.
+
+**A chapter attribution was corrected.** Item #11's multiplex row cited
+LeSage & Pace (2009, Ch. 9). The book is real and correctly listed above,
+but its Chapter 9 is *Matrix Exponential Spatial Models* — checked on
+2026-11-01 against the Library of Congress CIP record for the 2009 CRC
+edition, which gives the full contents — and the book has no multiplex
+chapter. The row now cites Lee & Liu (2010), *Econometric Theory* 26(1),
+187–230, verified the same day, which is the actual econometrics of
+`y = Σⱼ ρⱼ Wⱼ y + Xβ + ε`. Worth distinguishing from the Cerqua case below: a
+real reference pointed at the wrong chapter, not a reference that does not
+exist. The three citations item #11 already carried — Leenders (2002),
+Manski (1993) and Bramoullé, Djebbari & Fortin (2009) — were each checked
+against the primary source and all three hold; BDF's full text was read and
+every formula in `SpatialNetworks.jl` is quoted from it rather than
+recalled.
 
 **Citations to verify before use — one has failed, one has passed.**
 Goldsmith-Pinkham, Sorkin & Swift (2020) was added to the list above on

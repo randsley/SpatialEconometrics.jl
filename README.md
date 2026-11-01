@@ -9,8 +9,8 @@ models, HAC-robust inference, weight-matrix construction, input-output
 calibration, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** — 3,051 test assertions across 52 top-level testsets
-> with both package extensions installed, and 3,016 without them. Every
+> **Version 0.3.0** — 3,217 test assertions across 53 top-level testsets
+> with both package extensions installed, and 3,182 without them. Every
 > testset reports an identical count on Julia 1.13.2 and 1.10.12. See
 > [Validation Status](#validation-status) for Monte Carlo results.
 
@@ -170,6 +170,9 @@ want an internal helper:
 | `SpatialRegimeModels` | Regime models with SKATER regionalization | Assuncao et al. (2006) |
 | `SpatialDiscreteChoice` | Spatial probit — linearized GMM and Albert-Chib Gibbs | Klier & McMillen (2008) |
 | `SpatialFiltering` | Eigenvector spatial filtering (ESF) and RE-ESF | Griffith (2003) |
+| `SpatialCausal` | Exposure mapping, spatial DiD, synthetic control | Abadie, Diamond & Hainmueller (2010) |
+| `SpatialShiftShare` | Shift-share designs and the AKM standard error | Adao, Kolesar & Morales (2019) |
+| `SpatialNetworks` | Peer-effects identification, network 2SLS, multiplex SAR | Bramoulle, Djebbari & Fortin (2009) |
 | `SpatialSimulation` | Six DGPs, Monte Carlo, power analysis | — |
 | `SpatialTables` | Coefficient and regression tables, LaTeX / CSV / Markdown | — |
 
@@ -208,10 +211,10 @@ our own because:
 
 ```text
 SpatialEconometrics/
-├── src/            # 25 modules: the umbrella plus 24 submodules
+├── src/            # 26 modules: the umbrella plus 25 submodules
 ├── ext/            # Makie and Turing package extensions
-├── test/           # runtests.jl — 52 top-level testsets
-├── examples/       # 24 runnable examples, one per topic
+├── test/           # runtests.jl — 53 top-level testsets
+├── examples/       # 26 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
 ├── validation/     # Monte Carlo output referenced below
 └── benchmark/      # BenchmarkTools suite; see benchmark/README.md

@@ -7,7 +7,7 @@ using Printf
 using StatsAPI
 import StatsAPI: coef, vcov, stderror, nobs, residuals, coefnames, dof_residual
 
-import ..SpatialUtils: check_design_rank, _print_coef_table, _normcdf
+import ..SpatialUtils: check_design_rank, _print_coef_table, _normcdf, _chi2_sf
 import ..SpatialHAC: ClusterRobustVCOV, vcov_cluster
 import ..SpatialDiagnostics: MoranResult, moran_global
 import Random
@@ -809,49 +809,18 @@ function balance_test(d::ShiftShareDesign{T},
     chi2, df, pj = if M == 1
         v = Vjoint[1, 1]
         c2 = v > zero(T) ? coefs[1]^2 / v : T(NaN)
-        (c2, 1, isnan(c2) ? one(T) : T(_chisq_sf(Float64(c2), 1)))
+        (c2, 1, isnan(c2) ? one(T) : T(_chi2_sf(Float64(c2), 1)))
     else
         Vs = Symmetric(Vjoint)
         if rank(Vs) < M
             (T(NaN), M, one(T))
         else
             c2 = dot(coefs, Vs \ coefs)
-            (c2, M, T(_chisq_sf(Float64(c2), M)))
+            (c2, M, T(_chi2_sf(Float64(c2), M)))
         end
     end
 
     return BalanceTest{T}(coefs, ses, t, p, nms, chi2, df, pj, K)
-end
-
-# Upper tail of a chi-square. Series for the regularised incomplete gamma,
-# which is all that is needed at these small degrees of freedom and avoids
-# a SpecialFunctions dependency.
-function _chisq_sf(x::Float64, k::Int)
-    x <= 0 && return 1.0
-    if k == 1
-        return 2 * (1 - _normcdf(sqrt(x)))
-    elseif k == 2
-        return exp(-x / 2)
-    end
-    # Recurrence on k, two steps at a time, from the k = 1 or 2 base.
-    if iseven(k)
-        s = exp(-x / 2)
-        term = s
-        for j in 1:(k ÷ 2 - 1)
-            term *= x / (2 * j)
-            s += term
-        end
-        return min(1.0, s)
-    else
-        s = 2 * (1 - _normcdf(sqrt(x)))
-        term = sqrt(2 * x / pi) * exp(-x / 2)
-        s += term
-        for j in 1:((k - 3) ÷ 2)
-            term *= x / (2 * j + 1)
-            s += term
-        end
-        return min(1.0, s)
-    end
 end
 
 Base.show(io::IO, b::BalanceTest) = begin

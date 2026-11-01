@@ -1263,6 +1263,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-30 | `stpca` — spatio-temporal principal components | a decomposition, not a statistic, so the gate is again the error rate: 200 draws per cell with a known field planted in one feature, `:moran` puts a smooth field first in 73–87% and a high-contrast field last in 72–86%, with 0 of 800 draws at the wrong end; the eigenvalue identity `λ = Var(U)·I(Aγ)` is checked against independently implemented statistics to 5.0e-14 | Verified correct |
 | 2026-10-31 | `fit_synthetic_control` / `placebo_test` — spatial synthetic control and its permutation inference | two gates. The p-value is a test statistic: no effect anywhere, 7×7 lattice, 44 clean donors, exact permutation, 1,000 reps — size 0.046 / 0.095 at nominal 5% / 10% at `ρ = 0`, 0.045 / 0.094 at `ρ = 0.6`, and 0.068 / 0.125 at `ρ = 0.9`, so it is correctly sized up to moderate spatial correlation and over-rejects by about a third of nominal at strong correlation. The estimator is checked against the exact optimum by support enumeration rather than a tolerance: objective to 3.55e-15, weights to 1.31e-14. Donor-pool contamination is an algebraic identity, pinned to 1e-12 | Verified correct; `ρ = 0.9` over-rejection and the p-value granularity floor documented |
 | 2026-10-31 | `fit_shift_share` / `balance_test` — shift-share designs, the AKM standard error and the shock-level balance test | two gates. Coverage of a nominal 95% interval, 2,000 reps, shares and residuals fixed with the shocks resampled: AKM 0.936 against HC1 0.732 at 100 effective shocks with a strong industry component, and HC1 rejecting a true null in up to 71% of samples — the failure the estimator exists for, reproduced. Clustering on each region's largest industry tracks HC1 (0.720) rather than fixing it. AKM itself falls to 0.864 at 20 effective shocks and 0.827 at 38 with concentrated exposure. The balance test is a test statistic: size 0.056 / 0.108 at nominal 5% / 10% at 100 effective shocks, 0.109 at 20 and 0.232 at 9, and the joint test over four characteristics reaches 0.324 at 20. Three published identities are pinned at machine precision rather than by tolerance: the Borusyak-Hull-Jaravel shock-level equivalence to 2.3e-13, the Goldsmith-Pinkham-Sorkin-Swift decomposition to 2.6e-13, and the reduction of the AKM variance to a cluster-robust one under full specialisation to 3.0e-15 | Verified correct; the few-shock degradation of both the interval and the balance test documented under warnings |
+| 2026-11-01 | `peer_identification` / `fit_peer_effects` — the network identification condition and the peer-effects 2SLS | two gates, and the first is not a Monte Carlo because the quantity is not random. `peer_identification` returns a verdict, so the gate is exact agreement with the verdicts Bramoullé, Djebbari and Fortin state in words, on the structures they name: equal-sized groups, self-included group means, two group sizes under fixed effects, three sizes, stars, complete bipartite graphs, lines and cycles — all 40 agree, as integer ranks rather than tolerances. The tolerance those ranks turn on is itself measured: worst spurious singular value across degenerate structures 1.97e-8, smallest genuine one across identified structures 4.0e-3, a separation of 2.0e5, and the default sits between them. The estimator's interval is the second gate: coverage of a nominal 95% interval, 2,000 replications, `n = 300` — 0.950–0.970 with a robust covariance across densities and error structures, against 0.921–0.942 for a homoskedastic one under strong heteroskedasticity. The Sargan test is a test statistic and is well sized throughout: 0.094–0.104 at 10%, 0.044–0.049 at 5%, 0.009–0.013 at 1%, across four densities. Five published identities are pinned at machine precision: `G² = G` under Manski's convention to 2.8e-17, the Moffitt/Lee within-block expansion exactly, their page-47 `G³` expansion for two groups to 2.8e-17, `G³ = G` on complete bipartite graphs exactly, and their Appendix B collinearity equivalence to 8.9e-16 | Verified correct; the density degradation of the estimator, and the fact that it does not show up in the rejection rate, documented under a warning |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -2538,3 +2539,209 @@ simulated rate.
 
 **Scope.** Item #15 is complete: exposure mapping, spatial DiD, spatial
 synthetic control and shift-share diagnostics.
+
+
+### `peer_identification` and `fit_peer_effects` — in testset 37
+
+Phase 7A's last row, and the one where reading the primary source changed
+what got built. The roadmap described the deliverable as "automated rank
+validation of the `W²X`, `W³X` instrument set". Bramoullé, Djebbari and
+Fortin's condition is not that. Theirs is a rank condition on the matrices
+`I, G, G²` and does not involve `X` at all; their footnote 17 states the
+check verbatim, as a rank-3 test on `[vec(I) vec(G) vec(G²)]`. The two
+answer different questions — identification in population, instrument power
+in this sample — and both are now reported, separately labelled. Conflating
+them is how a degenerate network gets fitted.
+
+**1. The verdicts, as integers.** The paper states its results about named
+structures, so the gate is exact agreement rather than a tolerance, and the
+algebra behind each is pinned too.
+
+| Structure | Prop. 1 | Prop. 4 | Identity pinned |
+|---|---|---|---|
+| Equal-sized groups | ✗ rank 2 | ✗ | — |
+| Groups, mean includes self | ✗ rank 2 | ✗ | `G² = G` to 2.8e-17, any sizes |
+| Groups, mean excludes self, equal | ✗ rank 2 | ✗ | `G² = I/(s-1) + ((s-2)/(s-1))G` exactly |
+| Two distinct group sizes | ✓ rank 3 | ✗ rank 3 | their p.47 `G³` expansion to 2.8e-17 |
+| Three distinct group sizes | ✓ | ✓ rank 4 | — |
+| Star / complete bipartite | ✓ | ✗ | `G³ = G` exactly |
+| Line, cycle, random graph | ✓ | ✓ | diameter ≥ 3 (their Corollary 1) |
+
+Forty verdicts, all agreeing. The second row is the one that matters in
+practice: taking a classroom average *including* the student makes
+`G² = G` identically, and no variation in group size rescues it.
+
+**2. The tolerance was wrong, and measurement caught it.** The rank is
+computed from the Gram matrix of the trace inner product rather than from
+an explicit `n² × m` matrix — at `n = 3,000` the explicit form is 288 MB
+and the Gram is `m × m`. The cost is that forming the Gram squares the
+condition number, so a singular value that is truly zero comes back near
+`sqrt(eps)` rather than at zero.
+
+Measured: the largest spurious singular value across the degenerate
+structures above is **1.97e-8**, on two equal groups of 8. The smallest
+genuine deciding value across identified structures is **4.0e-3**. The two
+populations are separated by a factor of 2.0e5.
+
+The first default was `1e-8`, which sits *below* that noise floor, and it
+reported two equal groups of 8 as **identified** — contradicting their
+Proposition 2 outright. The default is now `1e-6`, 50× above the measured
+noise and 4,000× below the measured signal, and both sides of that
+separation are pinned as tests, including the failing case at `1e-8` so the
+regression cannot return silently. Against a dense SVD of the explicit
+matrix the Gram singular values agree to better than 1e-7 throughout.
+
+**3. Identified is not estimable, and the failure is silent.** The rank
+condition is a population statement. Whether a sample can exploit it is
+separate, and it degrades with network density, because a unit's peers'
+peers become nearly everybody and `G²x` flattens towards a constant. 400
+draws per row, Erdős–Rényi at `n = 300`, true `β = 0.4`:
+
+| Density | Mean degree | Median `β̂` | sd(`β̂`) | Median first-stage F | Rejection at 10% |
+|---|---|---|---|---|---|
+| 0.015 | 4.6 | 0.402 | 0.226 | 36.5 | 0.105 |
+| 0.020 | 6.0 | 0.396 | 0.304 | 30.4 | 0.130 |
+| 0.030 | 9.0 | 0.421 | 0.504 | 21.8 | 0.117 |
+| 0.050 | 15.0 | 0.378 | 1.160 | 13.2 | 0.087 |
+| 0.100 | 29.9 | 0.309 | 1.865 | 6.8 | 0.062 |
+| 0.200 | 59.8 | 0.147 | 4.695 | 4.4 | 0.062 |
+
+This reproduces the paper's own simulation finding that precision is a
+decreasing function of density. The spread of `β̂` rises
+**twenty-one-fold**, the median biases toward zero, and the first-stage F
+collapses from 36.5 to 4.4.
+
+The last column is the finding worth recording. **The rejection rate does
+not deteriorate — it improves**, from 0.105 to 0.062. The standard errors
+grow faster than the estimates do, so the test turns conservative exactly
+as the estimate becomes useless, and nothing about the significance of the
+result reveals it. That is why `first_stage_F` is computed and warned on at
+a threshold of 10, rather than left for the user to think of.
+
+**4. The robust covariance earns its default, conditionally.** Coverage of
+a nominal 95% interval for `β`, 2,000 replications, `n = 300`:
+
+| `β` | Errors | `:robust` | `:homoskedastic` |
+|---|---|---|---|
+| 0.0 | homoskedastic | 0.966 | 0.970 |
+| 0.0 | heteroskedastic | 0.970 | 0.942 |
+| 0.3 | heteroskedastic | 0.964 | 0.926 |
+| 0.6 | heteroskedastic | 0.961 | 0.921 |
+
+Two things, one of which contradicted the guess that prompted the run. The
+gap **widens with `β`**: the spatial multiplier `(I - βG)⁻¹` compounds the
+heteroskedasticity across the network rather than averaging it away, which
+is the opposite of what was expected. And a first pass using mild
+heteroskedasticity — a 1.5× spread in the error standard deviation — showed
+no separation at all; the table above uses an 11× spread. So the default is
+right and will often make no visible difference, and saying only the first
+half of that would oversell it.
+
+**5. Sargan size.** A test statistic, so it owes a null distribution. 2,000
+replications under correct specification:
+
+| Density | 10% | 5% | 1% |
+|---|---|---|---|
+| 0.015 | 0.098 | 0.044 | 0.013 |
+| 0.030 | 0.094 | 0.045 | 0.009 |
+| 0.060 | 0.104 | 0.049 | 0.010 |
+| 0.120 | 0.099 | 0.049 | 0.009 |
+
+Correctly sized throughout, including at densities where the estimator
+itself has fallen apart — which is worth knowing, since it means a passed
+Sargan test says nothing about whether the instruments are strong.
+
+**6. Exactness against independently written code.** The 2SLS estimator
+reproduces the formula as printed in their §4, written out separately in
+the test file, to **3.8e-13**, in both the plain and the fixed-effects
+form. The multiplex fit with a single channel reproduces
+`fit_spatial(SAR, …)` — already written and audited — with the maximised
+log-likelihood agreeing to **5.7e-14** and the standard errors to 1.6e-10
+and 6.0e-10, which is what validates the generalised information matrix
+rather than merely the optimiser. The multiplex coordinate ascent is
+checked against a dense grid search over the stationary region, since
+coordinate ascent can stall on a ridge and that had to be measured rather
+than assumed.
+
+**7. A correctness bug the tests found.** The first implementation required
+the instrument block to have full column rank. On interaction in two groups
+it does not: `G²x` lies in the span of `x`, `G x` and a group indicator, so
+one column is redundant — on a network that **passes** the rank condition.
+A redundant instrument supplies no information but invalidates nothing; the
+orthogonal projector onto the instrument span exists whatever its rank, and
+only the `(S'S)⁻¹` form of it fails. The projection is now taken from an
+orthonormal basis of that span, and the instrument **rank** rather than its
+column count feeds the Sargan degrees of freedom, where counting columns
+would have overstated the restrictions.
+
+**8. Why `check = false` cannot rescue a degenerate network.** It was
+written as an escape hatch and it does not work on an exactly degenerate
+structure — which is not a limitation of the override. Their Appendix B
+proves that `I, G, G²` are dependent **if and only if** `E(Gy|x)` is
+perfectly collinear with `(ι, x, Gx)`, so when identification fails the
+instruments are collinear with the included regressors and no estimate
+exists to report. Measured on equal-sized groups, the residual of `E(Gy|x)`
+on `(ι, x, Gx)` is 8.9e-16; on a two-size structure, which is identified,
+it is not small. Both directions are pinned.
+
+**A chapter attribution was corrected.** Item #11's multiplex row cited
+LeSage & Pace (2009, Ch. 9). The book is real and correctly listed, but its
+Chapter 9 is *Matrix Exponential Spatial Models*, confirmed against the
+Library of Congress CIP record for the 2009 CRC edition, and the book has
+no multiplex chapter. The row now cites Lee & Liu (2010), *Econometric
+Theory* 26(1), 187–230, verified the same day. This is a weaker failure
+than the Cerqua one above — a real reference pointed at the wrong chapter,
+not a reference that does not exist — and is worth distinguishing as such.
+The three citations the item already carried, Leenders (2002), Manski
+(1993) and Bramoullé, Djebbari & Fortin (2009), were each checked against
+the primary source and all three hold.
+
+**A fourth copy of the chi-squared survival function was removed.** The
+previous pass added `_chisq_sf` to `SpatialShiftShare`, duplicating
+`SpatialUtils._chi2_sf`. The suite already carried a test pinning that
+function to a single definition — written after three copies once produced
+a wrong p-value — and it did not catch this one, because the copy was
+spelled differently. The duplicate is gone and that test now pins module
+identity rather than name. The shared version is also the more accurate:
+the removed copy leaned on `_normcdf` and was good to 1.5e-7 on odd degrees
+of freedom, against 6e-9 for the shared one.
+
+**A guarded assertion is worse than a failing one.** Testset `37e` asserted
+Corollary 1 as a `@test` inside an `if id.diameter >= 3 && id.connected`
+guard, over four structures, one of which was an Erdos-Renyi draw. The
+guard is the right *logic* and the wrong *construction*: when it fails the
+assertion does not fail, it does not run. The suite stays green and the
+only trace is that the assertion count is one lower.
+
+That is exactly what happened, and the cross-version run is what found it.
+The same `MersenneTwister(77)` and the same calls give the ER graph **326
+edges on 1.13.2 and 288 on 1.10.12** — the standing rule above about pinning
+a random draw, in its quietest form, since nothing here pinned a *number*.
+At 288 edges the draw came out disconnected, so on 1.10 the guard failed,
+the assertion vanished, and the full suite reported **3,179 + 2 broken
+against 3,180 + 2** on 1.13.2. A one-assertion gap is the entire signal
+available: no failure, no warning, no red CI.
+
+Two changes, because the guard and the draw are separate faults:
+
+| Fault | Fix |
+|---|---|
+| The assertion was guarded, so a failed guard silently removed coverage | Asserted as the implication it is: `@test !(diameter >= 3 && connected) \|\| identified`. Fires once per structure on every version, whatever the structure turns out to be. |
+| The structure was an RNG draw, so what was covered varied by version | All four structures are now deterministic. The ER draw is replaced by a 4x4 grid — diameter 6, neither a line nor a ring — with its connectivity and diameter asserted outright, so the implication is entered rather than satisfied vacuously. |
+
+`37e` goes from 10 assertions on 1.13.2 and 9 on 1.10.12 to **12 on both**.
+The generalisable part, and the reason this is in the ledger rather than
+just fixed: **an assertion count that differs across environments is a
+finding, not a reconciliation exercise.** The temptation on seeing 3,179
+against 3,180 is to record both figures with their versions, which the
+roadmap already does for the extensions and which is correct there, because
+there the mechanism is known. Here the mechanism was unknown, and the
+difference was coverage going missing.
+
+**What is not here.** No network formation model: links are taken as given
+and strictly exogenous, which is the paper's own maintained assumption and
+the one its conclusion names as the central remaining problem. No global
+differencing (their §3.3 and Proposition 5). No GMM alternative to 2SLS.
+The multiplex fit has no spatially autoregressive disturbance, so it is the
+first half of Lee and Liu's model rather than all of it. Each is additive
+and none is implied by the row's scope.

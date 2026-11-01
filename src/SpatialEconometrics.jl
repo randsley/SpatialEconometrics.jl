@@ -35,6 +35,7 @@ include("SpatialDiscreteChoice.jl")
 include("SpatialFiltering.jl")
 include("SpatialCausal.jl")
 include("SpatialShiftShare.jl")
+include("SpatialNetworks.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -50,6 +51,7 @@ const GWRMod        = GWREstimation
 const GravityMod    = SpatialGravityModels
 const DSLMod        = FormulaDSL
 const ShiftShareMod = SpatialShiftShare
+const NetworksMod   = SpatialNetworks
 const WeightsMod    = SpatialWeights
 const SelectionMod  = SpatialModelSelection
 const PanelDiagMod  = SpatialPanelDiagnostics
@@ -86,6 +88,7 @@ import .SpatialTables: CoefTable, coeftable, summary_stats, to_latex, to_csv, to
 import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianSpatialProbitModel, fit_bayesian_spatial_probit, SpatialOrderedProbitModel, fit_spatial_ordered_probit, SpatialProbitEffects, marginal_effects
 import .SpatialCausal: ExposureMap, exposure, ring_exposure, InterferenceReport, check_interference, SpatialDiDResult, fit_spatial_did, SyntheticControlResult, fit_synthetic_control, donor_weights, PlaceboTest, placebo_test, SpilloverGaps, spillover_gaps
 import .SpatialShiftShare: ShiftShareDesign, shift_share_design, ShiftShareFit, fit_shift_share, ExposureConcentration, exposure_concentration, ShockAggregates, shock_aggregate, BalanceTest, balance_test, RotembergWeights, rotemberg_weights, ShiftShareMoran, shift_share_moran
+import .SpatialNetworks: network_weights, group_weights, PeerIdentification, peer_identification, PeerEffectsFit, fit_peer_effects, MultiplexSAR, fit_multiplex_sar, network_moran
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf, STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups
 
 """
@@ -531,6 +534,13 @@ export
     BalanceTest, balance_test,
     RotembergWeights, rotemberg_weights,
     ShiftShareMoran, shift_share_moran,
+
+    # SpatialNetworks
+    network_weights, group_weights,
+    PeerIdentification, peer_identification,
+    PeerEffectsFit, fit_peer_effects,
+    MultiplexSAR, fit_multiplex_sar,
+    network_moran,
     # Extension entry points (methods live in ext/)
     AbstractBayesianSpatialResult,
     bayesian_sar, bayesian_sdm, bayesian_sem,
