@@ -1264,6 +1264,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-31 | `fit_synthetic_control` / `placebo_test` — spatial synthetic control and its permutation inference | two gates. The p-value is a test statistic: no effect anywhere, 7×7 lattice, 44 clean donors, exact permutation, 1,000 reps — size 0.046 / 0.095 at nominal 5% / 10% at `ρ = 0`, 0.045 / 0.094 at `ρ = 0.6`, and 0.068 / 0.125 at `ρ = 0.9`, so it is correctly sized up to moderate spatial correlation and over-rejects by about a third of nominal at strong correlation. The estimator is checked against the exact optimum by support enumeration rather than a tolerance: objective to 3.55e-15, weights to 1.31e-14. Donor-pool contamination is an algebraic identity, pinned to 1e-12 | Verified correct; `ρ = 0.9` over-rejection and the p-value granularity floor documented |
 | 2026-10-31 | `fit_shift_share` / `balance_test` — shift-share designs, the AKM standard error and the shock-level balance test | two gates. Coverage of a nominal 95% interval, 2,000 reps, shares and residuals fixed with the shocks resampled: AKM 0.936 against HC1 0.732 at 100 effective shocks with a strong industry component, and HC1 rejecting a true null in up to 71% of samples — the failure the estimator exists for, reproduced. Clustering on each region's largest industry tracks HC1 (0.720) rather than fixing it. AKM itself falls to 0.864 at 20 effective shocks and 0.827 at 38 with concentrated exposure. The balance test is a test statistic: size 0.056 / 0.108 at nominal 5% / 10% at 100 effective shocks, 0.109 at 20 and 0.232 at 9, and the joint test over four characteristics reaches 0.324 at 20. Three published identities are pinned at machine precision rather than by tolerance: the Borusyak-Hull-Jaravel shock-level equivalence to 2.3e-13, the Goldsmith-Pinkham-Sorkin-Swift decomposition to 2.6e-13, and the reduction of the AKM variance to a cluster-robust one under full specialisation to 3.0e-15 | Verified correct; the few-shock degradation of both the interval and the balance test documented under warnings |
 | 2026-11-01 | `peer_identification` / `fit_peer_effects` — the network identification condition and the peer-effects 2SLS | two gates, and the first is not a Monte Carlo because the quantity is not random. `peer_identification` returns a verdict, so the gate is exact agreement with the verdicts Bramoullé, Djebbari and Fortin state in words, on the structures they name: equal-sized groups, self-included group means, two group sizes under fixed effects, three sizes, stars, complete bipartite graphs, lines and cycles — all 40 agree, as integer ranks rather than tolerances. The tolerance those ranks turn on is itself measured: worst spurious singular value across degenerate structures 1.97e-8, smallest genuine one across identified structures 4.0e-3, a separation of 2.0e5, and the default sits between them. The estimator's interval is the second gate: coverage of a nominal 95% interval, 2,000 replications, `n = 300` — 0.950–0.970 with a robust covariance across densities and error structures, against 0.921–0.942 for a homoskedastic one under strong heteroskedasticity. The Sargan test is a test statistic and is well sized throughout: 0.094–0.104 at 10%, 0.044–0.049 at 5%, 0.009–0.013 at 1%, across four densities. Five published identities are pinned at machine precision: `G² = G` under Manski's convention to 2.8e-17, the Moffitt/Lee within-block expansion exactly, their page-47 `G³` expansion for two groups to 2.8e-17, `G³ = G` on complete bipartite graphs exactly, and their Appendix B collinearity equivalence to 8.9e-16 | Verified correct; the density degradation of the estimator, and the fact that it does not show up in the rejection rate, documented under a warning |
+| 2026-11-04 | `pesaran_cd` / `alpha_exponent` / `dependence_verdict` — the CD test for weak cross-sectional dependence, the exponent of cross-sectional dependence, and the verdict that reads them together | three statistics, so three gates, and the strongest one is a replication. **Size under independence** at nominal 10/5/1%, across six `(N, T)` combinations including `N ≫ T`: 0.091–0.102, 0.043–0.053, 0.007–0.014. **Pesaran's own headline result reproduced**, `N = 100`, `T = 50`, 3,000 reps, 5% level: rejection 0.048 / 0.054 / 0.055 at true `α = 0.00 / 0.10 / 0.25`, then 0.144 / 0.549 / 1.000 at `α = 0.40 / 0.50 / 0.75` — correctly sized across `[0, ¼]` and over-rejecting above, with the transition at precisely the `α = 1/4` boundary his eq. (12) states. His stated motivation reproduced too, on *estimated* residuals at `T = 10`: `CD` size 0.045 / 0.048 / 0.040 / 0.064 / 0.048 against `CD_lm`'s 0.068 / 0.248 / 0.794 / 1.000 / 1.000 for `N = 10 / 25 / 50 / 100 / 200`. `α̂` is not a test statistic, so its gate is bias and RMSE over Bailey, Kapetanios & Pesaran's own admissible range, plus **refusal where the parameter does not exist**: an independent panel gives `α̂ = 0.3684` and throws, and the cancelling design is refused 300/300 against 0/300 for the homogeneous one. Scale invariance is exact at 0.0e0 under standardisation and 0.394 without it. The CD and LM statistics are recomputed from explicit double loops over eqs (2), (5), (9), (10) and agree to 3.6e-15 or better | Verified correct; two failure configurations measured and documented rather than left to be discovered — see below |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -2745,3 +2746,232 @@ differencing (their §3.3 and Proposition 5). No GMM alternative to 2SLS.
 The multiplex fit has no spatially autoregressive disturbance, so it is the
 first half of Lee and Liu's model rather than all of it. Each is additive
 and none is implied by the row's scope.
+
+## Post-audit: weak versus strong cross-sectional dependence
+
+Two roadmap rows shipped together on 2026-11-04 — the diagnostics that say
+whether a common factor is present (`SpatialCommonFactors`) and the
+estimators that survive one (`SpatioTemporalModels`). They were folded into
+one pass deliberately: separately, one is a test whose remedy does not
+exist and the other a remedy with no test to motivate it.
+
+Suite 3,217 → 3,415 with Makie and Turing installed, and 3,182 → 3,380 with
+both absent, zero failures either way, on **Julia 1.13.3 and 1.10.13** —
+both channels having moved on from the 1.13.2/1.10.12 that earlier sections
+of this file name, so the versions were re-read rather than carried
+forward. The extensions-absent count is identical on the two versions.
+Testsets 38 and 39 contribute 117 and 81 assertions, and the step of 198
+balances exactly. Docs build clean under `checkdocs = :exports`, and
+`examples/27_common_factors.jl` and `examples/28_spatio_temporal.jl` both
+run green.
+
+### The number that justifies the pair
+
+Every design below has a genuine common factor `λᵢfₜ`. Nothing changes but
+the *distribution of the loadings*. Bias / RMSE in `ρ̂`, true `ρ = 0.4`,
+`N = 42`, `T = 30`, 200 replications:
+
+| loadings | `NoFE` | `TwoWayFE` | `fit_sp_cce` | `fit_interactive_fe` |
+|---|---|---|---|---|
+| mean 2 (dominant) | **+0.484** | +0.002 / **0.029** | −0.001 / 0.047 | −0.032 / 0.041 |
+| mean 1 | **+0.285** | +0.003 / 0.068 | −0.000 / 0.047 | −0.017 / **0.032** |
+| mean 0, random | −0.004 | +0.003 / 0.068 | −0.008 / 0.059 | −0.002 / **0.025** |
+| mean 0, balanced ±1 | **+0.329** | **+0.373** ⚠ | +0.005 / 0.100 | −0.023 / **0.035** |
+
+Neither diagonal of that table is the expected story.
+
+**`TwoWayFE` wins outright when the loadings have a strong common mean**
+(RMSE 0.029 against CCE's 0.047). This is worth stating because the
+reflexive advice is the opposite: reach for the more general estimator.
+Here the general estimator loses, and for an understandable reason — a time
+effect is *exactly* a factor with equal loadings, so on that design
+`TwoWayFE` is correctly specified and parsimonious, while CCE spends `N·q`
+projected columns buying nothing. The exactness is measurable, not
+rhetorical: a factor with `λᵢ ≡ λ` is removed by the within-transform to
+`5.55e-16`, and a heterogeneous one keeps 99.9% of its variance.
+
+**`TwoWayFE` is worse than doing nothing when the loadings are balanced in
+sign** — `+0.373` against `NoFE`'s `+0.329`. Removing a cross-sectional
+mean that is already zero destroys variation and leaves the factor
+untouched. That is the only cell in the table where a correction is
+actively harmful, and it is the cell the diagnostics below are least able
+to warn about, which is the whole point of the next section.
+
+### Two failure configurations, measured rather than inferred
+
+A docstring in the first draft said the CD test's blind spot is that
+cancelling loadings give `ρ̄_N ≈ 0` and no rejection. That was a plausible
+inference from eq. (9) and it is wrong. Measured, `N = 40`, `T = 60`, 2,000
+reps, 5% level:
+
+| loadings | CD rejection | `α` identified? | mean \|ρ̂\| |
+|---|---|---|---|
+| independent | 0.047 | no (correctly) | 0.104 |
+| homogeneous | 1.000 | yes, 300/300 | 0.496 |
+| mean-zero random | **0.348** | sometimes | 0.293 |
+| balanced ±1 | 0.911, **all negative** | **no, 0/300** | 0.911 |
+
+There are two distinct failures and neither is a quiet non-rejection.
+
+With **random mean-zero loadings** CD's power collapses to about a third
+and **does not recover as `N` grows**: 0.377 at `N = 10` against 0.343 at
+`N = 160`. It is structural, not a small-sample matter, and that is the
+sharper statement — a power of 0.348 that improved with `N` would be a
+sample-size problem.
+
+With **balanced ±1 loadings** CD rejects 91% of the time, but the statistic
+is **negative**: a strong common factor reported as negative average
+dependence, because `ρ̂ᵢⱼ ∝ λᵢλⱼ` and the signs cancel in the mean while
+accumulating in magnitude. A user reading only the p-value concludes
+correctly by accident, and a user reading the sign concludes the opposite
+of the truth.
+
+What survives both is the **average absolute** correlation, so it is
+returned as `abs_rho_bar` alongside its independence benchmark
+`sqrt(2/(πT))` — measured 0.1036 against a predicted 0.1030. It flags 1.000
+of mean-zero-loading draws where the signed statistic manages 0.348. This
+is why `dependence_verdict` exists and why it checks the absolute average
+against its benchmark *before* trusting the signed statistic.
+
+### A measurement that seemed to overturn a published result
+
+`alpha_exponent`'s bias correction, BKP eq. (15), came out **worse than the
+uncorrected eq. (14) in every cell** of the first run, with the estimator
+biased −0.05 to −0.09 across the admissible range. The paper says the
+correction should help in the middle of that range. The first instinct was
+to treat eq. (15) as not worth its default.
+
+That instinct was wrong, and the general lesson is worth the space: **a
+measurement that appears to overturn a published result is first evidence
+about the implementation.** The resolution was arithmetic.
+`Var(x̄ₜ) = κ²N^(2α−2) + …` with `κ² = σ_f²μ_v²`, so `α̂` is estimated *for
+a given* `κ²` — and the implementation standardises each series, which is
+what makes `α̂` scale invariant, thereby setting `κ²` to the signal share
+rather than 1. At `κ² = 0.5` the predicted shift is
+`½ln(0.5)/ln(50) = −0.0886`; the measured bias at `N = 50` was `−0.0883`.
+The entire discrepancy, to three decimals.
+
+With `κ²` passed correctly the bias is `+0.0003`, and eq. (15) then beats
+the baseline in the middle of the range exactly as BKP state: RMSE 0.0106
+against 0.0202 at `α = 0.70`. So `bias_correct = true` stayed the default,
+`kappa2` became a documented keyword, and the docstring records that
+`kappa2 = 1` is **a convention, not a measurement** — which is the part a
+user actually needs, and the part a default that merely looked validated
+would have hidden.
+
+### Exactness gates against already-audited code
+
+The most useful checks here are not Monte Carlo. Where a new estimator has
+a special case an existing audited one already covers, the agreement should
+be exact, and five such cases were available:
+
+| Reduction | Agreement |
+|---|---|
+| `fit_interactive_fe(n_factors = 0)` against `fit_spatial_panel` | log-likelihood **0.000e+00**, `ρ̂` 9.4e-9 |
+| `fit_star` against the normal equations written out in the test file | coefficients 3.9e-16 / 1.3e-15, `σ̂²` **0.000e+00** |
+| cumulative space-time IRF against `(I − ΣₗAₗ)⁻¹` | 1.1e-15 |
+| `pesaran_cd` on a matrix against the same data as a vector | **0.000e+00** |
+| interactive-FE factor *projection* across starting values | 5.2e-10, and 0.000e+00 under a sign flip |
+
+The `σ²` comparison in the first of these differed at 0.9274 against
+0.9336, which is exactly the 600/596 degrees-of-freedom convention — the
+reference reports the ML value and this implementation the dof-corrected
+one. Documented rather than changed, since neither is wrong.
+
+The last row is the one that matters for interactive fixed effects.
+**Factors and loadings are identified only up to rotation**, so for any
+invertible `R` the pair `(FR, ΛR⁻ᵀ)` fits identically, and a test comparing
+`m.factors` across fits would be testing the starting value. The identified
+object is the projection `F(F'F)⁻¹F'`, which is what `factor_projection`
+returns and what the suite pins. Getting this wrong is the standard error
+in implementations of Bai (2009), and the sign flip — the simplest rotation
+there is — leaves the projection unchanged to exactly `0.0e0`.
+
+### The cross-version run earned its keep again, in a different way
+
+The two-version rule caught something on this pass too, and the shape is
+worth distinguishing from the `37e` case above. There the totals differed
+by one and nothing failed. Here the **totals matched exactly** — 3,381 on
+both — and one assertion *failed* on Julia 1.10.13 while passing on 1.13.3:
+
+```
+38i. the verdict ties the two together: Test Failed
+  Expression: v.kind === :strong
+   Evaluated: semi_weak === strong
+```
+
+So the diagnostic that finds a guarded assertion (count mismatch, no
+failure) would not have found this one, and a one-version run would not
+have found it at all.
+
+The cause is not a defect in `dependence_verdict`, and that was worth
+establishing before changing anything. `:strong` requires `α̂ > 0.9`. On the
+test's design — `N = 60`, `T = 80`, a genuine `α = 1` factor with loadings
+of mean 1 and sd 0.2 against unit noise — `α̂` is **0.9093 with sd 0.0109**
+over 400 draws. The threshold sits 0.85 sd from the mean, so **17% of draws
+classify as `:semi_weak`**. The test did not fail because 1.10 is different;
+it failed because it had roughly a one-in-six chance of failing on any
+stream, and 1.13.3 drew one of the five.
+
+The downward bias is itself the `κ²` effect documented two sections above:
+`kappa2 = 1` is a convention, the standardisation sets the true `κ²` to the
+signal share, and `α̂` is biased down by `½ln(κ²)/ln(N)`. At a signal share
+near 0.5 and `N = 60` that is about `−0.08`, which is the whole gap between
+0.9093 and a true 1.0. Nothing is broken; the estimator is doing what its
+own docstring says.
+
+Two changes, because the fragile test and the blunt boundary are separate
+issues:
+
+| Issue | Response |
+|---|---|
+| The assertion sat 0.85 sd from a hard threshold, so the draw decided the outcome | Design strengthened to loadings of mean 2, where the minimum `α̂` over 400 draws is 0.9516, and the **margin is now asserted** (`α̂ > 0.93`) rather than only the verdict. The claim is now a property of the design. |
+| A genuine `α = 1` factor of moderate strength is labelled `:semi_weak` about one time in six, and nothing said so | Recorded as a warning admonition on `dependence_verdict`, with the measured mean, sd and rate. The threshold was **not** moved: 0.9 is BKP's own characterisation, and moving a principled threshold to make a test pass would be the wrong repair. |
+
+The mitigating fact, stated because it bounds how much the mislabel costs:
+the `:semi_weak` recommendation is to compare `fit_spatial_panel` against
+`fit_sp_cce` and read a material move in `ρ̂` as the factor being absorbed.
+That is the right action on an `α = 1` panel too. The verdict understates
+the kind; it does not misdirect the user.
+
+The generalisable point, and the reason this is in the ledger rather than
+just fixed: **an assertion whose subject is a continuous statistic needs its
+margin measured, not assumed.** `v.kind === :strong` reads like a
+categorical claim and is really a claim about a distribution's position
+relative to a cutoff. The standing rule above says a new diagnostic needs a
+null-distribution Monte Carlo; the corollary this pass adds is that a new
+*assertion about* a diagnostic needs to know how far it is from flipping.
+
+### An attribution gap, recorded as the lesser failure it is
+
+The roadmap cited Pesaran (2006) and Ertur & Musolesi (2017) for spatial
+CCE. Ertur & Musolesi is an *application* paper on international technology
+diffusion. It is correctly cited for the weak/strong distinction, but it is
+not the methodological source for a spatial CCE *estimator*. That is
+**Yang, C. F. (2021), *Econometric Reviews* 40(1), 14–50**, verified
+against the published record and now added.
+
+This belongs beside the LeSage & Pace chapter error above, and is the same
+weaker class: a real reference doing real work, pointed at a claim it does
+not make, rather than a reference that does not exist. Ertur & Musolesi was
+not removed — it was never a phantom. The failure is that the
+methodological citation was *missing*, and a missing citation is harder to
+notice than a wrong one precisely because nothing in the row looks broken.
+
+### What is not here
+
+No **SpVAR** and no **time-varying `ρ`**. Both belonged to the roadmap rows
+folded into this pass, and both were deferred by explicit decision rather
+than silently dropped; each is a substantial estimator in its own right,
+and they are recorded as a named follow-up row rather than left to be
+rediscovered. No GMM alternative to the CCE 2SLS. No Shi & Lee (2017)
+dynamic interactive-effects estimator — `fit_interactive_fe` is static in
+`y`. `fit_star` has no contemporaneous `Wyₜ` by construction, which is the
+specification's defining assumption rather than a gap: that model is
+`fit_spatial_panel`, and neither nests the other.
+
+One risk is worth stating rather than hiding. Bai's iterative principal
+components converges to a *local* optimum, and agreement across starting
+values is evidence but not proof of a global one. The starts are therefore
+exposed as `n_starts` rather than fixed internally, and the measured
+agreement above is reported as exactly that.

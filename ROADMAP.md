@@ -2,19 +2,21 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 25 submodules, 3,217 test assertions in 53 top-level testsets with both
-> package extensions installed and 3,182 without them — the same counts on
-> Julia 1.13.2 and 1.10.12, since the difference is the extensions and not
-> the version. 26 examples, 12 notebooks, 2 package extensions, CI/CD and
-> 52 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> 27 submodules, 3,415 test assertions in 55 top-level testsets with both
+> package extensions installed and 3,380 without them — the same counts on
+> Julia 1.13.3 and 1.10.13, since the difference is the extensions and not
+> the version. 28 examples, 12 notebooks, 2 package extensions, CI/CD and
+> 54 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
 > item #15's exposure mapping and spatial difference-in-differences landed
 > on 2026-10-30, its spatial synthetic control and shift-share diagnostics
-> on 2026-10-31, and item #11 (Networks) on 2026-11-01. **Phase 7B is the
-> next open phase.** Tier 3 is otherwise untouched, and the correctness audit
-> in `docs/AUDIT.md` is closed — findings 1–25, with 29–32 added afterwards
-> from the benchmark suite and Phase 6C.
+> on 2026-10-31, and item #11 (Networks) on 2026-11-01. **Phase 7B is open
+> and half done:** items #1 (common factors) and #12 (spatio-temporal)
+> closed together on 2026-11-04, with SpVAR and time-varying `ρ` deferred to
+> a named follow-up row; #13 and #16 remain. Tier 3 is otherwise untouched,
+> and the correctness audit in `docs/AUDIT.md` is closed — findings 1–25,
+> with 29–32 added afterwards from the benchmark suite and Phase 6C.
 >
 > Items #15 and #16, and every block marked **Planned additions**, were added
 > after that audit closed. They are the extend half of clean → fix → extend.
@@ -79,16 +81,36 @@ and the phase tables, so they do not get renumbered.
 - `panel_lm_tests(y, X, W, N, T)` → NamedTuple with joint LM statistics
 - `panel_moran(residuals, W, N, T)` → Vector of per-period `MoranResult`
 
-**Planned additions — weak vs strong cross-sectional dependence:** the
-delivered diagnostics all assume cross-sectional correlation is *weak*, that
+**Weak vs strong cross-sectional dependence — ✅ Complete (2026-11-04):**
+the diagnostics above all assume cross-sectional correlation is *weak*, that
 is, governed by `W`. The panel literature (Pesaran, Bai, Elhorst) separates
 that from *strong* dependence driven by unobserved global factors, which `W`
 cannot absorb and which biases `ρ̂` when ignored.
 
 | Feature | Description | Reference |
 |---|---|---|
-| Spatial panel CCE | Augment the spatial dynamic panel with cross-sectional averages `ȳ_t`, `X̄_t`, `Wȳ_t` to purge common factors | Pesaran (2006); Ertur & Musolesi (2017) |
+| Spatial panel CCE | Augment the spatial dynamic panel with cross-sectional averages `ȳ_t`, `X̄_t`, `Wȳ_t` to purge common factors | Pesaran (2006); **Yang (2021)**; Ertur & Musolesi (2017) |
 | Cross-sectional dependence tests | Pesaran CD, and the Bailey–Kapetanios–Pesaran exponent `α` that says whether the dependence is weak or strong | Pesaran (2015); Bailey et al. (2016) |
+
+`src/SpatialCommonFactors.jl`, submodule 26. Docs:
+`docs/src/models/common_factors.md`, `docs/src/api/common_factors.md`.
+Example: `examples/27_common_factors.jl`. Tests: testset 38.
+
+`pesaran_cd`, `alpha_exponent`, `dependence_verdict`, `fit_sp_cce`. Two
+measured facts drove the design and are in `docs/AUDIT.md` rather than
+inferred from the papers: CD's power against **random mean-zero loadings is
+0.348 and does not improve with `N`**, and against **balanced ±1 loadings
+the statistic is large but negative** — so `abs_rho_bar` and its
+independence benchmark are returned alongside, and `dependence_verdict`
+checks them before trusting the sign. `alpha_exponent` **throws rather than
+returning a number** when `α ≤ 1/2`, where Bailey, Kapetanios & Pesaran
+prove it is not identified.
+
+Yang (2021) was added this pass: the row previously cited only Pesaran
+(2006) and Ertur & Musolesi (2017), and the latter is an *application* paper
+correctly cited for the weak/strong distinction but not the methodological
+source for a spatial CCE estimator. Recorded in `docs/AUDIT.md` as an
+attribution gap.
 
 Interactive fixed effects with spatial lags are the estimation counterpart
 and sit under [#12](#12-spatio-temporal-models).
@@ -849,24 +871,39 @@ and the identification machinery the estimate did not anticipate.
 
 **Deliverables:**
 
-| Feature | Description | Reference |
-|---|---|---|
-| STAR model | Space-Time Autoregressive: `y_t = Σ_k ρ_k W^k y_{t-1} + Xβ + ε` with higher-order spatial and temporal lags | Pfeifer & Deutsch (1980) |
-| SpVAR | Spatial Vector Autoregression: multivariate spatial panel VAR with impulse response functions | Di Giacinto (2010) |
-| Space-time impulse response | Trace the propagation of a shock through space and time; compute cumulative spatial multipliers | LeSage & Pace (2009) |
-| Time-varying spatial effects | Allow ρ_t to change over time via state-space or rolling-window estimation | — |
-| Forecasting | `spatial_forecast(m, X_future, W; h=5)` — h-step ahead spatial panel forecasts | — |
-| Interactive fixed effects with spatial lags | Joint estimation of a factor structure `λᵢ'f_t` alongside `Wy` and `WX`, separating genuine spatial interaction from global shocks | Bai (2009); Shi & Lee (2017) |
+| Feature | Description | Reference | Status |
+|---|---|---|---|
+| STAR model | Space-Time Autoregressive: `y_t = Σ_k ρ_k W^k y_{t-1} + Xβ + ε` with higher-order spatial and temporal lags | Pfeifer & Deutsch (1980) | ✅ |
+| SpVAR | Spatial Vector Autoregression: multivariate spatial panel VAR with impulse response functions | Di Giacinto (2010) | ⬜ **deferred** |
+| Space-time impulse response | Trace the propagation of a shock through space and time; compute cumulative spatial multipliers | LeSage & Pace (2009) | ✅ |
+| Time-varying spatial effects | Allow ρ_t to change over time via state-space or rolling-window estimation | — | ⬜ **deferred** |
+| Forecasting | `spatial_forecast(m, X_future, W; h=5)` — h-step ahead spatial panel forecasts | — | ✅ |
+| Interactive fixed effects with spatial lags | Joint estimation of a factor structure `λᵢ'f_t` alongside `Wy` and `WX`, separating genuine spatial interaction from global shocks | Bai (2009); Shi & Lee (2017) | ✅ |
 
 The factor-structure row is the estimator that pairs with the cross-sectional
 dependence diagnostics under [#1](#1-spatial-panel-data-toolkit): the tests
 say whether a factor structure is there, this estimates it.
 
-**New file:** `src/SpatioTemporalModels.jl` (~500 lines)
+**Status:** ✅ **Complete, with two rows deferred** (2026-11-04).
+`src/SpatioTemporalModels.jl`, submodule 27. Docs:
+`docs/src/models/common_factors.md`, `docs/src/api/common_factors.md`.
+Example: `examples/28_spatio_temporal.jl`. Tests: testset 39.
+
+`fit_star`, `fit_interactive_fe`, `factor_projection`, `space_time_irf`,
+`spatial_forecast`. `fit_star` places every spatial lag one or more periods
+back, so all regressors are predetermined, least squares is consistent and
+there is no Jacobian — the price, stated rather than hidden, is that there is
+no contemporaneous `Wyₜ`. That specification is `fit_spatial_panel`, and
+**neither nests the other**. `fit_interactive_fe` exposes
+`factor_projection(m)` because factors and loadings are identified only up to
+rotation; comparing `m.factors` across fits compares starting values.
+
+**SpVAR and time-varying `ρ` are deferred by explicit decision**, not
+dropped — see the follow-up row at the end of Phase 7B. Each is a
+substantial estimator in its own right and neither is needed by the factor
+story this pass delivers.
 
 **Dependencies:** None
-
-**Estimated complexity:** ~500 lines
 
 ---
 
@@ -1067,15 +1104,28 @@ the simplex-constrained program is solved by accelerated projected gradient
 with an exact Lipschitz step, about 110 lines, and verified against an
 independent support enumeration.
 
-### Phase 7B — ⬜ Spatio-temporal, common factors & semiparametrics
+### Phase 7B — 🔶 Spatio-temporal, common factors & semiparametrics
 
 | Priority | Item | Est. Lines | Rationale |
 |---|---|---|---|
-| 18 | Spatio-Temporal Models (#12) | ~500 | STAR, SpVAR, forecasting, interactive FE |
-| 19 | Common factors in panels (#1) | ~400 | SP-CCE and the CD / `α` exponent tests |
-| 20 | Semiparametric Spatial (#13) | ~500 | Quantile regression, penalized models |
-| 21 | Spatial GARCH (#16) | ~450 | Spatial structure in the variance |
-| | **Phase 7B total** | **~1,850** | |
+| 18 | ✅ Spatio-Temporal Models (#12) | ~500 | STAR, forecasting, interactive FE — SpVAR and time-varying `ρ` deferred |
+| 19 | ✅ Common factors in panels (#1) | ~400 | SP-CCE and the CD / `α` exponent tests |
+| 20 | ⬜ Semiparametric Spatial (#13) | ~500 | Quantile regression, penalized models |
+| 21 | ⬜ Spatial GARCH (#16) | ~450 | Spatial structure in the variance |
+| 22 | ⬜ **Deferred from #12** | ~450 | SpVAR (Di Giacinto 2010) and time-varying `ρ_t` by state-space or rolling window |
+| | **Phase 7B total** | **~2,300** | Items 18 and 19 closed 2026-11-04; actual ~2,050 lines across two submodules |
+
+**Items 18 and 19 were taken as one pass**, on 2026-11-04, because the
+roadmap cross-references them as two halves of one phenomenon and that is
+right: the CD and `α` tests say whether a factor structure is *there*, and
+interactive fixed effects *estimate* it. Shipping either alone would have
+delivered a test whose remedy does not exist, or a remedy with no test to
+motivate it.
+
+**Row 22 is the deferral, named rather than dropped.** SpVAR and
+time-varying `ρ` were both in item #12's deliverables and both were cut by
+explicit decision at the start of the pass. They are recorded here so the
+scope reduction is visible in the plan rather than only in the ledger.
 
 ### Phase 8 — ⬜ Ecosystem, benchmarks & JSS submission
 
@@ -1107,24 +1157,38 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #15 spatial synthetic control) | 23 | 2,430 † | 17,962 |
 | **master** (+ #15 shift-share, so #15 complete) | 24 | 3,051 † | 19,085 |
 | **master** (+ #11 networks, so Phase 7A complete) | 25 | 3,217 † | 20,289 |
-| **v0.4.0** (= master today, unreleased) | 25 | 3,217 † | 20,289 |
+| **master** (+ #1 and #12, so Phase 7B half done) | 27 | 3,415 † | 22,577 |
+| **v0.4.0** (= master today, unreleased) | 27 | 3,415 † | 22,577 |
 | — | | | |
-| **v1.0.0** (Phases 6C–8) | 27–29 | ~3,300 | ~22,000 |
+| **v1.0.0** (Phases 6C–8) | 28–30 | ~3,700 | ~24,500 |
 
-Measured on master: 25 submodules plus the umbrella across 20,289 lines of
-`src/`, 7,852 lines of tests, 3,781 lines of examples across 26 scripts,
-398 lines of package extensions, 52 documentation pages and 12 notebooks
+Measured on master: 27 submodules plus the umbrella across 22,577 lines of
+`src/`, 8,536 lines of tests, 4,313 lines of examples across 28 scripts,
+398 lines of package extensions, 54 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
+The v1.0.0 projection moved up this pass rather than being met: the old
+`~22,000` line estimate is already exceeded at 22,577 with two Phase 7B
+rows still open, so it was recounted against what #13 and #16 plausibly
+add rather than left as a figure the repo had walked past.
+
 **State the environment with the assertion count.** The figures above are
-3,217 with Makie and Turing **installed**, where testsets 25 and 26
-contribute 11 and 24 assertions, and 3,182 with both **absent**, where each
+3,415 with Makie and Turing **installed**, where testsets 25 and 26
+contribute 11 and 24 assertions, and 3,380 with both **absent**, where each
 reports a single broken marker instead of running. Both were measured in the
 repository working tree, which matters — see the correction below. That
-difference is 35 passing assertions — 3,182 + 11 + 24 = 3,217, the two
+difference is 35 passing assertions — 3,380 + 11 + 24 = 3,415, the two
 broken markers being replaced rather than added, which is why the arithmetic
 is 35 and not 33. A count quoted without its environment can therefore look
 like a regression when nothing has regressed.
+
+**State the Julia version too, and re-read it rather than carrying it
+forward.** The figures above were measured on **1.13.3** and **1.10.13**.
+Earlier revisions of this file said 1.13.2 and 1.10.12, which was true when
+written; `juliaup` had since moved both channels, so the labels were stale
+while the counts they qualified were not. Cheap to check with
+`julia --version` and `julia +1.10 --version`, and a version label nobody
+re-reads is exactly the kind of figure that drifts into being wrong.
 
 **Corrected on 2026-10-31: there is no cross-version assertion difference.**
 Earlier revisions of this section described a genuine six-assertion gap
@@ -1158,7 +1222,7 @@ and that block holds exactly six assertions — one `@test_logs` guarding
 testset 11b reports **12 in the repository and 6 in a `src`-and-`test`-only
 copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it, and
 the extensions-absent figure CI sees is the in-repository one — 2,395 then,
-3,182 now — never the copy's.
+3,380 now — never the copy's.
 
 Two consequences for anyone measuring this suite. A scratch copy must
 include `notebooks/data/` to be comparable with the repository at all. And
@@ -1186,6 +1250,20 @@ the removed duplicate is really gone. So the rule is that a step equals the
 new testset's size *unless an existing testset also changed*, and when it
 does not balance the right response is to find the three rather than to
 adjust the total.
+
+**The Phase 7B step balances, which is the useful outcome.** 3,217 to 3,415
+is 198, and testsets 38 and 39 are 117 and 81 — 198 exactly. So the two new
+rows are purely additive and nothing elsewhere in the suite was quietly
+adjusted. That is worth one line of arithmetic: this pass touched two new
+submodules, the umbrella, `docs/make.jl` and two new doc pages, and a step
+that balances is the cheapest available evidence it left the other 53
+testsets alone.
+
+Testset 38 was **116 at first measurement and is 117** because the
+cross-version run below forced an assertion to be repaired rather than
+re-counted. Recording that is the point: the first figure was not wrong
+when taken, and resisting the urge to quietly carry it forward is what
+keeps the step arithmetic worth doing at all.
 
 **The same check caught a defect across versions, not just across rows.**
 The networks row first measured 3,215 and 3,180 on 1.13.2 against 3,179 on
@@ -1278,6 +1356,7 @@ development line rather than across three releases.
 - Sutton, J., & Sutton, J. (2023). A road map to capture the spatial dependence underlying regions' economic resilience. *Spatial Economic Analysis*, 19(1), 57–72.
 - Vuong, Q. H. (1989). Likelihood ratio tests for model selection and non-nested hypotheses. *Econometrica*, 57(2), 307–333.
 - Wang, C., Kockelman, K. M., & Wang, X. (2013). The spatial dimensions of land use change dynamics in the Austin, Texas Metropolitan Area. *Transportation Research Record*, 2397(1), 131–142.
+- Yang, C. F. (2021). Common factors and spatial dependence: An application to US house prices. *Econometric Reviews*, 40(1), 14–50.
 - Yu, H., Fotheringham, A. S., Li, Z., Oshan, T., Kang, W., & Wolf, L. J. (2020). Inference in multiscale geographically weighted regression. *Geographical Analysis*, 52(1), 87–106.
 
 **A chapter attribution was corrected.** Item #11's multiplex row cited
@@ -1294,6 +1373,19 @@ Manski (1993) and Bramoullé, Djebbari & Fortin (2009) — were each checked
 against the primary source and all three hold; BDF's full text was read and
 every formula in `SpatialNetworks.jl` is quoted from it rather than
 recalled.
+
+**A methodological citation was missing.** Item #1's spatial CCE row cited
+Pesaran (2006) and Ertur & Musolesi (2017). Both are real and both are
+listed above, but Ertur & Musolesi is an *application* paper on
+international technology diffusion: correct for the weak/strong
+distinction, which is what it was doing in the row, and not the
+methodological source for a spatial CCE *estimator*. That is Yang, C. F.
+(2021), *Econometric Reviews* 40(1), 14–50, verified against the published
+record on 2026-11-04 and now cited. Ertur & Musolesi was not removed — it
+was never a phantom. This is weaker still than the chapter error above,
+and worth distinguishing for the same reason: a *missing* citation is
+harder to notice than a wrong one, because nothing in the row looks
+broken.
 
 **Citations to verify before use — one has failed, one has passed.**
 Goldsmith-Pinkham, Sorkin & Swift (2020) was added to the list above on

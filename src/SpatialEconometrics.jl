@@ -36,6 +36,8 @@ include("SpatialFiltering.jl")
 include("SpatialCausal.jl")
 include("SpatialShiftShare.jl")
 include("SpatialNetworks.jl")
+include("SpatialCommonFactors.jl")
+include("SpatioTemporalModels.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -52,6 +54,8 @@ const GravityMod    = SpatialGravityModels
 const DSLMod        = FormulaDSL
 const ShiftShareMod = SpatialShiftShare
 const NetworksMod   = SpatialNetworks
+const FactorsMod    = SpatialCommonFactors
+const SpatioTempMod = SpatioTemporalModels
 const WeightsMod    = SpatialWeights
 const SelectionMod  = SpatialModelSelection
 const PanelDiagMod  = SpatialPanelDiagnostics
@@ -89,6 +93,8 @@ import .SpatialDiscreteChoice: SpatialProbitModel, fit_spatial_probit, BayesianS
 import .SpatialCausal: ExposureMap, exposure, ring_exposure, InterferenceReport, check_interference, SpatialDiDResult, fit_spatial_did, SyntheticControlResult, fit_synthetic_control, donor_weights, PlaceboTest, placebo_test, SpilloverGaps, spillover_gaps
 import .SpatialShiftShare: ShiftShareDesign, shift_share_design, ShiftShareFit, fit_shift_share, ExposureConcentration, exposure_concentration, ShockAggregates, shock_aggregate, BalanceTest, balance_test, RotembergWeights, rotemberg_weights, ShiftShareMoran, shift_share_moran
 import .SpatialNetworks: network_weights, group_weights, PeerIdentification, peer_identification, PeerEffectsFit, fit_peer_effects, MultiplexSAR, fit_multiplex_sar, network_moran
+import .SpatialCommonFactors: CDTestResult, pesaran_cd, AlphaExponentResult, alpha_exponent, DependenceVerdict, dependence_verdict, SpCCEModel, fit_sp_cce
+import .SpatioTemporalModels: STARModel, fit_star, InteractiveFEModel, fit_interactive_fe, factor_projection, IRFResult, space_time_irf, spatial_forecast
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf, STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups
 
 """
@@ -541,6 +547,17 @@ export
     PeerEffectsFit, fit_peer_effects,
     MultiplexSAR, fit_multiplex_sar,
     network_moran,
+
+    # SpatialCommonFactors
+    CDTestResult, pesaran_cd,
+    AlphaExponentResult, alpha_exponent,
+    DependenceVerdict, dependence_verdict,
+    SpCCEModel, fit_sp_cce,
+
+    # SpatioTemporalModels
+    STARModel, fit_star,
+    InteractiveFEModel, fit_interactive_fe, factor_projection,
+    IRFResult, space_time_irf, spatial_forecast,
     # Extension entry points (methods live in ext/)
     AbstractBayesianSpatialResult,
     bayesian_sar, bayesian_sdm, bayesian_sem,
