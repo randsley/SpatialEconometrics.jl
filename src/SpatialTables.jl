@@ -177,12 +177,12 @@ end
 # Export Formats
 # ═══════════════════════════════════════════════════════════════════════
 
-# Each exporter writes into a format with its own metacharacters, and a
+# Each exporter writes into a format with its own metacharacters. A
 # coefficient name is safe in none of them. The names this package produces
 # routinely carry `_` (`W_x1` from SLX, `R1_(Intercept)` from regimes) and
-# Greek letters (`ρ`, `λ`), so the escaping below is not decoration: without
-# it `to_latex` emits a document that will not compile and `to_markdown`
-# emits a table that will not render.
+# Greek letters (`ρ`, `λ`). The escaping below is therefore not decoration.
+# Without it, `to_latex` emits a document that will not compile, and
+# `to_markdown` emits a table that will not render.
 
 const _LATEX_GREEK = Dict(
     'ρ' => "\$\\rho\$",
@@ -285,9 +285,9 @@ Format coefficient table as a Markdown table string.
 """
 function to_markdown(ct::CoefTable; digits::Int=4)
     io = IOBuffer()
-    # `P>|z|` needs escaped pipes: written bare they read as two further
-    # cell separators, so the header row declared eight cells against the
-    # separator row's six and no renderer lined the table up.
+    # `P>|z|` needs escaped pipes. Bare pipes read as two more cell
+    # separators. The header row then declared eight cells against the
+    # separator row's six, and no renderer lined the table up.
     println(io, "| Variable | Estimate | Std.Err | z | P>\\|z\\| | Sig |")
     println(io, "|:---------|--------:|--------:|---:|------:|:---:|")
     for i in eachindex(ct.names)

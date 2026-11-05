@@ -35,9 +35,9 @@ A treatment vector together with its spatial exposure columns, returned by
 [`exposure`](@ref) and [`ring_exposure`](@ref).
 
 An exposure mapping is the object that makes a spillover estimable. SUTVA
-assumes unit `i`'s outcome responds only to `D_i`; an exposure mapping
-replaces that with a named, finite summary of the treatment *around* `i`,
-and the spillover parameter is then defined relative to that summary rather
+assumes unit `i`'s outcome responds only to `D_i`. An exposure mapping
+replaces that with a named, finite summary of the treatment *around* `i`.
+The spillover parameter is then defined relative to that summary, rather
 than left implicit.
 
 # Fields
@@ -71,14 +71,14 @@ Build an [`ExposureMap`](@ref) from a treatment indicator and a weight
 matrix: column `k` of `E` is `W^k D`.
 
 # Arguments
-- `D`: treatment indicator, length `N`. `Bool`, integer or float; anything
+- `D`: treatment indicator, length `N`. `Bool`, integer or float. Anything
   other than 0 and 1 is rejected, because a fractional "treatment" makes
   the direct/spillover split ill-defined.
 - `W`: `N x N` sparse weight matrix.
 
 # Keywords
-- `order`: number of spatial orders. `1` gives `WD` alone; `2` adds `W²D`,
-  which lets a second ring differ from the first instead of being forced
+- `order`: number of spatial orders. `1` gives `WD` alone. `2` adds `W²D`,
+  which lets a second ring differ from the first, instead of being forced
   to decay at whatever rate `W` implies.
 - `standardize`: row-standardize `W` first. On (the default), `WD` is the
   **fraction** of `i`'s neighbours that are treated, which is bounded in
@@ -135,8 +135,9 @@ existing `W`: a unit is exposed through neighbours at distance in
 
 A ring is what separates a spillover from a displacement effect. With
 `d_min = 0` the band includes immediate neighbours, where a policy's effect
-and its displacement are mixed together; starting the band beyond them
-reads the effect at a distance where mechanical displacement is implausible.
+and its displacement are mixed together. Starting the band beyond them
+reads the effect at a distance where mechanical displacement is
+implausible.
 
 Builds the band with [`band_weights`](@ref) and hands it to
 [`exposure`](@ref).
@@ -181,9 +182,9 @@ What an exposure design can and cannot identify, returned by
 
 The spillover coefficient is identified by controls that differ in
 exposure. If every control has a treated neighbour there is no unexposed
-baseline, and `δ` is soaked up by the constant: the fit still returns a
-number, but it is the difference between *more* and *less* exposed, not
-between exposed and not. If no control has a treated neighbour, `δ` rests
+baseline, and the constant soaks up `δ`. The fit still returns a number,
+but it is the difference between *more* and *less* exposed, not between
+exposed and not. If no control has a treated neighbour, `δ` rests
 entirely on the treated units' own exposure and cannot be separated from
 the direct effect at all.
 """
@@ -375,7 +376,8 @@ StatsAPI.coefnames(m::SpatialDiDResult) = m.coefnames
 StatsAPI.dof_residual(m::SpatialDiDResult) = length(m.residuals) - length(m.coef)
 
 """
-    fit_spatial_did(y, treat, W; X = nothing, vcov = :cluster, coords = nothing,
+    fit_spatial_did(y, treat, W; X = nothing, vcov = :cluster,
+                    coords = nothing,
                     dist_cutoff = nothing, order = 1, standardize = true,
                     cluster_groups = nothing)
 
@@ -397,10 +399,10 @@ OLS problem in `[1, D, E, ΔX]`, whose coefficients on `D` and `E` are `τ`
 and `δ`. For more than two, a two-way within transform does the same job
 with `D_it` and `E_it` varying over time.
 
-A conventional DiD omits `E`, which does not make the spillover zero — it
-pushes it into the error, where it is correlated with `D` by construction,
-and into the control group, which is no longer untreated. Both biases run
-through `τ̂`.
+A conventional DiD omits `E`, which does not make the spillover zero. It
+pushes the spillover into the error, where it is correlated with `D` by
+construction, and into the control group, which is no longer untreated.
+Both biases run through `τ̂`.
 
 # Arguments
 - `y`: `N x T` outcomes, units by periods.
@@ -416,7 +418,7 @@ through `τ̂`.
   `AbstractRobustVCOV` instance. See below — the default is measured, not
   conventional.
 - `coords`, `dist_cutoff`: required by `:conley`.
-- `cluster_groups`: required by `:cluster`; unit index is the usual choice.
+- `cluster_groups`: required by `:cluster`. Unit index is the usual choice.
 - `order`, `standardize`: passed to [`exposure`](@ref).
 
 # Which covariance, and why the default is not the spatial one
@@ -437,23 +439,23 @@ quantity it is trying to estimate:
 | `:conley`, cutoff 6.0 | 85.3% | 0.785 |
 
 `:cluster` is the default on that evidence, not on convention. The ordering
-held across nine configurations — treated block, scattered, half-grid and
-alternating stripes, at `ρ = 0`, `0.6` and `0.9`, at `N = 144` and `400`:
-`:cluster` stayed within `93.0–97.0%` and Conley fell monotonically as the
+held across nine configurations: treated block, scattered, half-grid and
+alternating stripes, at `ρ = 0`, `0.6` and `0.9`, at `N = 144` and `400`.
+`:cluster` stayed within `93.0–97.0%`. Conley fell monotonically as the
 cutoff widened, reaching `82%` at the widest.
 
 **Conley degrades identically when there is no spatial correlation at
-all** (`93.0% → 83.9%` across the same cutoffs at `ρ = 0`), which is the
-diagnostic that settles what is happening: the decay is the finite-sample
+all** (`93.0% → 83.9%` across the same cutoffs at `ρ = 0`). That is the
+diagnostic that settles what is happening. The decay is the finite-sample
 cost of estimating more pair covariances, not the correction working. It is
 not the PSD projection either — `psd_fix = false` reproduces every figure
 to three decimals, because the meat is already positive semi-definite here.
 
 **Why the spatial correction matters less than it should.** The exposure
-column is what does it. Including `WD` means `τ` is identified off the
-contrast between a unit and its neighbours, and that contrast differences
-out the component of the error they share — which is precisely the
-spatially correlated part. In these designs `cor(D, WD)` runs from `0.93`
+column is what does it. Including `WD` identifies `τ` off the contrast
+between a unit and its neighbours. That contrast differences out the
+component of the error they share, which is precisely the spatially
+correlated part. In these designs `cor(D, WD)` runs from `0.93`
 to `0.99`, and `OLS`'s `SE/MCsd` barely moves between `ρ = 0` and
 `ρ = 0.9` (`1.010` to `1.207`). In the one design where `cor(D, WD) = 0`
 exactly — alternating stripes — the spatial correlation is orthogonal to
@@ -467,9 +469,9 @@ report more than one cutoff, and prefer the narrow end.
 
 !!! note "What clustering on unit is actually doing here"
     In the two-period design the regression is first-differenced, so there
-    is one observation per unit and each cluster is a singleton: `:cluster`
-    reduces to a heteroskedasticity-robust (HC1) covariance. That is why it
-    performs well — not because it is absorbing serial or spatial
+    is one observation per unit and each cluster is a singleton. `:cluster`
+    then reduces to a heteroskedasticity-robust (HC1) covariance. That is
+    why it performs well. It is not absorbing serial or spatial
     correlation, neither of which survives the differencing. In a staggered
     design with `T > 2` the clusters are genuine and it absorbs
     within-unit serial correlation as usual.
@@ -489,7 +491,7 @@ m = fit_spatial_did(y, D, W; vcov = :cluster, cluster_groups = 1:N)
 !!! warning "Staggered adoption with heterogeneous effects"
     The two-way fixed effects estimator used when `T > 2` does not recover
     the sample-weighted average treatment effect once effects differ across
-    adoption cohorts: it applies its own implicit weights, some of them
+    adoption cohorts. It applies its own implicit weights, some of them
     negative (Goodman-Bacon). Measured on three-cohort rollouts over eight
     periods, `N = 100`, no noise, so every gap below is bias and not
     sampling error:
@@ -805,9 +807,9 @@ that was actually run.
 and `treated_mask` marks the treated rows: units in the two-period design,
 unit-periods in the staggered one. Taking both from the builder is what
 keeps the reported spillover on the same footing as the coefficient it
-multiplies — the staggered design's exposure varies over time, and
-averaging the static ever-treated exposure instead would scale `δ̂` by the
-wrong number.
+multiplies. The staggered design's exposure varies over time. Averaging
+the static ever-treated exposure instead would scale `δ̂` by the wrong
+number.
 """
 function _exposure_means(E_used::AbstractMatrix{T}, treated_mask::AbstractVector{Bool}) where {T}
     order = size(E_used, 2)
@@ -961,8 +963,8 @@ end
 # Convex quadratic over the unit simplex, solved by accelerated projected
 # gradient (FISTA) with the exact Lipschitz constant L = 2 σ_max(X0'X0),
 # so the step size is derived rather than tuned. FISTA is not monotone, so
-# a plain projected-gradient polish follows; the returned point is then
-# certified by its own KKT gap rather than trusted.
+# a plain projected-gradient polish follows. Its own KKT gap then certifies
+# the returned point, rather than this code trusting it.
 #
 # Returns `(w, objective, iterations, kkt_gap, kkt_violation)`. At an
 # optimum the gradient is equal across the support and no smaller off it,
@@ -988,11 +990,11 @@ function _solve_pensynth(X0::Matrix{T}, x1::Vector{T}, d::Vector{T}, λ::T;
     fw = _pensynth_obj(G, b, d, λ, w, x1)
 
     # The stopping rule is the KKT gap, not the step length. When the
-    # donor pool is larger than the predictor set — the usual case — `G`
-    # is rank deficient, the solution set is a face rather than a point,
-    # and the iterate keeps drifting along the flat directions long after
-    # the objective has stopped moving. A step-length test never fires
-    # there; the gradient condition is the quantity that actually
+    # donor pool is larger than the predictor set, which is the usual case,
+    # `G` is rank deficient. The solution set is then a face rather than a
+    # point, and the iterate keeps drifting along the flat directions long
+    # after the objective has stopped moving. A step-length test never
+    # fires there. The gradient condition is the quantity that actually
     # characterises the optimum.
     gscale = max(one(T), maximum(abs, b), λ * maximum(abs, d))
     check_every = 10
@@ -1008,11 +1010,11 @@ function _solve_pensynth(X0::Matrix{T}, x1::Vector{T}, d::Vector{T}, λ::T;
         @. z = wp + ((tk - one(T)) / tk1) * (wp - w)
         # Adaptive restart (O'Donoghue & Candès). FISTA is not monotone,
         # and on an ill-conditioned problem the momentum overshoots and
-        # oscillates; dropping it when the objective genuinely rises
-        # recovers the fast rate. The candidate is always accepted — it
-        # is the iterate sequence — and the threshold is relative, since
-        # near the optimum the objective moves by rounding alone and an
-        # exact comparison restarts forever.
+        # oscillates. Dropping it when the objective genuinely rises
+        # recovers the fast rate. The candidate is always accepted, because
+        # it is the iterate sequence. The threshold is relative, since near
+        # the optimum the objective moves by rounding alone, and an exact
+        # comparison restarts forever.
         if fp > fw * (one(T) + T(1e-12)) + T(1e-300)
             tk1 = one(T)
             copyto!(z, wp)
@@ -1107,8 +1109,8 @@ _treated_indices(treated::Integer, N::Int) =
 # ─── Donor pool ──────────────────────────────────────────────────────
 
 # Returns `(donors, excluded_neighbours)`. Treated units are never donors
-# under any rule: a unit cannot help build its own counterfactual, and
-# with several treated units one treated unit's post-period outcome is
+# under any rule. A unit cannot help build its own counterfactual. And with
+# several treated units, one treated unit's post-period outcome is
 # contaminated by its own treatment.
 function _donor_pool(rule, treated::Vector{Int}, N::Int,
                      W::Union{Nothing,AbstractSparseMatrix})
@@ -1174,10 +1176,11 @@ end
 # measured over a long pre-period.
 #
 # `standardize` scales each predictor row by its standard deviation across
-# the units used. Without it a predictor measured in large units dominates
-# the fit for no substantive reason — this is the role `V` plays in the
-# nested formulation, taken here as `V = I` on standardised predictors so
-# the program stays one convex problem with a reproducible solution.
+# the units used. Without it, a predictor measured in large units dominates
+# the fit for no substantive reason. This is the role `V` plays in the
+# nested formulation. It is taken here as `V = I` on standardised
+# predictors, so the program stays one convex problem with a reproducible
+# solution.
 function _scm_predictors(::Type{T}, Y::AbstractMatrix, predictors, T0::Int,
                          used::Vector{Int}, standardize::Bool) where {T}
     X = if predictors === nothing
@@ -1207,7 +1210,7 @@ end
 
 # `d[q]` is the distance from treated unit `i` to donor `donors[q]`, which
 # the penalty multiplies. Abadie & L'Hour (2021) penalise pairwise
-# discrepancy to break the non-uniqueness of the unpenalised weights;
+# discrepancy to break the non-uniqueness of the unpenalised weights.
 # `:spatial` makes that discrepancy geographic, which is what this package
 # is for.
 function _penalty_distances(::Type{T}, metric::Symbol, i::Int,
@@ -1274,15 +1277,15 @@ The fitted synthetic control for one or more treated units, returned by
 - `ratio_aggregate`: the same ratio formed from `att_path`.
 - `kkt_gap`, `kkt_violation`, `iterations`: solver diagnostics per treated
   unit. The two KKT numbers certify the weights are at the constrained
-  optimum and should be ~0; see [`fit_synthetic_control`](@ref).
+  optimum and should be ~0. See [`fit_synthetic_control`](@ref).
 
 # Why there is no `vcov`
 
-`coef`, `coefnames`, `nobs` and `residuals` are defined; `vcov` and
+`coef`, `coefnames`, `nobs` and `residuals` are defined. `vcov` and
 `stderror` are **not**, and the omission is deliberate. The weights are
 the solution of a constrained optimisation, not an estimator with a
-sampling distribution of known form, and the gap is a difference between
-one observed path and one constructed path rather than a regression
+sampling distribution of known form. The gap is a difference between one
+observed path and one constructed path, rather than a regression
 coefficient. There is no standard error to report. Inference is the
 permutation test in [`placebo_test`](@ref), with the caveats measured
 there.
@@ -1358,16 +1361,16 @@ where `x_i` collects `i`'s pre-treatment predictors, `X0` the donors', and
 after `T0`. With several treated units each gets its own weights and the
 `att` is the mean of their post-period gaps.
 
-The program is convex with a unique minimum whenever `X0` has full column
-rank on the active face, and it is solved to its own KKT certificate
-rather than to an iteration budget — see `kkt_gap` below.
+The program is convex, with a unique minimum whenever `X0` has full column
+rank on the active face. It is solved to its own KKT certificate rather
+than to an iteration budget. See `kkt_gap` below.
 
 # Why the donor pool is screened
 
 This is the part that makes the method spatial, and it is not cosmetic. If
 the policy spills over, the treated unit's neighbours are themselves
-affected, and the unpenalised fit will happily build the counterfactual
-out of them because they track the treated unit best in the pre-period.
+affected. The unpenalised fit will then build the counterfactual out of
+them, because they track the treated unit best in the pre-period.
 The spillover then lands inside the comparison and the gap understates the
 effect. `donor_pool = :exclude_neighbours` (the default) removes any
 untreated unit adjacent to a treated one under `W`, reusing
@@ -1386,11 +1389,11 @@ counterfactuals, and which one a solver returns is an accident of the
 algorithm. Abadie & L'Hour (2021) break the tie with a penalty on pairwise
 discrepancy between the treated unit and each donor it draws on.
 
-`penalty_metric = :spatial` makes that discrepancy geographic distance
-(needs `coords`; `metric = HaversineDistance()` for lon/lat), `:covariate`
-uses standardised predictor distance, `:none` sets `λ = 0`. Raising `λ`
-moves the solution toward the single nearest donor; `λ = 0` is the
-unpenalised program.
+`penalty_metric = :spatial` makes that discrepancy geographic distance. It
+needs `coords`, with `metric = HaversineDistance()` for lon/lat.
+`:covariate` uses standardised predictor distance, and `:none` sets
+`λ = 0`. Raising `λ` moves the solution toward the single nearest donor.
+`λ = 0` is the unpenalised program.
 
 # Arguments
 - `Y`: `N x T` outcomes, units by periods — the same layout as
@@ -1407,8 +1410,8 @@ unpenalised program.
   the pre-period outcome path, `Y[:, 1:T0]`.
 - `standardize`: scale each predictor to unit variance before fitting.
   This is `V = I` on standardised predictors, taken deliberately in place
-  of a nested search over `V`: the nested form is non-unique, so two
-  equally good `V` give different weights and the result stops being
+  of a nested search over `V`. The nested form is non-unique, so two
+  equally good `V` give different weights, and the result stops being
   reproducible.
 - `penalty`, `penalty_metric`, `metric`: as above.
 - `tol`, `maxiter`: solver controls.
@@ -1416,9 +1419,9 @@ unpenalised program.
 # Fit diagnostics, and reading them honestly
 
 `rmspe_pre` is the pre-period root mean squared gap. A synthetic control
-with a poor pre-period fit says nothing about the post period, and
-`ratio = rmspe_post / rmspe_pre` is the statistic to look at rather than
-the gap alone — a large gap on a badly fitting unit is not evidence.
+with a poor pre-period fit says nothing about the post period. So
+`ratio = rmspe_post / rmspe_pre` is the statistic to look at, rather than
+the gap alone. A large gap on a badly fitting unit is not evidence.
 [`placebo_test`](@ref) ranks exactly this ratio.
 
 `kkt_gap` and `kkt_violation` are the solution's own optimality
@@ -1663,7 +1666,7 @@ p = (1 + #{ratio_placebo >= ratio_observed}) / (1 + R)
 ```
 
 over `R` placebo assignments. Dividing by the pre-period fit is what makes
-placebo ratios comparable across units: a donor that the synthetic control
+placebo ratios comparable across units. A donor that the synthetic control
 tracks badly before treatment will show a large post-period gap for
 reasons that have nothing to do with any policy.
 
@@ -1676,7 +1679,7 @@ since a placebo fitted under different settings is not a comparison.
 
 With `J` clean donors and `m` treated units there are `binomial(J, m)`
 possible assignments. All of them are enumerated when that number is at
-most `n_placebo`, giving an exact permutation test; otherwise
+most `n_placebo`, which gives an exact permutation test. Otherwise
 `n_placebo` assignments are sampled without replacement using `rng`. The
 result records which happened in its `exact` field.
 
@@ -1721,7 +1724,7 @@ standard errors above nominal at 1,000 replications). Treat a p-value
 near the threshold as uninformative when the outcome is strongly
 spatially correlated.
 
-The ratio statistic is what keeps the distortion this small: scaling the
+The ratio statistic is what keeps the distortion this small. Scaling the
 post-period gap by the pre-period fit makes units comparable even when
 their error variances are not, so spatial dependence largely divides
 out.
@@ -1866,7 +1869,7 @@ estimated spillover — the synthetic control counterpart of
 `att_spill_control` in [`fit_spatial_did`](@ref).
 
 The neighbour is not treated, so under no spillover its gap should be
-noise around zero; a systematic post-period gap is the spillover. The same
+noise around zero. A systematic post-period gap is the spillover. The same
 caution applies as for the main fit: check `rmspe_pre` before believing a
 gap, and use [`placebo_test`](@ref) on the main fit to calibrate what gap
 sizes arise by chance.

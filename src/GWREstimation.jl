@@ -23,8 +23,8 @@ export BandwidthType, FixedBandwidth, AdaptiveBandwidth,
 How the GWR neighbourhood around each location is sized. Subtypes:
 [`FixedBandwidth`](@ref) and [`AdaptiveBandwidth`](@ref).
 
-The bandwidth is the single most consequential GWR choice: too small and
-the local coefficients chase noise, too large and they flatten towards the
+The bandwidth is the single most consequential GWR choice. Too small, and
+the local coefficients chase noise. Too large, and they flatten towards the
 global regression.
 """
 abstract type BandwidthType end
@@ -35,9 +35,9 @@ A constant kernel bandwidth `h`, in the units of the coordinates, used at
 every location.
 
 Appropriate when units are spread evenly. Where density varies, a fixed
-radius means sparse regions contribute few observations to their local
-fit — sometimes fewer than there are parameters — so
-[`AdaptiveBandwidth`](@ref) is usually safer with irregular data.
+radius leaves sparse regions with few observations for their local fit,
+sometimes fewer observations than parameters. [`AdaptiveBandwidth`](@ref)
+is usually safer with irregular data.
 
 # Examples
 ```julia
@@ -54,7 +54,7 @@ A nearest-neighbour bandwidth: each local regression uses its `k` closest
 observations, so the radius expands in sparse areas and contracts in dense
 ones.
 
-The more robust default for irregularly spaced data, since every local fit
+The better default for irregularly spaced data, since every local fit
 gets the same number of observations. `k` must comfortably exceed the
 number of parameters.
 
@@ -198,11 +198,11 @@ covariate, instead of a single bandwidth.
   the whole fit.
 - `enp_se`: the Monte Carlo standard error of each `enp`, zero when the
   degrees of freedom were computed exactly and `NaN` when they were not
-  computed at all. Under `:stochastic` it is not decoration: `AICc`
-  inherits the same noise, so a difference of a few AICc units between two
-  fits may be the estimator rather than the models.
-- `df_method`: `:exact`, `:stochastic` or `:none`, recording how the
-  degrees of freedom were obtained.
+  computed at all. Under `:stochastic` it is not decoration. `AICc`
+  inherits the same noise. A difference of a few AICc units between two
+  fits may therefore be the estimator rather than the models.
+- `df_method`: `:exact`, `:stochastic` or `:none`, recording which method
+  produced the degrees of freedom.
 - `AICc`, `sigma2`: penalised by `hat_trace`, so directly comparable with
   the same fields on a [`GWRModel`](@ref).
 - `iterations`, `converged`: state of the back-fitting loop. **Check
@@ -248,12 +248,13 @@ end
 
 Distance between rows `i` and `j` of `coords`, without building them.
 
-`sqrt(sum((coords[i, :] .- coords[j, :]) .^ 2))` is the same number and
-allocates three vectors to get it, once per candidate neighbour, which is
-`O(N * bw)` allocations across a GWR fit and was the reason threading the
-local regressions scaled to 3x rather than to the core count. Summation
-order is unchanged: for the two columns GWR asserts, `sum` over a pair
-adds `v[1] + v[2]`, and so does this.
+`sqrt(sum((coords[i, :] .- coords[j, :]) .^ 2))` is the same number. It
+allocates three vectors to get it, once per candidate neighbour. That is
+`O(N * bw)` allocations across a GWR fit, and it was the reason threading
+the local regressions scaled to 3x rather than to the core count.
+
+Summation order is unchanged. For the two columns GWR asserts, `sum` over
+a pair adds `v[1] + v[2]`, and so does this.
 """
 @inline function _euclid(coords::AbstractMatrix{T}, i::Int, j::Int) where {T}
     acc = zero(T)
@@ -269,12 +270,12 @@ function _get_bandwidth_distance(tree::KDTree, coords::AbstractMatrix{T}, i::Int
                                  nidx::Union{Nothing,Vector{Int}}=nothing,
                                  ndist::Union{Nothing,Vector{Float64}}=nothing) where {T}
     point = @view coords[i, :]
-    # +1 includes self, but never ask the tree for more neighbours than it
-    # holds: knn throws on k > N, so AdaptiveBandwidth(N) -- which the
-    # bandwidth search used to put in range -- was an error rather than the
-    # natural 'every point' case.
+    # +1 includes self. Never ask the tree for more neighbours than it
+    # holds, because knn throws on k > N. AdaptiveBandwidth(N) was therefore
+    # an error rather than the natural 'every point' case, and the bandwidth
+    # search used to put it in range.
     nq = min(bw.k + 1, size(coords, 1))
-    # `knn` allocates its two result vectors; at k = 500 that is 8 KiB per
+    # `knn` allocates its two result vectors. At k = 500 that is 8 KiB per
     # observation, for one number. `knn!` writes into buffers the caller
     # already owns, which is why they are threaded this far down.
     if nidx === nothing || ndist === nothing
@@ -311,18 +312,18 @@ Returns `(n, h_i, w_self)`: `idx[1:n]` are the neighbour indices in
 bandwidth in distance units, and `w_self` is the weight `i` gives itself.
 
 This replaces a dense length-`N` weight vector allocated per call. The
-kernel vanishes outside its support, so of those `N` entries only `b` were
-ever nonzero -- on a square grid `b / N` runs from 0.02 to 0.56 across
-plausible bandwidths -- and every caller then multiplied an `N x K` design
-by a diagonal that was mostly zero. Both the arithmetic and the allocation
-were `Θ(N²)` where `Θ(N · b)` does.
+kernel vanishes outside its support, so only `b` of those `N` entries were
+ever nonzero. On a square grid, `b / N` runs from 0.02 to 0.56 across
+plausible bandwidths. Every caller then multiplied an `N x K` design by a
+diagonal that was mostly zero. Both the arithmetic and the allocation were
+`Θ(N²)` where `Θ(N · b)` does.
 
 Two details are load-bearing:
 
   - `sortres = true`. `inrange` otherwise returns indices in tree order,
     and the compact design's row order would be whatever the KD-tree
-    internals happen to give. Ascending index order is both reproducible
-    and the order the dense path accumulated in, which keeps the
+    internals happen to give. Ascending index order is reproducible, and
+    it is the order the dense path accumulated in. That keeps the
     difference between the two at roundoff rather than merely small.
   - `w_self` is the kernel at distance zero, computed rather than looked
     up. `_euclid(coords, i, i)` is exactly zero, so this is bit-identical
@@ -331,9 +332,9 @@ Two details are load-bearing:
 
 `inrange` allocates the index vector it returns, `O(b)` against the `O(N)`
 this removes. `NearestNeighbors` 0.4.29 offers `inrange!`, which would
-write into `idx` and remove that too, but it is not in every `0.4` and
-using it would mean tightening the compat bound; worth revisiting if
-allocation still shows up in a profile.
+write into `idx` and remove that too. It is not in every `0.4`, so using
+it would mean tightening the compat bound. Worth revisiting if allocation
+still shows up in a profile.
 """
 function _local_support!(sc, tree::KDTree, coords::AbstractMatrix{T}, i::Int,
                          bw::BandwidthType, kernel::KernelFunction) where {T}
@@ -356,9 +357,9 @@ end
 The dense length-`N` weight vector at observation `i`: zero outside the
 kernel's support.
 
-Kept as the reference form that [`_local_support!`](@ref) replaced. The
-estimators no longer call it -- it allocates `N` doubles to carry `b` of
-them -- but the tests do, to check the compact path against the dense
+Kept as the reference form that [`_local_support!`](@ref) replaced. It
+allocates `N` doubles to carry `b` of them, so the estimators no longer
+call it. The tests do call it, to check the compact path against the dense
 arithmetic it was derived from.
 """
 function _get_weights(tree::KDTree, coords::AbstractMatrix{T}, i::Int,
@@ -434,9 +435,9 @@ Run `f(range)` over `nchunks` contiguous pieces of `1:N`, one task each.
 task per chunk lets `f` allocate its scratch once at entry and reuse it
 across the whole chunk.
 
-Determinism does not depend on `nchunks`: the chunks are disjoint, `f`
-writes only rows in its own range, and every reduction is left to a serial
-pass afterwards.
+Determinism does not depend on `nchunks`. The chunks are disjoint, `f`
+writes only rows in its own range, and a serial pass afterwards does every
+reduction.
 """
 function _tforeach_chunks(f::F, N::Int; nchunks::Int=Threads.nthreads()) where {F}
     N <= 0 && return nothing
@@ -464,9 +465,9 @@ function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tr
 
     # One local regression per observation, each reading the KD-tree and the
     # data and writing only its own row. Threading is therefore exact rather
-    # than approximate: the arithmetic of iteration `i` is untouched, and the
-    # two reductions that follow -- `tr_S` and `RSS` -- are serial passes in
-    # index order, so the result does not depend on the thread count.
+    # than approximate. The arithmetic of iteration `i` is untouched. The two
+    # reductions that follow, `tr_S` and `RSS`, are serial passes in index
+    # order, so the result does not depend on the thread count.
     #
     # The design handed to the QR is the compact one: `b x K`, holding only
     # the rows inside the kernel's support, instead of `N x K` with `N - b`
@@ -480,10 +481,10 @@ function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tr
             n, _, w_self = _local_support!(sc, tree, coords, i, bw, kernel)
             Xc, yc = _fill_local!(sc, X, y, sc.idx, sc.wv, n)
 
-            # `qr!` and not `qr`: the compact design lives in task-owned
-            # scratch that is overwritten at the next observation anyway, so
-            # there is nothing to preserve and a copy per observation is a
-            # copy too many.
+            # `qr!` and not `qr`. The compact design lives in task-owned
+            # scratch, which the next observation overwrites anyway. There is
+            # nothing to preserve, and a copy per observation is a copy too
+            # many.
             F = qr!(Xc)
             β_i = F \ yc
             @inbounds for k in 1:K
@@ -499,14 +500,14 @@ function _gwr_fit_at_bandwidth(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, tr
             # Hat matrix diagonal: S[i,i] = w_i * x_i' (X'W_i X)^{-1} x_i.
             # With Xw = W^{1/2}X and R from its QR, X'W_i X = R'R, so
             # (X'W_i X)^{-1} = R^{-1}R^{-T} and S_ii = ||R^{-T} x_i sqrt(w_i)||².
-            # That is R' \ xi_w, NOT R \ xi_w: the latter forms (RR')^{-1} and
-            # inflates tr(S) past N on a badly scaled X, which then collapses
-            # the N - tr(S) divisor below to its floor of 1.
+            # That is R' \ xi_w, NOT R \ xi_w. The latter forms (RR')^{-1}
+            # and inflates tr(S) past N on a badly scaled X. The N - tr(S)
+            # divisor below then collapses to its floor of 1.
             #
             # `R` is the same here as it was from the dense design, up to
-            # column signs: both satisfy R'R = X'W_i X, the rows outside the
-            # support contributing exactly nothing to that product. And
-            # `sum(abs2, ·)` does not see a sign.
+            # column signs. Both satisfy R'R = X'W_i X, because the rows
+            # outside the support contribute exactly nothing to that
+            # product. And `sum(abs2, ·)` does not see a sign.
             sws = sqrt(w_self)
             @inbounds for k in 1:K
                 xi[k] = X[i, k] * sws
@@ -538,12 +539,13 @@ function _select_bandwidth_aicc(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, t
     aicc_at(k) = _gwr_fit_at_bandwidth(X, y, coords, tree, AdaptiveBandwidth(k), kernel)[8]
 
     # The AICc curve in k is not unimodal. On the Columbus data it reverses
-    # direction eleven times, and the golden-section search this replaced
-    # returned k = 43 where the grid minimum is k = 23 -- a bandwidth nearly
+    # direction eleven times. The golden-section search this replaced
+    # returned k = 43 where the grid minimum is k = 23: a bandwidth nearly
     # twice too wide, and 2.3 AICc units worse. Golden section is only valid
-    # on a unimodal objective, so scan instead: exhaustively over a short
-    # range, and coarse-then-local over a long one, where the curve is
-    # smoother because each step in k moves the neighbourhood far less.
+    # on a unimodal objective, so this scans instead. The scan is exhaustive
+    # over a short range, and coarse-then-local over a long one, where the
+    # curve is smoother because each step in k moves the neighbourhood far
+    # less.
     span = k_max - k_min + 1
     best_k = k_min
     best_a = aicc_at(k_min)
@@ -581,8 +583,8 @@ function _select_bandwidth_aicc(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, t
                                  kernel::KernelFunction, ::Type{FixedBandwidth};
                                  h_min::T=T(0.0), h_max::T=T(0.0)) where {T}
     # Extent from the bounding box. The previous version measured distances
-    # from coords[1, :] only, so a first point near the middle of the study
-    # area understated the extent and capped h_max below the useful range.
+    # from coords[1, :] only. A first point near the middle of the study area
+    # then understated the extent, and capped h_max below the useful range.
     lo = vec(minimum(coords; dims = 1))
     hi = vec(maximum(coords; dims = 1))
     extent = sqrt(sum(abs2, hi .- lo))
@@ -593,10 +595,10 @@ function _select_bandwidth_aicc(X::Matrix{T}, y::Vector{T}, coords::Matrix{T}, t
 
     aicc_at(h) = _gwr_fit_at_bandwidth(X, y, coords, tree, FixedBandwidth(h), kernel)[8]
 
-    # As in the adaptive case the objective is not unimodal, so bracket the
-    # minimum on a grid first and only then refine, where unimodality is a
-    # local claim rather than a global one. The grid is geometric because h
-    # acts multiplicatively on the kernel.
+    # As in the adaptive case, the objective is not unimodal. So bracket
+    # the minimum on a grid first, and refine only then, where unimodality
+    # is a local claim rather than a global one. The grid is geometric,
+    # because h acts multiplicatively on the kernel.
     M = 40
     ratio = (h_max / h_min)^(one(T) / (M - 1))
     grid = T[h_min * ratio^(m - 1) for m in 1:M]
@@ -640,9 +642,9 @@ at every location.
 
 Each local fit weights observations by their distance from the target
 location, so the result is a coefficient *surface* rather than a single
-vector. This describes how a relationship varies over space; it does not
-model spatial dependence in the error, which is what
-`fit_spatial` and `fit_spatial_error` are for.
+vector. This describes how a relationship varies over space. It does not
+model spatial dependence in the error, which is what `fit_spatial` and
+`fit_spatial_error` are for.
 
 # Arguments
 - `X`: `N x K` covariates, **without** an intercept — one is added.
@@ -652,9 +654,9 @@ model spatial dependence in the error, which is what
 # Keywords
 - `bandwidth`: a [`FixedBandwidth`](@ref) or [`AdaptiveBandwidth`](@ref).
   `nothing` (the default) selects an adaptive bandwidth by minimizing
-  corrected AIC, which costs an extra search but is the sensible default.
+  AICc, which costs an extra search but is the sensible default.
 - `kernel`: a [`KernelFunction`](@ref).
-- `varnames`: covariate names; defaults to `x1, x2, ...`.
+- `varnames`: covariate names. Defaults to `x1, x2, ...`.
 
 # Returns
 A [`GWRModel`](@ref).
@@ -678,11 +680,11 @@ bandwidth.
 
 !!! note "Identification"
     The design has to have full column rank. `X` goes in without an
-    intercept, since one is added, and no covariate may be a linear
-    combination of the others. A design that fails this throws an
-    `ArgumentError` naming the offending column, rather than failing
-    inside the linear algebra or returning an arbitrary split of one
-    coefficient across two.
+    intercept, since one is added. No covariate may be a linear combination
+    of the others. A design that fails this throws an `ArgumentError`
+    naming the offending column. It does not fail inside the linear
+    algebra, and it does not return an arbitrary split of one coefficient
+    across two.
 
     This is a check on the global design. A local fit can still be rank
     deficient at a narrow bandwidth with the global design full rank;
@@ -740,9 +742,9 @@ function fit_gwr(
             n, _, _ = _local_support!(sc, tree, coords_mat, i, bw, kernel)
             Xc, _ = _fill_local!(sc, X_aug, yv, sc.idx, sc.wv, n)
 
-            # Xc'Xc is X'W_i X: the rows outside the support contributed
-            # exactly zero to that product, so dropping them changes the
-            # matrix not at all beyond the order of the summation.
+            # Xc'Xc is X'W_i X. The rows outside the support contributed
+            # exactly zero to that product. Dropping them changes the matrix
+            # not at all, beyond the order of the summation.
             XwXw_inv = inv(Symmetric(Xc' * Xc))
             @inbounds for k in 1:K
                 se_local[i, k] = sqrt(max(zero(T), sigma2 * XwXw_inv[k, k]))
@@ -777,9 +779,9 @@ end
 """
     _mgwr_se_approx(X_aug, coords, tree, bandwidths, kernel, sigma2)
 
-The approximate MGWR local standard errors: for each `(i, k)`, the
-standard error `k` would have if it came from a single weighted regression
-of a known partial residual on column `k` alone.
+The approximate MGWR local standard errors. For each `(i, k)`, this is
+the standard error `k` would have if it came from a single weighted
+regression of a known partial residual on column `k` alone.
 
 It is approximate because it ignores that the other `K - 1` components
 were estimated too, which is stated where it is used. There is no
@@ -788,9 +790,9 @@ stochastic counterpart: it needs `‖B_k[i, :]‖²` for every `i`, which is
 
 This was two byte-identical blocks in [`fit_mgwr`](@ref), one on each side
 of the `inference` branch, differing only in which `sigma2` reached them.
-Both looped `i` outside `k`, rebuilding `AdaptiveBandwidth(bandwidths[k])`
-on every one of the `N · K` iterations although it depends only on `k`,
-and taking a dense length-`N` weight vector to use `b` of its entries.
+Both looped `i` outside `k`. Both rebuilt `AdaptiveBandwidth(bandwidths[k])`
+on every one of the `N · K` iterations, although it depends only on `k`.
+Both took a dense length-`N` weight vector to use `b` of its entries.
 """
 function _mgwr_se_approx(X_aug::Matrix{T}, coords::Matrix{T}, tree::KDTree,
                          bandwidths::Vector{Float64}, kernel::KernelFunction,
@@ -806,9 +808,10 @@ function _mgwr_se_approx(X_aug::Matrix{T}, coords::Matrix{T}, tree::KDTree,
             wv = sc.wv
             for i in rows
                 n, _, w_self = _local_support!(sc, tree, coords, i, bw_k, kernel)
-                # Written as the square of `x * sqrt(w)` rather than as
-                # `x^2 * w`, which is the same quantity but not the same
-                # rounding, and the dense form this replaced took the first.
+                # Written as the square of `x * sqrt(w)`, not as
+                # `x^2 * w`. The two are the same quantity, but not the
+                # same rounding, and the dense form this replaced took the
+                # first.
                 denom = zero(T)
                 @inbounds for t in 1:n
                     v = xk[idx[t]] * sqrt(wv[t])
@@ -850,9 +853,9 @@ function _mgwr_weight_cache(X_aug::Matrix{T}, bandwidths::Vector{Float64},
             swv = sc.wv
             for i in rows
                 n, _, _ = _local_support!(sc, tree, coords, i, bw_k, kernel)
-                # Entries of the support where the kernel evaluates to
-                # exactly zero are dropped, which `findall(!iszero, w)` also
-                # did: a Bisquare kernel is zero at `d == h`, and `inrange`
+                # This drops the entries of the support where the kernel
+                # evaluates to exactly zero, as `findall(!iszero, w)` also
+                # did. A Bisquare kernel is zero at `d == h`, and `inrange`
                 # returns that point. Keeping them would pad every cached
                 # row with entries that contribute nothing, and this cache
                 # is iterated once per back-fitting sweep.
@@ -888,10 +891,11 @@ end
 Apply the converged back-fitting smoother to `v`, writing the `k`-th additive
 component `R_k v` into `f[:, k]`, so that `sum(f; dims = 2)` is `S v`.
 
-This is the same fixed point as [`_mgwr_backfit_operator`](@ref) reaches, but
-evaluated at one vector instead of built as a matrix: the iteration carries
-`K` vectors rather than `K` dense `N x N` operators, which is what lets it
-run at an `N` where the exact accumulator will not fit. Cost is
+This is the same fixed point as [`_mgwr_backfit_operator`](@ref) reaches.
+This version evaluates it at one vector instead of building it as a matrix.
+The iteration carries `K` vectors rather than `K` dense `N x N` operators,
+which is what lets it run at an `N` where the exact accumulator will not
+fit. Cost is
 `O(max_iter K N bw)` with no allocation beyond `f`.
 
 Returns `(iters, converged)`.
@@ -948,18 +952,18 @@ standard error of each estimate.
 
 For Rademacher `v`, `E[v' R_k v] = tr(R_k)`, because the off-diagonal terms
 have mean zero. One pass of the back-fitting iteration returns every
-component `R_k v` at once, so a single probe estimates the whole `enp` vector
-rather than just its sum -- the per-coefficient effective parameters, which
-are what MGWR is usually read for.
+component `R_k v` at once. A single probe therefore estimates the whole
+`enp` vector rather than just its sum. Those are the per-coefficient
+effective parameters, which are what MGWR is usually read for.
 
-The estimate is unbiased but random, so the standard error travels with it:
-`AICc` built on it inherits that noise, and seeding `rng` is what makes a
-run reproducible. It gives no help with `se_local`, which needs a row norm
-per observation rather than a trace.
+The estimate is unbiased but random, so the standard error travels with
+it. `AICc` built on it inherits that noise, and seeding `rng` is what makes
+a run reproducible. It gives no help with `se_local`, which needs a row
+norm per observation rather than a trace.
 
-Validated against a back-fitting fixed point solved exactly as an
-`(NK) x (NK)` linear system: unbiased to within Monte Carlo error, with
-`enp_se` slightly optimistic at low probe counts (see `fit_mgwr`'s
+Checked against a back-fitting fixed point solved exactly as an
+`(NK) x (NK)` linear system. It is unbiased to within Monte Carlo error,
+with `enp_se` slightly optimistic at low probe counts (see `fit_mgwr`'s
 `probes` keyword).
 
 Returns `(enp, enp_se, converged)`.
@@ -1010,10 +1014,11 @@ At the fixed point the `k`-th additive component is `f_k = R_k y`, where
     R_k = S^(k) (I - sum_{j != k} R_j),    S^(k) = diag(x_k) C_k
 
 and row `i` of `C_k` is `(x_k' W_i x_k)^-1 (w_i .* x_k)'`. The recursion
-depends only on the frozen bandwidths and on `x_k` -- not on `y`, and not on
-the fitted coefficients -- so it runs after the fit and cannot perturb it.
-That independence is the whole reason it is a separate phase: it also
-converges more slowly, having started from zero rather than from a GWR fit.
+depends only on the frozen bandwidths and on `x_k`. It does not depend on
+`y`, and not on the fitted coefficients, so it runs after the fit and cannot
+perturb it. That independence is the whole reason it is a separate phase.
+It also converges more slowly, having started from zero rather than from a
+GWR fit.
 
 Returns `(Rt, Brow2, iters, converged)`.
 """
@@ -1024,14 +1029,14 @@ function _mgwr_backfit_operator(X_aug::Matrix{T}, bandwidths::Vector{Float64},
     N, K = size(X_aug)
     # Rt[k] holds R_k', transposed because every read below wants a *row* of
     # R_k or of M and column-major storage makes the transposed column the
-    # contiguous one. The diagonals alone will not do: forming R_k needs the
-    # full off-diagonal content of every other R_j, which is what makes this
-    # O(K N^2) in memory and why fit_mgwr gates it on N.
+    # contiguous one. The diagonals alone will not do. Forming R_k needs the
+    # full off-diagonal content of every other R_j. That is what makes this
+    # O(K N^2) in memory, and why fit_mgwr gates it on N.
     Rt = [zeros(T, N, N) for _ in 1:K]
     Mt = Matrix{T}(undef, N, N)
     brow = Vector{T}(undef, N)
-    # Brow2[i, k] = ||B_k[i, :]||^2, which is what the standard errors need
-    # and R_k alone cannot give: R_k is diag(x_k) B_k, so recovering B_k from
+    # Brow2[i, k] = ||B_k[i, :]||^2, which is what the standard errors need.
+    # R_k alone cannot give it. R_k is diag(x_k) B_k, so recovering B_k from
     # it divides by x_ik.
     Brow2 = zeros(T, N, K)
     iters = 0
@@ -1063,10 +1068,10 @@ function _mgwr_backfit_operator(X_aug::Matrix{T}, bandwidths::Vector{Float64},
                     denom += swv[t] * xk[sidx[t]]^2
                 end
 
-                # Row i of B_k is row i of C_k times M. The weights vanish
-                # outside the kernel's support, which is what keeps this
-                # O(N * bw) per row rather than O(N^2) -- and now the loop
-                # visits only the support instead of testing all N for it.
+                # Row i of B_k is row i of C_k times M. The weights
+                # vanish outside the kernel's support, which is what keeps
+                # this O(N * bw) per row rather than O(N^2). The loop now
+                # visits only the support, instead of testing all N for it.
                 fill!(brow, zero(T))
                 if denom > T(1e-12)
                     @inbounds for t in 1:n
@@ -1123,32 +1128,32 @@ As [`fit_gwr`](@ref): `X` without an intercept, `y`, and `N x 2` `coords`.
 - `max_iter`, `tol`: back-fitting iteration cap and convergence tolerance.
   Back-fitting runs in two phases: bandwidths are re-selected each sweep
   until they stop moving, then held fixed while the coefficients converge.
-  The second phase is where the sweeps go -- Columbus settles its
-  bandwidths after 5 sweeps and then needs about 100 more -- so `max_iter`
-  has to be generous. Those later sweeps are cheap, since the AICc search
-  is what costs.
-- `inference`: how to obtain the degrees of freedom, which is what
+  The second phase is where the sweeps go. Columbus settles its bandwidths
+  after 5 sweeps and then needs about 100 more, so `max_iter` has to be
+  generous. Those later sweeps are cheap, since the AICc search is what
+  costs.
+- `inference`: which method supplies the degrees of freedom, which is what
   identifies `enp`, `hat_trace` and `AICc`.
   * `true` (default): exact, by accumulating the smoother operators. Needs
     `K + 1` dense `N x N` matrices, hence `max_inference_n`.
   * `:stochastic`: Hutchinson probing. `O(N)` in memory, so it has no size
     gate, and it estimates the whole `enp` vector rather than just its sum.
-    The estimate is unbiased but random -- see `enp_se` -- and `se_local`
-    stays approximate, because a standard error needs a row norm per
-    observation and no trace estimator provides one.
+    The estimate is unbiased but random (see `enp_se`). `se_local` stays
+    approximate, because a standard error needs a row norm per observation
+    and no trace estimator provides one.
   * `false`: skip it. `enp`, `hat_trace` and `AICc` are `NaN`.
 - `max_inference_n`: fall back from exact to `NaN` above this `N` (default
   `2000`), warning rather than erroring. Pass `inference = :stochastic` to
   get degrees of freedom there instead.
 - `probes`, `rng`: probe count and random stream for `:stochastic` (default
-  `200`). Seed `rng` for a reproducible `AICc`; `enp_se` falls as
+  `200`). Seed `rng` for a reproducible `AICc`. `enp_se` falls as
   `1/sqrt(probes)`. The default is 200 rather than the 30-50 usually quoted
-  for Hutchinson because `enp_se` is mildly optimistic at small probe
-  counts: against an exactly solved fixed point its z-scores have standard
+  for Hutchinson, because `enp_se` is mildly optimistic at small probe
+  counts. Against an exactly solved fixed point, its z-scores have standard
   deviation 1.28 at 50 probes and 1.04 at 200, so nominal 95% intervals
-  cover about 91%. The estimate itself is unbiased at either count -- it is
+  cover about 91%. The estimate itself is unbiased at either count. It is
   the width that is understated, because a quadratic form in Rademacher
-  variables is not Gaussian and its variance is itself estimated from the
+  variables is not Gaussian, and its variance is itself estimated from the
   same few probes.
 
 # Returns
@@ -1157,11 +1162,11 @@ An [`MGWRModel`](@ref).
 !!! warning
     Back-fitting is not guaranteed to converge, and `converged` now requires
     both that the bandwidths settled and that the coefficients reached
-    `tol`. Check `m.converged` before reading the coefficients; if it is
+    `tol`. Check `m.converged` before reading the coefficients. If it is
     `false`, raise `max_iter` or loosen `tol`. Convergence is slow when the
     covariates are spatially correlated with each other, because the
-    additive components then compete for the same variation: the contraction
-    factor on Columbus is about 0.94 per sweep.
+    additive components then compete for the same variation. The
+    contraction factor on Columbus is about 0.94 per sweep.
 
 # Examples
 ```julia
@@ -1172,11 +1177,11 @@ m.bandwidths               # aligned with m.coefnames, intercept first
 
 !!! note "Identification"
     The design has to have full column rank. `X` goes in without an
-    intercept, since one is added, and no covariate may be a linear
-    combination of the others. A design that fails this throws an
-    `ArgumentError` naming the offending column, rather than failing
-    inside the linear algebra or returning an arbitrary split of one
-    coefficient across two.
+    intercept, since one is added. No covariate may be a linear combination
+    of the others. A design that fails this throws an `ArgumentError`
+    naming the offending column. It does not fail inside the linear
+    algebra, and it does not return an arbitrary split of one coefficient
+    across two.
 
     This is a check on the global design, as in `fit_gwr`.
 
@@ -1213,9 +1218,9 @@ function fit_mgwr(
     tree = _build_tree(coords_mat)
 
     # The accumulator below needs K+1 dense N x N operators, so it is gated
-    # on N. Above the gate we report NaN rather than an unpenalised number:
-    # AICc without tr(S) is the tr(S) = 0 case, and putting that beside a
-    # GWR AICc makes MGWR look better by exactly the penalty it is missing.
+    # on N. Above the gate we report NaN rather than an unpenalised number.
+    # AICc without tr(S) is the tr(S) = 0 case. Putting that beside a GWR
+    # AICc makes MGWR look better by exactly the penalty it is missing.
     inference isa Symbol && inference !== :stochastic &&
         throw(ArgumentError("fit_mgwr: inference must be true, false or " *
                             ":stochastic, got :$inference"))
@@ -1240,12 +1245,12 @@ function fit_mgwr(
 
     converged = false
     iter = 0
-    # Phase 1 re-selects every bandwidth each sweep; phase 2 holds them fixed
-    # and lets the coefficients converge. Splitting them matters three ways:
-    # the AICc search is ~95% of a sweep's cost, so the many sweeps the
-    # coefficients actually need are only affordable without it; the
+    # Phase 1 re-selects every bandwidth each sweep. Phase 2 holds them
+    # fixed and lets the coefficients converge. Splitting them matters three
+    # ways. The AICc search is ~95% of a sweep's cost, so the many sweeps
+    # the coefficients actually need are only affordable without it. The
     # smoother S is a fixed linear operator only once the bandwidths stop
-    # moving, which is what makes tr(S) well defined; and re-selecting
+    # moving, which is what makes tr(S) well defined. And re-selecting
     # forever lets a flat AICc curve flip the argmin on numerical noise.
     frozen = false
     froze_at = 0
@@ -1263,10 +1268,10 @@ function fit_mgwr(
                 partial_y .-= X_aug[:, j] .* coef_local[:, j]
             end
 
-            # Optimize bandwidth for this variable. k_min is left at the
+            # Optimize bandwidth for this variable. k_min stays at the
             # selector's statistical floor of K + 2 = 3 for these univariate
-            # sweeps; it used to be pinned at 20, which bound on every
-            # Columbus covariate -- their grid optima are 9 to 15 -- and so
+            # sweeps. It used to be pinned at 20, which bound on every
+            # Columbus covariate, whose grid optima are 9 to 15. That
             # reported a floor rather than a selection.
             x_k = X_aug[:, k:k]
             if frozen
@@ -1322,7 +1327,7 @@ function fit_mgwr(
     coef_global = vec(mean(coef_local; dims=1))
 
     # One rule for all of it: report degrees of freedom only when there is a
-    # converged operator to take them from. Otherwise NaN -- a trace that has
+    # converged operator to take them from. Otherwise NaN. A trace that has
     # not converged is not the trace of anything, and handing back a finite
     # number there repeats the mistake this whole exercise was about.
     did_accumulate = false
@@ -1347,12 +1352,12 @@ function fit_mgwr(
               "so there is no fixed smoother to probe. enp, hat_trace and " *
               "AICc are NaN. Raise max_iter."
     elseif want_stoch
-        # Hutchinson probing. The smoother is applied to vectors rather than
-        # built as a matrix, so this holds K vectors where the exact path
-        # holds K + 1 dense N x N operators -- the whole reason it has no
-        # size gate. A probe that has not converged biases the estimate
-        # rather than merely adding variance, so a failure here is fatal to
-        # the number in a way more probes cannot repair.
+        # Hutchinson probing. This applies the smoother to vectors rather
+        # than building it as a matrix, so it holds K vectors where the
+        # exact path holds K + 1 dense N x N operators. That is the whole
+        # reason it has no size gate. A probe that has not converged biases
+        # the estimate rather than merely adding variance, so a failure here
+        # is fatal to the number in a way more probes cannot fix.
         enp_h, se_h, probes_ok = _mgwr_enp_hutchinson(
             X_aug, bandwidths, coords_mat, tree, kernel;
             probes = probes, rng = rng, tol = tol, max_iter = max_iter)
@@ -1372,7 +1377,7 @@ function fit_mgwr(
         # Phase 3: the smoother, iterated on its own now that the bandwidths
         # are fixed. Keeping it out of the fitting loop is what lets the
         # coefficients come out bit-identical whether or not inference is
-        # asked for -- inference changes what is reported, never the fit.
+        # asked for. Inference changes what is reported, never the fit.
         Rt, Brow2, acc_iters, acc_converged =
             _mgwr_backfit_operator(X_aug, bandwidths, coords_mat, tree, kernel;
                                    tol = tol, max_iter = max_iter)
@@ -1394,9 +1399,9 @@ function fit_mgwr(
         tr_S = sum(enp)
 
         # Self-check, and still worth running even though the recursion
-        # converged on its own criterion: that criterion says the operator
+        # converged on its own criterion. That criterion says the operator
         # stopped moving, not that it is the smoother of *this* fit. If the
-        # coefficient loop hit max_iter, `fitted` is not S y and the gap is
+        # coefficient loop hit max_iter, `fitted` is not S y, and the gap is
         # where it shows. It also disposes of any worry about drift.
         f_hat = zeros(T, N)
         yv = Vector{T}(y)
@@ -1435,10 +1440,11 @@ function fit_mgwr(
         AICc = T(NaN)
         df_method = :none
 
-        # Approximate: this treats each coefficient as if it came from one
-        # weighted regression on a known partial residual, ignoring that the
-        # other components were estimated too. Reached with inference = false,
-        # above max_inference_n, or when the bandwidths never settled.
+        # Approximate. This treats each coefficient as if it came from one
+        # weighted regression on a known partial residual, and ignores that
+        # the other components were estimated too. Reached with
+        # inference = false, above max_inference_n, or when the bandwidths
+        # never settled.
         se_local = _mgwr_se_approx(X_aug, coords_mat, tree, bandwidths, kernel, sigma2)
     end
 

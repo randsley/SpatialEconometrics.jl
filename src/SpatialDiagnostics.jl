@@ -55,7 +55,7 @@ units of `y`.
 - `pseudo_p`: conditional-permutation p-value per unit.
 - `cluster_type`: one of `:HH`, `:LL`, `:HL`, `:LH` or `:ns` — note these
   are `Symbol`s, not strings. `:HH` and `:LL` mark clusters of high and of
-  low values; `:HL` and `:LH` mark spatial outliers; `:ns` marks units with
+  low values. `:HL` and `:LH` mark spatial outliers. `:ns` marks units with
   `pseudo_p > 0.05`.
 - `z_scores`: standardized `y`, the basis of the H/L classification.
 
@@ -120,9 +120,9 @@ end
 Geary's c with its reference moments, returned by [`geary_c`](@ref).
 
 # Fields
-- `C_stat`: the statistic. Its null expectation is 1; **below** 1 indicates
-  positive spatial autocorrelation and above 1 negative — the opposite
-  direction to Moran's I.
+- `C_stat`: the statistic. Its null expectation is 1. **Below** 1 indicates
+  positive spatial autocorrelation, and above 1 negative. That is the
+  opposite direction to Moran's I.
 - `E_C`: expectation under the null, 1.
 - `Var_C`: variance under the null.
 - `z_stat`: `(C_stat - E_C) / sqrt(Var_C)`, so a negative `z_stat` means
@@ -325,7 +325,7 @@ A [`LISAResult`](@ref).
 
 !!! warning
     These are `N` simultaneous tests, so some units will be significant by
-    chance alone; the `0.05` cut used for `:ns` is unadjusted. Read the
+    chance alone. The `0.05` cut used for `:ns` is unadjusted. Read the
     classification as exploratory.
 
 # Examples
@@ -437,10 +437,10 @@ neighbours.
 c = ((N-1) / (2 S_0)) * sum_ij w_ij (y_i - y_j)^2 / sum_i (y_i - ybar)^2
 ```
 
-Where Moran's I is a cross-product statistic and so responds to the global
-pattern, Geary's c sums squared differences across linked pairs and is
-therefore more sensitive to local, short-range variation. Using both is
-informative when they disagree.
+Moran's I is a cross-product statistic, so it responds to the global
+pattern. Geary's c sums squared differences across linked pairs, so it is
+more sensitive to local, short-range variation. Using both is informative
+when they disagree.
 
 # Returns
 A [`GearyCResult`](@ref).
@@ -564,14 +564,14 @@ function _trace_W2_WtW_fast(W::AbstractSparseMatrix{T}) where {T}
     return w2 + wtw
 end
 
-# Shared pieces of the Anselin LM battery: the OLS residuals, tr(W'W + W^2),
-# the information term J_rho_rho built from the LAGGED FITTED VALUES W*X*b,
-# and the two scores d_rho = e'Wy/s2 and d_lam = e'We/s2.
+# Shared pieces of the Anselin LM battery. These are the OLS residuals and
+# tr(W'W + W^2), the information term J_rho_rho built from the LAGGED FITTED
+# VALUES W*X*b, and the two scores d_rho = e'Wy/s2 and d_lam = e'We/s2.
 #
 # These live in one place on purpose. The four tests previously each carried
-# their own copy of this algebra and drifted: lm_test_lag ended up scoring
-# e'We (the LM-error numerator), and both robust tests formed d_rho as
-# e'Wy/s2 + e'We/s2 rather than e'Wy/s2.
+# their own copy of this algebra, and the copies drifted. lm_test_lag ended
+# up scoring e'We, which is the LM-error numerator. Both robust tests formed
+# d_rho as e'Wy/s2 + e'We/s2 rather than e'Wy/s2.
 function _lm_components(y::AbstractVector{T}, X::AbstractMatrix{T},
                         W::AbstractSparseMatrix{T}) where {T<:AbstractFloat}
     e, σ2, β, qr_X = _ols_residuals_and_sigma(y, X)
@@ -599,7 +599,7 @@ freedom.
 It is **not robust**: a spatial error process also inflates it, so a
 rejection on its own does not distinguish lag from error dependence. Use
 [`lm_test_robust_lag`](@ref), or [`lm_tests`](@ref) for the whole battery.
-`X` must include an intercept column; none is added for you.
+`X` must include an intercept column. None is added for you.
 
 
 # Returns
@@ -628,8 +628,8 @@ Tests `H0: lambda = 0` in `y = X*beta + u`, `u = lambda*W*u + e`, from OLS
 residuals. Chi-squared with 1 degree of freedom.
 
 Like [`lm_test_lag`](@ref) it is not robust to the other form of
-dependence; see [`lm_test_robust_error`](@ref) and [`lm_tests`](@ref).
-`X` must include an intercept column; none is added for you.
+dependence. See [`lm_test_robust_error`](@ref) and [`lm_tests`](@ref).
+`X` must include an intercept column. None is added for you.
 
 
 # Returns
@@ -655,7 +655,7 @@ This is the test to read when both plain statistics reject. It corrects
 `lm_test_lag` for local misspecification of the error process, so a
 rejection points at the lag specifically rather than at spatial dependence
 in general.
-`X` must include an intercept column; none is added for you.
+`X` must include an intercept column. None is added for you.
 
 
 # Returns
@@ -673,7 +673,7 @@ function lm_test_robust_lag(y::AbstractVector{T}, X::AbstractMatrix{T}, W::Abstr
 
     # Anselin, Bera, Florax & Yoon (1996), eq. for RS*_rho:
     #     (d_rho - d_lam)^2 / (J_rho_rho - tr(W'W + W^2))
-    # The correction SUBTRACTS the error score; adding it instead turns the
+    # The correction SUBTRACTS the error score. Adding it instead turns the
     # statistic into a second, inflated lag test that fires on SEM data.
     numer = (c.d_rho - c.d_lam)^2
     denom = c.J - c.Tr
@@ -688,9 +688,9 @@ end
 LM test for spatially autocorrelated errors, robust to the presence of an
 omitted spatial lag.
 
-The counterpart to [`lm_test_robust_lag`](@ref); together they are what
+The counterpart to [`lm_test_robust_lag`](@ref). Together they are what
 separates an error process from a lag process when both plain tests reject.
-`X` must include an intercept column; none is added for you.
+`X` must include an intercept column. None is added for you.
 
 
 # Returns
@@ -797,9 +797,9 @@ end
 #     J_tt = (W*X_d)'M(W*X_d) / sigma2
 #     J_rt = (W*X_d)'M(W*X*beta) / sigma2
 #
-# The asymmetry is real and is pinned as a test: J_rr carries the
-# tr(W'W + W^2) term because rho enters the Jacobian log|I - rho*W|, while
-# theta enters the mean only and contributes no such term. The rho-sigma2
+# The asymmetry is real, and a test pins it. J_rr carries the
+# tr(W'W + W^2) term because rho enters the Jacobian log|I - rho*W|.
+# Theta enters the mean only, and contributes no such term. The rho-sigma2
 # block is tr(W)/sigma2 = 0 for a hollow W, which is why concentrating out
 # sigma2 leaves J_rr alone.
 function _sdm_score_components(y::AbstractVector{T}, X::AbstractMatrix{T},
@@ -837,25 +837,26 @@ end
 
 # Solve a score quadratic form d' J^{-1} d through a Cholesky factor.
 #
-# A failure here means the information matrix is singular, which happens when
-# the Durbin block is collinear with X -- a duplicated column, or a W for
+# A failure here means the information matrix is singular. That happens when
+# the Durbin block is collinear with X: a duplicated column, or a W for
 # which W*X_d lands in span(X). That is a statement about the design, not a
-# numerical hiccup, so it is thrown rather than ridged away: a silently
+# numerical hiccup, so this throws rather than ridging it away. A silently
 # regularised statistic is the failure mode finding 16 recorded.
 # Is this information matrix safe to invert?
 #
-# `issuccess` on a `check = false` Cholesky is NOT a rank test. For an
-# exactly rank-deficient Gram matrix -- a repeated column in X, or a W for
-# which W*X lands in span(X) -- whether the final pivot comes out slightly
-# positive or slightly negative is down to the rounding of the particular
-# LAPACK build. It came out positive on macOS/aarch64 and on the Julia 1.10
-# dependency set, so the factorisation "succeeded" and the inverse returned
-# large meaningless numbers: finding 16's failure mode arrived by a different
-# route, and the first version of this code did not catch it.
+# `issuccess` on a `check = false` Cholesky is NOT a rank test. Take an
+# exactly rank-deficient Gram matrix: a repeated column in X, or a W for
+# which W*X lands in span(X). Whether the final pivot comes out slightly
+# positive or slightly negative is then down to the rounding of the
+# particular LAPACK build. It came out positive on macOS/aarch64 and on the
+# Julia 1.10 dependency set. The factorisation therefore "succeeded", and
+# the inverse returned large meaningless numbers. Finding 16's failure mode
+# arrived by a different route, and the first version of this code did not
+# catch it.
 #
 # The Cholesky pivots are a usable conditioning estimate, so gate on their
 # ratio. A pivot ratio at or below sqrt(eps) means a condition number around
-# 1/eps, which is singular by any standard a score test cares about, while a
+# 1/eps, which is singular by any standard a score test cares about. A
 # well-conditioned block sits near 1.
 function _chol_or_nothing(J::AbstractMatrix{T}) where {T<:AbstractFloat}
     F = cholesky(Symmetric(J); check = false)
@@ -883,14 +884,14 @@ Joint Rao score test for the spatial Durbin model: `H0: rho = 0` **and**
 `theta = 0`, against `y = rho*W*y + X*beta + W*X_d*theta + eps`.
 
 This is the test to run first. It asks whether the spatial Durbin model has
-anything to offer over OLS at all; only if it rejects is there a reason to
-ask which of the two pieces is responsible, which is what
+anything to offer over OLS at all. Only if it rejects is there a reason to
+ask which of the two pieces is responsible. That is what
 [`lm_test_robust_lag_durbin`](@ref) and [`lm_test_robust_durbin`](@ref)
 separate.
 
 Chi-squared with `k + 1` degrees of freedom, `k` being the number of
-non-constant columns of `X`. `X` must include an intercept column; none is
-added for you, and the lagged intercept is dropped from the Durbin block
+non-constant columns of `X`. `X` must include an intercept column, and none
+is added for you. The lagged intercept is dropped from the Durbin block,
 because `W*1 = 1` makes it collinear with the intercept itself.
 
 # Returns
@@ -944,9 +945,9 @@ end
 Rao score test for the Durbin terms, robust to the presence of a spatial
 lag: `H0: theta = 0`, allowing `rho != 0` locally.
 
-The counterpart of [`lm_test_robust_lag`](@ref) one level up: it subtracts
-the part of the Durbin score that a spatial lag would itself have produced,
-so a rejection points at `W*X` specifically rather than at spatial
+The counterpart of [`lm_test_robust_lag`](@ref), one level up. It subtracts
+the part of the Durbin score that a spatial lag would itself have produced.
+A rejection therefore points at `W*X` specifically, rather than at spatial
 dependence in general.
 
 Chi-squared with `k` degrees of freedom. `X` must include an intercept
@@ -956,7 +957,7 @@ column.
 A [`ScoreTestResult`](@ref).
 
 # References
-Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56;
+Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56.
 Bera, A. K., & Yoon, M. J. (1993). *Econometric Theory*, 9(4), 649–658.
 """
 function lm_test_robust_durbin(y::AbstractVector{T}, X::AbstractMatrix{T},
@@ -979,7 +980,7 @@ Rao score test for a spatial lag, robust to the presence of Durbin terms:
 
 Distinct from [`lm_test_robust_lag`](@ref), which is robust to spatial
 dependence in the **errors**. This one is robust to omitted `W*X`. Both test
-`rho = 0`; they differ in what they allow to be wrong under the null, and
+`rho = 0`. They differ in what they allow to be wrong under the null, and
 the suffix names that nuisance.
 
 Chi-squared with 1 degree of freedom. `X` must include an intercept column.
@@ -1061,7 +1062,7 @@ The reading, once `joint` has rejected:
 
 | Robust tests | Indication |
 |---|---|
-| neither rejects | the joint rejection is weak evidence; prefer the simpler model |
+| neither rejects | the joint rejection is weak evidence, so prefer the simpler model |
 | only `robust_lag` rejects | a lag, not Durbin terms: fit `SAR` |
 | only `robust_durbin` rejects | Durbin terms, not a lag: fit `SLX` |
 | both reject | fit `SDM` |
