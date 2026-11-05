@@ -3611,3 +3611,215 @@ volume, issue and pages, with an index recording each one's provenance.
 `.gitignore` excludes it: these are copyrighted works held for reading, not
 redistributed with the package. The point is that the next check is a file
 open rather than a fetch attempt against a publisher that refuses them.
+
+
+## The log-determinant approximation, measured against its own sources
+
+Everything below came from runs on 2026-11-05, on the lattices and `knn`
+weights named in each table. The approximation had been in `src/` since the
+package began. Its **source had never been recorded**, and no measurement
+had ever asked what it costs the estimate rather than the determinant.
+
+### The citation that was missing
+
+`chebyshev_logdet` and `precompute_chebyshev_traces` implement **Pace and
+LeSage (2004)**, *Chebyshev approximation of log-determinants of spatial
+weight matrices*, CSDA 45(2) 179-196. That reference was **in neither
+`ROADMAP.md`'s reference list nor the source file**. The method the entire
+scaling argument rests on was uncited. It is now in both, read in part: the
+introduction and sections 2.1 and 2.2 were read in the paper's own text;
+section 2.3, the Chebyshev form itself, and section 2.4, the bounds, were
+not, and the reference entry says so.
+
+Two things the paper settles that the package had been guessing at.
+
+**It states a symmetry assumption.** Section 2.1: the method assumes the
+weight matrix "is symmetric or similar to a symmetric matrix", with maximum
+eigenvalue 1, minimum at or above -1, and zero trace. For `knn` weights,
+which are asymmetric, its remedy is to symmetrise *before* row-standardising:
+`D_R = R^-1 (D_N + D_N')` for the statistics and
+`D_S = R^-1/2 (D_N + D_N') R^-1/2` for the log-determinant. It cites **Ord
+(1975, p. 125)** for the two being similar.
+
+Ord's premise, read on the page, is that the *unstandardised* adjacency is
+already symmetric. Verified numerically here:
+`max |eig(W) - eig(D^1/2 C D^-1/2)| = 1.9e-14`. So a row-standardised
+contiguity matrix satisfies the assumption and a row-standardised `knn`
+matrix does not.
+
+**The Taylor series is not the competitor; it is the error bar.** Section
+2.4 uses Martin's Taylor series, "which has known biases", to bound the
+Chebyshev approximation. The package has `precompute_neumann_traces` already
+and had been treating the two as alternatives.
+
+### The assumption is violated in practice, and it does not matter
+
+`N = 400`, order 12, against an exact dense log-determinant.
+
+| `W` | eigenvalues | err at 0.5 | at 0.7 | at 0.9 | at 0.95 |
+|---|---|---|---|---|---|
+| rook lattice, row-standardised | all real | 7.4e-10 | 1.4e-07 | 4.7e-04 | 5.3e-03 |
+| **knn k=6, row-standardised** | **complex**, max abs Im 5.5e-02 | 1.4e-07 | 2.2e-05 | 2.0e-03 | 5.9e-03 |
+| knn symmetrised then row-standardised | all real | 8.8e-08 | 8.9e-06 | 2.2e-03 | **2.5e-02** |
+
+The `knn` eigenvalues are genuinely complex, so the paper's guarantee does
+not hold. The error is the same order of magnitude anyway, and the paper's
+own remedy is the **worst** of the three at `ρ = 0.95`. What the package
+lacks on `knn` weights is the published error *bound*, not accuracy.
+
+### An exact baseline that owes nothing to a factorisation
+
+Ord's Appendix C, Case 3 gives the eigenvalues of the `p x q` lattice with
+constant weight 1/4 in closed form,
+`λ_rs = (1/2)[cos(rπ/(p+1)) + cos(sπ/(q+1))]`, so the log-determinant is
+analytic. Checked against a numerical eigendecomposition:
+
+| lattice | max abs difference over all eigenvalues |
+|---|---|
+| 20 x 20 (N = 400) | 3.8e-15 |
+| 40 x 40 (N = 1600) | 4.8e-15 |
+
+The sparse LU then agrees with the analytic value to about 1e-13, so the two
+baselines cross-validate and neither has to be trusted on its own.
+
+### The finding: log-determinant error is a bad proxy for what matters
+
+| N | ρ | order | error in `ρ̂` | error in log-determinant |
+|---|---|---|---|---|
+| 2500 | 0.30 | 6 | 1.3e-07 | 2.2e-05 |
+| 2500 | 0.60 | 6 | 1.2e-05 | 6.2e-03 |
+| **2500** | **0.90** | **6** | **3.4e-04** | **7.8e-01** |
+| 2500 | 0.90 | 12 | 4.7e-06 | 5.0e-03 |
+| 2500 | 0.90 | 20 | 2.6e-08 | 2.3e-05 |
+
+**An error of 0.78 in the log-determinant costs 0.00034 in `ρ̂`.** The gap is
+three to four orders of magnitude, and it recurs for stochastic trace error
+too, so it is a property of the profile likelihood rather than of one
+estimator: the maximiser depends on the *shape* of the approximation near
+the peak, and a smooth error moves the level far more than the argmax. Every
+accuracy figure in this literature, including the 0.02 Pace and LeSage
+report for `ρ̂` at `N = 57,647`, is a log-determinant figure.
+
+### Speed: the quoted ratio and the real one
+
+Per evaluation, Chebyshev is flat in `N` and the exact factorisation is not.
+
+| N | sparse LU | Chebyshev q=6 | ratio |
+|---|---|---|---|
+| 900 | 2.31 ms | 1.10 us | 2,097x |
+| 14,400 | 46.93 ms | 1.10 us | **42,659x** |
+
+Charge the Chebyshev route for its own traces and that becomes:
+
+| N | exact | Chebyshev | speed-up |
+|---|---|---|---|
+| 900 | 0.099 s | 0.022 s | 4.5x |
+| 2,500 | 0.263 s | 0.078 s | 3.4x |
+| 6,400 | 0.829 s | 0.154 s | 5.4x |
+| 14,400 | 2.012 s | 0.374 s | 5.0x |
+
+**A 42,659x per-evaluation advantage is 5x end to end, and flat in `N`.**
+The order-12 traces cost 7 to 12 LU solves and the optimiser needs 42, so
+the one-off dominates. The honest statement is the one the paper itself
+makes in its introduction: shared submodels reuse the same log-determinant
+function. Chebyshev is not a faster fit. It is a nearly free *second* fit,
+which is why it belongs in the Turing extension and in any likelihood-ratio
+search.
+
+On `knn` weights the exact recursion fills in and **crosses the
+break-even**: at `N = 3600, k = 24` the traces cost 58 LU-equivalents
+against a budget of 42, a net loss. The Hutchinson path never forms
+`T_k(W)`, and costs 1 to 10.
+
+| knn, N = 3600, q = 12 | trace time | break-even | `ρ̂` error |
+|---|---|---|---|
+| k=24 exact recursion | 1,628 ms | **58 LU** | 4.8e-06 |
+| k=24 Hutchinson S=30 | 29 ms | **1 LU** | 6.2e-04 |
+| k=24 Hutchinson S=100 | 92 ms | 3 LU | 1.5e-06 |
+
+Whether to use exact or stochastic traces is therefore **not an accuracy
+decision**. It is decided by whether `W`'s fill crosses the break-even,
+which `knn` at `k >= 12` does and a lattice does not.
+
+### Two consequences for stochastic traces
+
+Over 8 probe seeds at `N = 3600`, `knn k = 12`: `ρ̂` mean 0.694953 against an
+exact 0.694930, standard deviation 2.1e-04. Unbiased, with roughly 1e-04 of
+jitter. So:
+
+- **`ρ̂` is not reproducible unless the rng is seeded.** `ChebyshevApprox`
+  takes one, which matters more than it looks.
+- **A likelihood-ratio test must reuse the same traces across the models it
+  compares**, or the statistic absorbs trace noise. The paper recommends
+  reuse for speed. It is also a correctness requirement.
+
+### The ordering concern, tested and dropped
+
+Pace and Barry's argument for approximating was that sparse elimination
+ordering degrades on irregular data, so a lattice benchmark would flatter
+the exact route. Measured in microseconds per non-zero:
+
+| `W` | N = 900 | N = 3600 |
+|---|---|---|
+| rook lattice | 0.454 | 0.560 |
+| knn uniform k=12 | 0.205 | 0.348 |
+| knn **clustered** k=12 | 0.277 | 0.406 |
+
+Irregular geography is not slower per non-zero than the lattice, and
+clustering costs 17 to 35% over uniform points. At these sizes the concern
+does not bite, so the 5x above stands as measured rather than as a lower
+bound. Beyond `N = 10^4` it is untested.
+
+### Stochastic Lanczos quadrature does not help, and Hutch++ has nothing to exploit
+
+Both were proposed as the way to scale further. Both were measured rather
+than argued about.
+
+SLQ was implemented and validated first, because its initial numbers were
+non-monotone in the probe count. They were underpowered, not wrong:
+`sd * sqrt(S)` is constant at 33 to 38 across `S` of 10, 40 and 160, which
+is 1/sqrt(S) convergence, and the bias at `S = 160` is -0.05 on -237.4,
+inside one standard error.
+
+The validation also produced the reason SLQ cannot win. The quadrature
+**saturates at `m ≈ 10`**: the bias is -0.055 at `m = 10` and -0.061 at
+`m = 20, 30, 45, 60` and `90`, identical to four decimals. SLQ's
+distinguishing feature is an adaptive Gauss quadrature fitted to the
+spectrum, and it has converged by ten steps. What remains is Hutchinson
+probe variance, which is **the same variance the Chebyshev path faces**. The
+two are the same estimator in the regime that matters.
+
+What is left is wall time, at a matched matrix-vector budget:
+
+| matvecs | SLQ setup | Chebyshev + Hutchinson |
+|---|---|---|
+| 240 | 134 ms | **5.6 ms** |
+| 3,000 | 1,993 ms | **81 ms** |
+
+24x, because SLQ runs probes one at a time with full reorthogonalisation and
+an eigendecomposition each, while the Chebyshev recursion puts the whole
+probe block through BLAS-3. And SLQ needs a symmetric operator, so by Ord's
+premise it **cannot be used on row-standardised `knn` weights at all**,
+where Chebyshev empirically can.
+
+Hutch++ beats Hutchinson by sketching a low-rank part of the matrix whose
+trace is wanted. Here that matrix is `log(I - ρW)`:
+
+| ρ | top 10% of values carry | rank needed for 90% of the mass |
+|---|---|---|
+| 0.50 | 26.4% | 61.5% |
+| 0.90 | 34.8% | 59.1% |
+| 0.99 | 39.9% | 57.4% |
+
+Nearly flat. There is no low-rank structure to sketch, so Hutch++ would
+reduce to Hutchinson with sketching overhead. Answered without implementing
+it.
+
+**The standing conclusion.** Neither proposal helps, for two properties of
+this particular matrix: the quadrature converges at `m ≈ 10`, so adaptivity
+is wasted, and `log(I - ρW)` has no decaying spectrum. Stochastic traces are
+hopeless for the log-determinant — at `N = 1600` the noise is about
+`37/sqrt(S)`, so +/-0.1 would need some 137,000 probes — and entirely
+sufficient for the estimate, where `S = 50` already gives 1e-04. The
+roadmap's parked SLQ row is now closed on measured grounds rather than left
+open on plausible ones.

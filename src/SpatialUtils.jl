@@ -64,7 +64,37 @@ affordable.
 - `n_probes`: number of Hutchinson random probes used to estimate the
   traces. `0` computes them deterministically from sparse matrix powers,
   which is exact and preferred unless `W` is too large for that.
-- `rng`: random source, used only when `n_probes > 0`.
+- `rng`: random source, used only when `n_probes > 0`. **Seed it if the
+  estimate must be reproducible**: stochastic traces move `ρ̂` by about
+  `1e-4`, unbiased but not repeatable. A likelihood-ratio test must
+  also reuse one set of traces across the models it compares, or the
+  statistic absorbs the trace noise.
+
+# Choosing between exact and stochastic traces
+This is **not an accuracy decision**. Measured at `N = 3600`, order 12:
+the exact recursion fills in on `knn` weights and at `k = 24` costs 58
+LU-equivalents against an optimiser budget of 42, a net loss, while
+Hutchinson costs 1 to 10. On a lattice the recursion stays cheap and is
+exact. Decide on `W`'s fill, not on the error.
+
+# Accuracy, and what it is accuracy *in*
+Order 6 is adequate for point estimation because the error in `ρ̂` runs
+three to four orders of magnitude below the error in the
+log-determinant: at `N = 2500, ρ = 0.9`, a log-determinant error of
+`7.8e-01` cost `3.4e-04` in `ρ̂`. The profile maximiser depends on the
+shape of the approximation near the peak, not on its level.
+
+# Reference
+Pace, R. K. & LeSage, J. P. (2004). Chebyshev approximation of
+log-determinants of spatial weight matrices. *Computational Statistics
+& Data Analysis*, 45(2), 179–196.
+
+The method assumes `W` is symmetric or **similar** to a symmetric
+matrix. By Ord (1975, p. 125) a row-standardised *symmetric* adjacency
+qualifies; a row-standardised `knn` matrix does not, and its eigenvalues
+are genuinely complex. Measured, that costs nothing — the error stays
+the same order of magnitude as on a lattice — but the paper's error
+bound does not apply there. See `docs/AUDIT.md`.
 
 See also [`ExactLU`](@ref), `chebyshev_logdet`.
 """
