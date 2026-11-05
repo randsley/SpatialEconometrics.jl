@@ -3880,3 +3880,60 @@ explained by low order (`q = 2` and `q = 5` against 6 and 12 here), by much
 larger `N` — the error is a sum over `N` terms — and by the extremes of the
 `ρ` range, which is where his own text says performance falls off and where
 his quoted minima and maxima sit. His medians for `q = 5` are 0.0025 to 7.3.
+
+## A fifth citation checked on contact, and the mildest failure yet
+
+`fit_spatial_did` has cited **Delgado & Florax (2015)** and **Chagas, Azzoni
+& Almeida (2016)** since it shipped. Both were verified and **neither had
+been read**; the ledger recorded that exposure on 2026-11-05 and the user
+supplied both papers the same day. Reading them separates them.
+
+**Delgado & Florax is exactly right.** Their eq. (6), read in the Tinbergen
+Institute working paper, is
+`y = β₀ + β₁D + β₂T + β₃D·T + β₄(WD)·T + ε`, which is the design the
+function fits, and their `ATE(wd) = β₃ + β₄·wd` is what `att_total_treated`
+reports. One refinement worth recording: their derivation carries
+`β₄ = λβ₃`, since they obtain the model from `L = I + λW`. The
+implementation does not impose it — `D` and `E` are free columns — so their
+restricted case is nested rather than assumed, which is a relaxation, not a
+departure.
+
+**Chagas et al. is cited for an estimator this package does not implement.**
+Their eq. (7) is the *unrestricted* SDID, splitting exposure into two
+channels with separately estimated coefficients: `W_{T,T}b₁` from treated
+onto treated, and `W_{NT,T}b₂` from treated onto controls. Their own
+footnote 4 states it plainly — "Delgado and Florax (2015) consider only the
+restricted case" — so the two-channel generalisation is precisely that
+paper's methodological contribution.
+
+`fit_spatial_did` estimates **one** exposure coefficient per order and forms
+
+    att_spill_treated = Σ_k δ_k · Ē_T[k]
+    att_spill_control = Σ_k δ_k · Ē_C[k]
+
+from that single `δ`, scaled by the treated and control group means
+(`_exposure_means`, `src/SpatialCausal.jl:814`). The two spillover figures
+differ because the groups have different average exposure, **not** because
+two coefficients were estimated. That is Delgado & Florax. It is not Chagas
+eq. (7).
+
+### Why this one is mild, and why it still counts
+
+Unlike the Liang/Gao/Gong failure, nothing here is false: Chagas et al. is a
+spatial DiD paper, it discusses the restricted case, and it is a reasonable
+thing to read beside this function. The defect is that it stood in a
+`# References` block beside the estimating equation, with nothing to tell a
+reader that the paper's distinctive contribution is the one piece the code
+does not contain. A reader checking the citation would find it apt and still
+be misled about what runs.
+
+The docstring now says which paper supplies the estimator, which supplies
+the idea, and what is absent. The unrestricted two-channel form is filed as
+a roadmap row rather than left as an implied feature.
+
+**The running tally of citations that failed on contact is now five**, and
+the shapes keep differing: a wrong chapter; a paper that does not exist as
+described; a paper whose notation differs from the code citing it; a paper
+cited for a method it explicitly declines to provide; and now a paper cited
+beside an estimator it generalises but did not supply. Only the first was
+findable without opening the source.

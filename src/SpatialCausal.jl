@@ -404,6 +404,29 @@ pushes the spillover into the error, where it is correlated with `D` by
 construction, and into the control group, which is no longer untreated.
 Both biases run through `τ̂`.
 
+# Which spatial DiD this is
+
+This is **Delgado and Florax (2015), their eq. (6)**, read in the paper:
+`y = β₀ + β₁D + β₂T + β₃D·T + β₄(WD)·T + ε`. Their derivation carries
+the restriction `β₄ = λβ₃`, which this estimator does **not** impose —
+`D` and `E` enter as free columns — so their restricted case is nested
+rather than assumed. Their `ATE(wd) = β₃ + β₄·wd` is what
+`att_total_treated` reports.
+
+`att_spill_treated` and `att_spill_control` come from **one** exposure
+coefficient per order, scaled by the mean exposure of the treated and of
+the controls. The two differ because the groups have different average
+exposure, not because two coefficients were estimated.
+
+**Chagas, Azzoni and Almeida (2016) eq. (7) is a different estimator and
+is not implemented here.** They split exposure into two channels with
+separate free coefficients — `W_{T,T}b₁` from treated onto treated and
+`W_{NT,T}b₂` from treated onto controls — and their footnote 4 states
+that "Delgado and Florax (2015) consider only the restricted case".
+That generalisation is a roadmap row, not a feature of this function.
+Cite that paper here for the applied design and for the two-channel
+idea, not for the estimator this code fits.
+
 # Arguments
 - `y`: `N x T` outcomes, units by periods.
 - `treat`: either a length-`N` indicator (two periods, treatment switching
@@ -526,11 +549,15 @@ m = fit_spatial_did(y, D, W; vcov = :cluster, cluster_groups = 1:N)
     about the implementation.
 
 # References
-Delgado, M. & Florax, R. (2015). Difference-in-differences techniques for
-spatial spillovers. *Economics Letters*, 137.
-Chagas, A., Azzoni, C. & Almeida, A. (2016). A spatial
-difference-in-differences analysis of the impact of sugarcane production.
-*Regional Science and Urban Economics*, 59.
+Delgado, M. S. & Florax, R. J. G. M. (2015). Difference-in-differences
+techniques for spatial data: local autocorrelation and spatial
+interaction. *Economics Letters*, 137, 123–126. **Read**, from Tinbergen
+Institute Discussion Paper 2015-091/VIII. Eq. (6) is the design above.
+Chagas, A. L. S., Azzoni, C. R. & Almeida, A. N. (2016). A spatial
+difference-in-differences analysis of the impact of sugarcane production
+on respiratory diseases. *Regional Science and Urban Economics*, 59,
+24–36. **Read.** Its eq. (7), the unrestricted two-channel SDID, is
+**not** what this function fits; see above.
 Goodman-Bacon, A. (2021). Difference-in-differences with variation in
 treatment timing. *Journal of Econometrics*, 225(2).
 """
