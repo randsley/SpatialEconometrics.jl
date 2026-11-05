@@ -79,10 +79,11 @@ exact. Decide on `W`'s fill, not on the error.
 
 # Accuracy, and what it is accuracy *in*
 Order 6 is adequate for point estimation because the error in `ρ̂` runs
-three to four orders of magnitude below the error in the
+two to three orders of magnitude below the error in the
 log-determinant: at `N = 2500, ρ = 0.9`, a log-determinant error of
-`7.8e-01` cost `3.4e-04` in `ρ̂`. The profile maximiser depends on the
-shape of the approximation near the peak, not on its level.
+`7.8e-01` cost `3.4e-04` in `ρ̂`, a ratio of 2,294. The profile
+maximiser depends on the shape of the approximation near the peak, not
+on its level.
 
 # Reference
 Pace, R. K. & LeSage, J. P. (2004). Chebyshev approximation of

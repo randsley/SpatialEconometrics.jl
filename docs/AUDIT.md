@@ -3937,3 +3937,34 @@ described; a paper whose notation differs from the code citing it; a paper
 cited for a method it explicitly declines to provide; and now a paper cited
 beside an estimator it generalises but did not supply. Only the first was
 findable without opening the source.
+
+## Correction: the gap is two to three orders of magnitude, not three to four
+
+The section "The finding: log-determinant error is a bad proxy for what
+matters" summarises its own table as a gap of "three to four orders of
+magnitude". That is wrong, and the table above it says so. Its five rows
+give ratios of log-determinant error to `ρ̂` error of
+
+    2.2e-05 / 1.3e-07 =  169x
+    6.2e-03 / 1.2e-05 =  517x
+    7.8e-01 / 3.4e-04 = 2294x
+    5.0e-03 / 4.7e-06 = 1064x
+    2.3e-05 / 2.6e-08 =  885x
+
+which is **two to three** orders. The claim was an overstatement of the
+measurement, not a second measurement.
+
+An independent re-run, recorded in chapter 6 of the book repo on a
+row-standardised 40 x 40 lattice, agrees: 197x, 478x and 1029x at
+(ρ = 0.5, q = 6), (0.9, 12) and (0.9, 6). A fourth cell, (0.5, q = 12), came
+out at 1x and measures nothing — both errors are at or below 3e-9, which is
+the resolution of a golden-section search run to `tol = 1e-9`, so that cell
+reports the optimiser's floor rather than the approximation's accuracy. It is
+excluded rather than averaged in.
+
+The finding itself is unaffected, and so is every conclusion drawn from it:
+the gap is still large, it still recurs for stochastic trace error and on
+fragmented graphs, and every accuracy figure in this literature is still a
+log-determinant figure. Only the size of the gap was misstated. The original
+section is left as it stands, per the convention that a closed entry is the
+record of its commit; this note is the correction.
