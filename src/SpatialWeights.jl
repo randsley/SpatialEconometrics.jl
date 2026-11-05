@@ -9,6 +9,7 @@ using Printf
 export
     # Construction
     knn_weights, distance_weights, band_weights, block_diagonal_weights,
+    order_weights, order_weights_list,
     # Standardization
     row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!,
     # Diagnostics
@@ -191,6 +192,149 @@ function block_diagonal_weights(W_list::Vector{<:AbstractSparseMatrix})
         offset += n
     end
     return sparse(I_idx, J_idx, V_val, N_total, N_total)
+end
+
+# ─── Higher-Order Contiguity Weights ─────────────────────────────────
+
+"""
+    order_weights(W, l; row_standardize = true, binary = true)
+
+The **order-`l` spatial weights matrix**: unit `j` is a neighbour of `i` iff
+the shortest path from `i` to `j` in `W`'s adjacency graph has exactly `l`
+steps. `l = 0` returns the identity.
+
+This is the `W⁽ˡ⁾` of Anselin & Smirnov (1996), and it is **not** `W^l`.
+
+!!! warning "`W^l` is a different object"
+    `W²` counts *walks* of length two, so it is non-zero on the diagonal —
+    every `i` reaches itself back through any neighbour — and it
+    double-counts units reachable by several two-step paths.
+    `order_weights(W, 2)` instead **partitions** the pairs: each `j`
+    appears at exactly one order, its shortest-path distance, and the
+    diagonal is empty for `l ≥ 1`.
+
+    Measured on a 4×4 rook lattice (`N = 16`, 48 first-order links): `W²`
+    has **84 non-zeros, 16 of them on the diagonal**, against **68 and 0**
+    for `order_weights(W, 2)`. Summed over orders 1 to 6 — 6 being the
+    lattice's diameter — `order_weights` yields exactly `N(N−1) = 240`
+    ordered pairs, each once.
+
+    `W²` also retains first-order neighbours wherever a triangle exists,
+    which `order_weights` never does. On a triangle with one pendant unit,
+    `W²` is non-zero on **6** pairs that are already first-order
+    neighbours; `order_weights(W, 2)` is non-zero on **0**.
+
+The construction is a breadth-first search from each unit, so the cost is
+`O(N·nnz(W))` and the result depends only on `W`'s sparsity pattern, not on
+its values — any row-standardisation already applied to `W` is irrelevant
+to which pairs come out at which order.
+
+Pass `binary = false` to weight each order-`l` link by `1/d` where `d` is
+the number of distinct shortest paths; the default `true` gives the usual
+binary-then-row-standardised contiguity matrix.
+
+# Arguments
+- `W`: the first-order weights or adjacency matrix, `N×N`. Only its pattern
+  is read.
+- `l`: the order. `0` gives `I`; `l` greater than the graph diameter gives
+  an all-zero matrix, which `order_weights_list` refuses rather than
+  returning.
+
+See also [`order_weights_list`](@ref), which returns `[W⁽⁰⁾, …, W⁽ˢ⁾]` and
+checks the diameter once for the whole list.
+"""
+function order_weights(
+    W::AbstractSparseMatrix, l::Int;
+    row_standardize::Bool = true, binary::Bool = true
+)
+    N = size(W, 1)
+    size(W, 2) == N || throw(DimensionMismatch(
+        "order_weights: W is $(size(W)) but must be square"))
+    l >= 0 || throw(ArgumentError("order_weights: l must be ≥ 0, got $l"))
+    l == 0 && return sparse(1.0I, N, N)
+
+    # Adjacency pattern, ignoring values and any self-loops.
+    A = [Int[] for _ in 1:N]
+    rows = rowvals(W)
+    vals = nonzeros(W)
+    for j in 1:N
+        for idx in nzrange(W, j)
+            i = rows[idx]
+            (i == j || iszero(vals[idx])) && continue
+            push!(A[i], j)        # W[i, j] != 0  ⇒  j is a neighbour of i
+        end
+    end
+
+    I_idx = Int[]; J_idx = Int[]; V_val = Float64[]
+    dist = fill(-1, N)
+    npath = zeros(Int, N)
+    frontier = Int[]; nxt = Int[]
+
+    for src in 1:N
+        fill!(dist, -1); fill!(npath, 0)
+        dist[src] = 0; npath[src] = 1
+        empty!(frontier); push!(frontier, src)
+        for step in 1:l
+            empty!(nxt)
+            for u in frontier, v in A[u]
+                if dist[v] == -1
+                    dist[v] = step
+                    npath[v] = npath[u]
+                    push!(nxt, v)
+                elseif dist[v] == step
+                    npath[v] += npath[u]
+                end
+            end
+            isempty(nxt) && break
+            frontier, nxt = nxt, frontier
+        end
+        for v in frontier
+            dist[v] == l || continue
+            push!(I_idx, src); push!(J_idx, v)
+            push!(V_val, binary ? 1.0 : 1.0 / npath[v])
+        end
+    end
+
+    Wl = sparse(I_idx, J_idx, V_val, N, N)
+    row_standardize && row_standardize!(Wl)
+    return Wl
+end
+
+"""
+    order_weights_list(W, s; row_standardize = true, binary = true)
+
+`[W⁽⁰⁾, W⁽¹⁾, …, W⁽ˢ⁾]` with `W⁽⁰⁾ = I`, each built by
+[`order_weights`](@ref).
+
+Refuses when `s` exceeds the graph diameter, rather than returning an
+all-zero matrix for the orders that do not exist: a model fitted with an
+empty `W⁽ˡ⁾` has a structurally zero column, and the coefficient on it is
+not identified. The error reports the diameter so the caller can lower `s`.
+
+A disconnected `W` has no finite diameter; the check is applied per
+component, so `s` may be at most the largest component's diameter and the
+orders remain well defined within components.
+"""
+function order_weights_list(
+    W::AbstractSparseMatrix, s::Int;
+    row_standardize::Bool = true, binary::Bool = true
+)
+    s >= 0 || throw(ArgumentError("order_weights_list: s must be ≥ 0, got $s"))
+    out = Vector{SparseMatrixCSC{Float64, Int}}(undef, s + 1)
+    out[1] = sparse(1.0I, size(W, 1), size(W, 1))
+    for l in 1:s
+        Wl = order_weights(W, l; row_standardize = row_standardize,
+                           binary = binary)
+        if nnz(Wl) == 0
+            diam = l - 1
+            throw(ArgumentError(
+                "order_weights_list: no pairs at order $l, so W⁽$(l)⁾ is " *
+                "empty and its coefficient would not be identified. The " *
+                "largest component's diameter is $diam, so s ≤ $diam."))
+        end
+        out[l + 1] = Wl
+    end
+    return out
 end
 
 # ─── Standardization ─────────────────────────────────────────────────

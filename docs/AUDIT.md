@@ -1265,6 +1265,7 @@ so the rule has somewhere to be satisfied.
 | 2026-10-31 | `fit_shift_share` / `balance_test` — shift-share designs, the AKM standard error and the shock-level balance test | two gates. Coverage of a nominal 95% interval, 2,000 reps, shares and residuals fixed with the shocks resampled: AKM 0.936 against HC1 0.732 at 100 effective shocks with a strong industry component, and HC1 rejecting a true null in up to 71% of samples — the failure the estimator exists for, reproduced. Clustering on each region's largest industry tracks HC1 (0.720) rather than fixing it. AKM itself falls to 0.864 at 20 effective shocks and 0.827 at 38 with concentrated exposure. The balance test is a test statistic: size 0.056 / 0.108 at nominal 5% / 10% at 100 effective shocks, 0.109 at 20 and 0.232 at 9, and the joint test over four characteristics reaches 0.324 at 20. Three published identities are pinned at machine precision rather than by tolerance: the Borusyak-Hull-Jaravel shock-level equivalence to 2.3e-13, the Goldsmith-Pinkham-Sorkin-Swift decomposition to 2.6e-13, and the reduction of the AKM variance to a cluster-robust one under full specialisation to 3.0e-15 | Verified correct; the few-shock degradation of both the interval and the balance test documented under warnings |
 | 2026-11-01 | `peer_identification` / `fit_peer_effects` — the network identification condition and the peer-effects 2SLS | two gates, and the first is not a Monte Carlo because the quantity is not random. `peer_identification` returns a verdict, so the gate is exact agreement with the verdicts Bramoullé, Djebbari and Fortin state in words, on the structures they name: equal-sized groups, self-included group means, two group sizes under fixed effects, three sizes, stars, complete bipartite graphs, lines and cycles — all 40 agree, as integer ranks rather than tolerances. The tolerance those ranks turn on is itself measured: worst spurious singular value across degenerate structures 1.97e-8, smallest genuine one across identified structures 4.0e-3, a separation of 2.0e5, and the default sits between them. The estimator's interval is the second gate: coverage of a nominal 95% interval, 2,000 replications, `n = 300` — 0.950–0.970 with a robust covariance across densities and error structures, against 0.921–0.942 for a homoskedastic one under strong heteroskedasticity. The Sargan test is a test statistic and is well sized throughout: 0.094–0.104 at 10%, 0.044–0.049 at 5%, 0.009–0.013 at 1%, across four densities. Five published identities are pinned at machine precision: `G² = G` under Manski's convention to 2.8e-17, the Moffitt/Lee within-block expansion exactly, their page-47 `G³` expansion for two groups to 2.8e-17, `G³ = G` on complete bipartite graphs exactly, and their Appendix B collinearity equivalence to 8.9e-16 | Verified correct; the density degradation of the estimator, and the fact that it does not show up in the rejection rate, documented under a warning |
 | 2026-11-04 | `pesaran_cd` / `alpha_exponent` / `dependence_verdict` — the CD test for weak cross-sectional dependence, the exponent of cross-sectional dependence, and the verdict that reads them together | three statistics, so three gates, and the strongest one is a replication. **Size under independence** at nominal 10/5/1%, across six `(N, T)` combinations including `N ≫ T`: 0.091–0.102, 0.043–0.053, 0.007–0.014. **Pesaran's own headline result reproduced**, `N = 100`, `T = 50`, 3,000 reps, 5% level: rejection 0.048 / 0.054 / 0.055 at true `α = 0.00 / 0.10 / 0.25`, then 0.144 / 0.549 / 1.000 at `α = 0.40 / 0.50 / 0.75` — correctly sized across `[0, ¼]` and over-rejecting above, with the transition at precisely the `α = 1/4` boundary his eq. (12) states. His stated motivation reproduced too, on *estimated* residuals at `T = 10`: `CD` size 0.045 / 0.048 / 0.040 / 0.064 / 0.048 against `CD_lm`'s 0.068 / 0.248 / 0.794 / 1.000 / 1.000 for `N = 10 / 25 / 50 / 100 / 200`. `α̂` is not a test statistic, so its gate is bias and RMSE over Bailey, Kapetanios & Pesaran's own admissible range, plus **refusal where the parameter does not exist**: an independent panel gives `α̂ = 0.3684` and throws, and the cancelling design is refused 300/300 against 0/300 for the homogeneous one. Scale invariance is exact at 0.0e0 under standardisation and 0.394 without it. The CD and LM statistics are recomputed from explicit double loops over eqs (2), (5), (9), (10) and agree to 3.6e-15 or better | Verified correct; two failure configurations measured and documented rather than left to be discovered — see below |
+| 2026-11-04 | `lr_spatial_interaction` — the likelihood-ratio test of a SpVAR against the nested panel VAR, i.e. whether there is any spatial interaction to model | one statistic, one gate, run on data generated with **no spatial interaction at all**. Size at nominal 10/5/1%, 1,500 replications: 0.1100 / 0.0527 / 0.0113 at `N = 12, T = 100`, 0.1147 / 0.0513 / 0.0080 at `N = 12, T = 400`, and 0.1193 / 0.0620 / 0.0100 at `N = 24, T = 200`. The Monte Carlo standard error is 0.008 at the 10% level, so the test is mildly liberal there — one to two standard errors — and close to nominal at 5% and 1%. Power against the spatial DGP is 1.000 at the 5% level already at `T = 50`. The restriction itself is pinned rather than trusted: `fit_spvar(…; s = 0)` reproduces the independently written `fit_nested_panel_var` to 0.000e+00 in both the log-likelihood and every coefficient | Verified correct; the 10% liberality documented, and the 150-replication run that said the opposite recorded below |
 
 ### `sdm_tests` — four checks, in testset 27
 
@@ -2964,7 +2965,10 @@ No **SpVAR** and no **time-varying `ρ`**. Both belonged to the roadmap rows
 folded into this pass, and both were deferred by explicit decision rather
 than silently dropped; each is a substantial estimator in its own right,
 and they are recorded as a named follow-up row rather than left to be
-rediscovered. No GMM alternative to the CCE 2SLS. No Shi & Lee (2017)
+rediscovered. (**SpVAR was built immediately afterwards, the same day** —
+see the next section. The deferral held for one pass, not permanently, and
+this paragraph is left standing rather than rewritten because the record of
+what a pass did not contain is worth more than a tidy one.) No GMM alternative to the CCE 2SLS. No Shi & Lee (2017)
 dynamic interactive-effects estimator — `fit_interactive_fe` is static in
 `y`. `fit_star` has no contemporaneous `Wyₜ` by construction, which is the
 specification's defining assumption rather than a gap: that model is
@@ -2975,3 +2979,445 @@ components converges to a *local* optimum, and agreement across starting
 values is evidence but not proof of a global one. The starts are therefore
 exposed as `n_starts` rather than fixed internally, and the measured
 agreement above is reported as exactly that.
+
+
+## Post-audit: a spatial VAR, and three things it caught
+
+`SpVAR` implements Di Giacinto (2010), *On vector autoregressive modeling in
+space and time*, Journal of Geographical Systems 12(2), 125–154,
+doi:10.1007/s10109-010-0116-6. **Verified against the published record**,
+and read in full — not from the journal, which is paywalled, but from Bank
+of Italy *Temi di discussione* **746**, which is freely available and
+carries the same text. Every equation quoted in the module and its docs
+page was extracted from that PDF with its own equation number. Greek glyphs
+drop out of the symbol font under `pdftotext`, so symbol identities were
+fixed from the surrounding prose — the same trap as BDF in #11 and Pesaran
+in #1, and the third time it has had to be worked around.
+
+Suite **3,683 → 3,718** with Makie and Turing loadable and **3,380 →
+3,683** with both absent, zero failures either way, on **Julia 1.13.3 and
+1.10.13**. The extensions-absent figure is **identical on the two
+versions**, measured separately, so there is again no cross-version
+assertion difference. Testset 40 contributes **303**, and the step from
+3,380 is 303 exactly — balanced at every one of the three points at which
+testset 40 grew, even though this pass also touched
+`src/SpatialWeights.jl`.
+
+Note which entry point gives which figure, because it is easy to invert:
+`Pkg.test()` is the one that genuinely **excludes** the extensions, so it
+reports 3,683 plus two broken markers; running `test/runtests.jl` directly
+leaves `@v1.13` on `LOAD_PATH`, the extensions load, testsets 25 and 26 run
+rather than reporting a marker, and the total is 3,718 with no broken
+entries. 3,683 + 11 + 24 = 3,718, the markers being replaced rather than
+added.
+
+### What is exact, and pinned as such
+
+Six quantities here are algebraic, so none of them is checked against a
+tolerance chosen to pass.
+
+| Identity | Why it matters | Measured |
+|---|---|---|
+| `|C₀| = Π_r |A⁽⁰⁾_rr|` | the estimator's whole speed rests on it | `0.000e+00` |
+| `L̃ = Σ_k L̃_k`, eq (23) | concentrating `Λ` out separates the likelihood into `K` unrelated terms, so a spatial VAR is `K` spatial autoregressions and not one `NK×NK` problem | `0.000e+00` |
+| `s = 0` ≡ nested panel VAR, eqs (15)–(18) | `fit_nested_panel_var` was written independently, which is what makes the reduction worth testing | `0.000e+00` in loglik and in every coefficient |
+| `K = 1, s = 1` Jacobian | at `K = 1` the structural form is a single SAR, so `|C₀|` must be `|I − ρW|` | `< 1e-10` |
+| `Σ_h Ψ_h = (C₀ − Σ_h C_h)⁻¹` | the long-run multiplier | `2.665e-15` |
+| outward STIR ≡ inward STIR at `K = 1`, symmetric `W` | the two differ by a transpose, so this is a free check on the whole IRF chain | `0.0e+00` (ring), `2.776e-17` (spectrally standardised path) |
+| order condition eq (14) | reproduces the paper's own worked `K=2,s=1 ⇒ N≥3` and `K=2,s=2 ⇒ N≥4` as integer bounds | exact, and the independently derived free-coefficient count matches the paper's printed `NK(K−1)/2 + sNK(K+1)/2` at every `N, K, s` tested |
+
+### How `μ` is concentrated out, and why the reduction is not exact
+
+The `s = 0`, `K = 1` reduction should be an ordinary heteroskedastic AR(1)
+panel, and it is — but not to machine precision, which is worth explaining
+because the other five reductions above are exact.
+
+`fit_spvar` absorbs the unit intercept by demeaning each unit's **level**
+series once, over `t = p+1 … T`. That is not a convenience: the spatial lag
+of a demeaned series is not the demeaned spatial lag, since
+`mean_t(Wyₜ)ᵢ = (Wȳ)ᵢ ≠ ȳᵢ`, so demeaning the constructed regressor columns
+separately would break `(I − ρW)ỹ` and the Jacobian with it. Demeaning the
+series preserves the structural form exactly, with `μ` absorbed as
+`μ̃ = (I − ρW)μ`.
+
+At `s = 0` there is no spatial term, and the exact profiled likelihood
+instead demeans the lagged and current sub-series by their **own** means,
+which differ by `(y_T − y₁)/(T−1)`. So the two disagree in finite samples.
+Measured against an independently written profiled FIML, `N = 10`,
+`φ = 0.55`, heteroskedastic `λ ∈ [0.5, 1.5]`:
+
+| `T` | 150 | 300 | 600 | 1200 | 2400 | 4800 |
+|---|---|---|---|---|---|---|
+| gap | 6.23e-5 | 1.45e-5 | 4.42e-6 | 1.11e-6 | 3.90e-7 | 5.06e-8 |
+
+The first guess was `O(1/T)`, since that is the order of the difference
+between the two means. **It is wrong.** The ratio per doubling averages
+about **4**, not 2; `T·gap` falls steadily from 0.0093 to 0.0002 rather
+than stabilising, while `T²·gap` is roughly constant in 1.2–2.3. The two
+ways of concentrating `μ` therefore agree to **second** order — a stronger
+result than the one assumed, and the reason this is recorded as a
+documented property of the estimator rather than fixed as a defect.
+
+Testset `40m` asserts the implication rather than the rate: a fourfold
+increase in `T` must shrink the gap by far more than fourfold. The measured
+ratio is 13.1 against the 5 asserted, a margin of 2.6× — checked before
+being trusted, which is the `38i` rule from the same day.
+
+### Two estimators that look comparable and are not
+
+`fit_dynamic_spatial_panel` is the obvious thing to pin `fit_spvar` against
+at `K = 1, s = 1`. It cannot be, and the way it fails is informative.
+
+Handing it `y(t−1)` as a regressor **refuses**, with an identification
+error: it builds its own time lag, so the column is exactly collinear with
+it. That refusal is pinned in testset `40m`, because it is the reason the
+two cannot be compared coefficient by coefficient.
+
+Fitted as intended instead — an exogenous regressor, the lag left to the
+estimator — it returns `ρ̂ = 0.1875` on data where `fit_spvar` returns
+`0.3749` against a true `ρ = 0.40`. The gap is not an error in either: the
+dynamic spatial panel has **no `W yₜ₋₁` term**, and the DGP has one with
+coefficient 0.10. Omitting it does not leave `ρ` alone; it roughly halves
+it, because the spatial content of the lagged spatial lag has nowhere to go
+but the contemporaneous spatial parameter. `fit_spvar` also carries a
+per-unit `λᵢ` where the dynamic panel assumes a common variance.
+
+The two models do not nest, and the 2× discrepancy in `ρ̂` is what a user
+should expect from leaving out a spatial lag of the lagged dependent
+variable. Reported rather than averaged away, because "the estimates
+disagree" is the kind of result that gets quietly attributed to one of the
+two implementations being wrong.
+
+### The asymptotics run the other way, and that was measured not asserted
+
+Di Giacinto's asymptotics are `T → ∞` at **fixed `N`**. Every other panel
+estimator in this package is consistent as `N` grows, so the temptation was
+to reach for the large-`N` habits in `SpatialPanelEconometrics.jl`. The
+gate was designed to make the regime visible rather than assumed. Bias in
+the dynamic coefficient `g(t−1)` (truth 0.30), homogeneous SpVAR(1,1),
+`K = 2`, ring, 150 replications:
+
+| `N` = 12, `T` growing | bias | | `T` = 50, `N` growing | bias |
+|---|---|---|---|---|
+| `T = 50` | −0.0337 | | `N = 12` | −0.0267 |
+| `T = 100` | −0.0180 | | `N = 24` | −0.0318 |
+| `T = 200` | −0.0084 | | `N = 48` | −0.0296 |
+| `T = 400` | −0.0040 | | `N = 96` | −0.0294 |
+| `T = 800` | −0.0014 | | | |
+
+Growing `T` removes the bias by a factor of 24. Growing `N` by a factor of
+eight does not move it at all.
+
+`N` is not useless — it buys variance, and that separation is the point.
+Measured independently in `examples/29_spvar.jl` section 7 at 60
+replications, which reports both: at `T = 50`, going from `N = 12` to
+`N = 96` moves the bias from −0.0344 to −0.0289 while RMSE falls from
+0.0559 to 0.0337; at `N = 12`, going from `T = 50` to `T = 800` moves the
+bias from −0.0205 to −0.0025 and RMSE from 0.0469 to 0.0108. So `N`
+tightens the sampling distribution around the wrong value and `T` moves it
+onto the right one. The spatial coefficient `ρ₁` is far less affected in
+either direction, which is why the docstring warning is about the
+*dynamics* rather than the spatial parameters.
+
+Coverage of the nominal 95% interval, 400 replications (Monte Carlo
+standard error about 0.011):
+
+| | `ρ₁` | `g(t−1)` | eq-2 `g` |
+|---|---|---|---|
+| `N = 12, T = 100` | 0.935 | 0.935 | 0.948 |
+| `N = 12, T = 200` | 0.945 | 0.925 | 0.953 |
+| `N = 12, T = 800` | 0.955 | 0.950 | 0.948 |
+| `N = 24, T = 200` | 0.960 | 0.940 | 0.927 |
+
+Close to nominal throughout, slightly short for the dynamic coefficient at
+small `T`, and not improving with `N` — the same finite-sample bias showing
+up in the interval rather than the point estimate.
+
+### 150 replications said the opposite about the LR test
+
+The first size table for `lr_spatial_interaction` ran at 150 replications
+and reported the test **conservative**: 0.073–0.087 at the 10% level,
+0.033–0.047 at 5%, 0.000–0.007 at 1%. At 1,500 replications it is mildly
+**liberal** at 10% — 0.110–0.119 — and close to nominal elsewhere.
+
+Nothing changed in the code between the two runs. The Monte Carlo standard
+error at 150 draws is 0.024 at the 10% level, wide enough to swallow the
+whole finding and reverse its sign. This is the `38i` lesson from the same
+day in a second form: there, an assertion passed on one Julia version and
+failed on another because its margin was 0.85 standard deviations; here, a
+size table was briefly believed because nobody had compared the deviation
+being claimed against the error bar on it. **A size table is not worth
+printing until the replication count makes its error bar smaller than the
+deviation it claims.** Both runs are recorded, not just the one that
+survived.
+
+### Three defects the gates caught
+
+**A refusal path that could not run.** `order_weights_list` refuses when an
+order is empty, and the message interpolates the order into
+`W⁽$l⁾`. Julia treats `⁾` as an identifier character, so `$l⁾` parses as a
+variable named `l⁾` and the refusal threw `UndefVarError` instead of the
+`ArgumentError` it was written to throw. The error path was therefore
+**completely broken while the happy path was fine**, and it was caught only
+because testset `40a` asserts the refusal rather than assuming it. Fixed by
+writing `$(l)`. A reminder that `@test_throws` on a *specific* exception
+type is doing real work: `@test_throws Exception` would have passed.
+
+**`const` inside a `@testset`.** Three parameter tuples at the head of
+testset 40 were declared `const`, which is a syntax error on a local
+variable — *"syntax: unsupported `const` declaration on local variable"*.
+This would have taken the whole suite down, and was caught by running the
+new testset in isolation before running the suite, which is now the habit.
+
+**A refusal test masked by an earlier refusal.** Testset `40j` checked that
+`T_per > p + 1` is enforced, by passing `T_per = 2`. But `Y` still had
+`N×T` rows, so the row-count check fired first and the test was really
+checking the dimension guard twice. The assertion passed for the wrong
+reason until the exception *type* was pinned. Fixed by reshaping `Y` to
+match. Guard ordering matters, and a test that names the wrong guard is
+worse than no test because it reads as coverage.
+
+### `W⁽ˡ⁾` is not `Wˡ`, and nothing in the package built it
+
+Di Giacinto's `W⁽ˡ⁾` is the order-`l` weights matrix in the sense of Anselin
+and Smirnov (1996): pairs at graph distance exactly `l`. `Wˡ` is not that.
+Powers count **walks**, so they are non-zero on the diagonal, double-count
+paths, and where the graph has triangles they retain first-order neighbours
+at order 2. Nothing in `src/` built order-`l` weights —
+`HigherOrderSpatial.jl` is SLX/SAC/SDEM, which is two weight matrices, not
+a hierarchy — and no roadmap row planned one.
+
+`order_weights` and `order_weights_list` were therefore added to
+`SpatialWeights.jl`, by breadth-first shortest-path hop count. Measured on a
+4×4 rook lattice, `N = 16`, 48 first-order links:
+
+| | non-zeros | on the diagonal |
+|---|---|---|
+| `W²` | 84 | 16 |
+| `order_weights(W, 2)` | 68 | 0 |
+
+and summed over orders 1 to 6 the order matrices cover exactly
+`N(N−1) = 240` ordered pairs, each once. On a triangle with one pendant
+unit, `W²` is non-zero on 6 pairs that are already first-order neighbours;
+`order_weights(W, 2)` is non-zero on 0 of them. The trap is made into a
+test rather than described in a comment.
+
+### `p > 1` was shipping unexercised, and the ledger said otherwise
+
+The sentence above, in its first form, read: *"No `p > 1` worked example,
+though `p` is implemented and tested."* The second clause was **false**. Of
+twelve subsets in testset 40, every one ran at the `p = 1` default; `p = 2`
+appeared nowhere in the suite. The claim was written in the same pass that
+should have checked it, which is the most instructive part: a ledger entry
+asserting coverage is itself an assertion, and it got less scrutiny than
+any `@test` in the file precisely because it was prose.
+
+It mattered more than the `binary = false` gap. At `p = 1` the companion
+matrix **is** the reduced-form matrix, so its block structure — the
+`Kp·N`-square form with the shifted identity below — is first exercised
+only at `p = 2`, as are the loop over `C_h`, the `(t−2)` coefficient names
+and the longer history a forecast requires.
+
+Measured on a SpVAR(2,1), `K = 2`, `N = 12`, `T = 600`, ring:
+
+| check | result |
+|---|---|
+| `Σ_h Ψ_h` vs `(C₀ − C₁ − C₂)⁻¹` | **8.882e-16** |
+| `ρ₁` recovery, both equations | 0.3049 [0.30], −0.1856 [−0.18] |
+| companion radius, fitted vs DGP | 0.5251 vs 0.4924 |
+| `length(m.C)`, `m.T_eff` | 2, `T − 2` |
+| coefficient names | both `(t−1)` and `(t−2)` present, in equal counts |
+| forecast with one period of history | refused, `DimensionMismatch` |
+
+The long-run multiplier is the gate that would catch a dropped or
+double-counted lag matrix, and at `8.882e-16` it does not. **Nothing was
+wrong with the `p > 1` code.** The defect was in the verification, and in a
+ledger line that described verification which did not exist. Now testset
+`40n`.
+
+`rho_bounds` was in the same condition — documented, never exercised — and
+is now pinned too: bounded to `(0.5, 0.9)` where the unconstrained optimum
+is near 0.30, the estimate sits **on** the boundary at `0.500000` rather
+than outside it, and the bounded fit's log-likelihood is strictly worse.
+
+Three options in this module were found undertested in one sweep
+(`binary = false`, `p > 1`, `rho_bounds`), which suggests the sweep was
+worth doing and should be part of closing a row rather than an afterthought:
+**list the keywords, grep the suite for each, and test what comes back
+zero.** `maxiter` and `tol` remain exercised only at their defaults, which
+is recorded here rather than claimed otherwise.
+
+### A documented keyword that no run had exercised
+
+`order_weights` takes `binary = false`, which weights each order-`l` link
+by `1/d` where `d` is the number of distinct **shortest** paths. The
+docstring described it. Nothing ran it — every gate, the example and the
+whole of testset 40 used the default — so a documented option was shipping
+on the strength of having been written.
+
+That is precisely what this project's standing rule forbids, and the rule
+had been applied all pass to *statistics* while a *keyword* slipped past.
+It was checked against an independent closed form rather than a tolerance:
+on a rook lattice every shortest path is monotone, so the number of
+shortest paths from `(1,1)` to `(a+1,b+1)` is exactly the binomial
+`C(a+b, a)`.
+
+| from `(1,1)` to | `l` | measured | `1/C(a+b,a)` |
+|---|---|---|---|
+| (2,2) | 2 | 0.50000000 | 1/2 |
+| (3,2) | 3 | 0.33333333 | 1/3 |
+| (3,3) | 4 | 0.16666667 | 1/6 |
+| (4,2) | 4 | 0.25000000 | 1/4 |
+| (4,3) | 5 | 0.10000000 | 1/10 |
+| (4,4) | 6 | 0.05000000 | 1/20 |
+
+Exact at `1e-12` on all six, plus `1/2` on a 4-ring's opposite unit (two
+shortest paths), `1.0` at order 2 on a 6-ring (one path) and `1/2` at its
+order-3 diameter (two paths). The two settings are also pinned to produce
+the **same sparsity pattern**, differing only in values, with
+`binary = true` all ones before standardisation. Now testset `40a2`.
+
+The lesson is narrow and worth having: **the standing rule covers options,
+not just outputs.** A keyword is a claim about behaviour in exactly the way
+a diagnostic is, and a keyword nobody has run is weaker evidence than a
+diagnostic nobody has simulated, because at least the diagnostic gets
+exercised by its own happy path.
+
+### Row standardisation alone splits outward from inward
+
+The obvious guess is that the outward and inward STIRs coincide whenever
+`K = 1`. They coincide when `W⁽ˡ⁾` is **symmetric**, which is not the same
+thing, and `order_weights_list` row-standardises by default. On a 14-unit
+path, row standardisation gives `max|W − Wᵀ| = 0.5` and an outward/inward
+gap of `1.345e-02`; spectrally standardised, the same path has zero
+asymmetry and a gap of `2.776e-17`. A ring is regular, so row
+standardisation preserves its symmetry and the gap is `0.0e+00` there —
+which is why the first version of this gate looked like a bug in
+`space_time_stir` and was not one. The premise was wrong, not the code.
+
+Leaving the weights raw is **not** the alternative: a binary path has
+eigenvalues near 2, so the DGP used throughout these gates is explosive on
+raw path weights. `simulate_spvar` in `examples/29_spvar.jl` refuses, with
+the spectral radius in the message, which is the guard working rather than
+an obstacle.
+
+### A forecast benchmark that flattered the model by accident
+
+`examples/29_spvar.jl` first compared `spvar_forecast` against a **zero**
+forecast and reported RMSE 1.3671 against 1.4035 — a three percent gain.
+Two things were wrong with that, and only one of them was visible.
+
+The benchmark was wrong. `fit_spvar` absorbs a per-unit intercept, so the
+honest comparison is each unit's in-sample mean, not zero. A zero forecast
+only looks competitive on a DGP whose levels happen to sit near the origin,
+which that one did (`μ ∼ N(0,1)`). And **a zero benchmark cannot detect
+whether the absorbed intercepts were restored at all** — the most likely
+defect in a forecast built from a demeaned fit.
+
+To be clear about what was and was not at risk: the suite already pins
+that. Testset `40h` reconstructs the one-step forecast from the reduced
+form by hand and compares it to `spvar_forecast` including the
+`+ m.means[i, k]` term, at `rtol = 1e-10`, so a dropped intercept fails the
+suite. The weak benchmark was in the **example**, not the tests, and the
+example is documentation rather than verification. The near-miss is
+therefore smaller than it first looked, and saying so is part of recording
+it accurately.
+
+It was still checked directly, on a DGP with intercepts of order 50 and
+−30 where forgetting them would be unmissable. `spvar_forecast` restores
+them: forecast means `255.012` and `122.295` against actual `255.061` and
+`122.331`, with RMSE `1.2510` and `1.2128` against `9.4165` and `5.3837`
+for the sample-mean forecast — gains of 7.5× and 4.4×. The level forecast
+is correct, and the original example was understating it.
+
+The second problem was the averaging. Over twelve horizons the gain reads
+as 1.03×. Per horizon:
+
+| `h` | g: model | g: mean | y: model | y: mean |
+|---|---|---|---|---|
+| 1 | 1.1978 | 1.4670 | 1.0990 | 1.2871 |
+| 2 | 1.3701 | 1.4629 | 1.9033 | 1.8993 |
+| 3 | 1.3310 | 1.3107 | 1.7909 | 1.7815 |
+| 4 | 1.3254 | 1.4050 | 1.2706 | 1.3169 |
+| 8 | 1.2381 | 1.2838 | 1.1547 | 1.1549 |
+| 12 | 1.7636 | 1.7864 | 1.1726 | 1.1952 |
+
+The gain is at `h = 1`, essentially gone by `h = 2`, and at `h = 3` the
+model is **marginally worse** than the sample mean. That is what a
+companion spectral radius of 0.74 implies, and past a few periods these are
+one draw over 14 units and mostly sampling noise. The example now prints
+both cuts.
+
+Two lessons, both general. **A number printed next to a result is read as
+a check, so it had better be capable of failing** — the zero forecast was
+not, and an example's printed comparison carries the same rhetorical weight
+as a test without any of the force. And **an average over horizons can turn
+a correct short-horizon forecast into an apparent failure**, which is the
+same error in the opposite direction from the one the benchmark made.
+
+### The order condition binds in the right order, and for the right reason
+
+Eq (13)'s counts are the **heterogeneous** ones, which is the condition the
+paper prints. `fit_spvar` ships the homogeneous case (eq 8), so it applies
+the homogeneous count: refusing on the heterogeneous bound would refuse
+models it can in fact estimate. Measured at `K = 2, s = 2` on a ring, 60
+fits per cell:
+
+| `N` | homogeneous condition | heterogeneous condition | fits | mean companion radius |
+|---|---|---|---|---|
+| 3 | satisfied | **fails** | — | refused by `order_weights_list`: a 3-ring has diameter 1, so `W⁽²⁾` is empty |
+| 4 | satisfied | satisfied | 60/60 | 0.711 |
+| 5 | satisfied | satisfied | 60/60 | 0.727 |
+| 8 | satisfied | satisfied | 60/60 | 0.726 |
+
+So at the one `N` where the two conditions disagree, a third guard — the
+empty-order check — refuses first, and refuses for a reason that is true
+regardless of which condition one believes: a structurally zero column has
+no identified coefficient. The guards are not redundant and they fire in a
+defensible order. The order condition remains **necessary, not
+sufficient**, and it is labelled that way in the docstring; `check_design_rank`
+is the second line of defence within a given sample.
+
+### The ordering is the result
+
+`ordering` has no default in `fit_spvar`, and the reason is a number. On a
+14-region ring with `T = 400`, reversing the contemporaneous causal order of
+a two-variable system moved the log-likelihood by **9.949** and the peak
+outward STIR of `y` to a shock in `g` by a factor of **5.25** at spatial
+order 0 and **1.33** at order 1. It also moved the **date**: the order-0
+response peaks on impact under the true ordering and at `h = 2` under the
+reversed one, because the effect then has to travel through a lag to exist
+at all.
+
+A default would have hidden the only choice the user is obliged to make,
+and would have made the package complicit in the most common failure in
+applied SVAR work. This is the same decision as refusing rather than
+returning a number for an under-identified system: the estimator declines
+to guess on the user's behalf.
+
+### What is not here
+
+No **bootstrap confidence bands for the STIR** (the paper's §5 tail); the
+point estimates and asymptotic intervals stand without them, and the
+coverage table above is what justifies saying so. No **spatially
+heterogeneous coefficients** — the full eq (7), with `Φ` genuinely diagonal
+rather than scalar. The global STIR summaries assume homogeneity and
+moderate `N` cannot support the heterogeneous count, but the order
+condition is implemented for **both** parameterisations regardless, since
+its printed form is the heterogeneous one. No **`p > 1` worked example**, though `p` is
+implemented and now tested — see below; the sentence that first stood here
+claimed it was tested when it was not.
+
+**Pfeifer and Deutsch (1980)**, *Technometrics* 22(1), 35–47, could not be
+read. tandfonline returns 403 to automated access and JSTOR returns an
+interstitial, the same wall as the `stpca` sources. The open question it
+would settle is whether STARMA's `W⁽ˡ⁾` means order-`l` neighbourhoods
+rather than powers of `W`, which bears on `fit_star`'s docstring
+attribution and not on its behaviour: the two conventions **agree at
+`l = 0` and `l = 1` and diverge only at `S ≥ 2`**, and `spatial_lags = 1`
+is the default. The question is recorded as open rather than answered from
+recollection, which is the rule that caught the LeSage & Pace chapter error
+and the Ertur & Musolesi attribution gap. `order_weights_list` now exists,
+so if the answer turns out to be order-`l`, exposing it in `fit_star` is an
+option rather than a rewrite — and it would be filed as its own row, since
+shipped tested behaviour does not change silently to match a citation.

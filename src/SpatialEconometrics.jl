@@ -38,6 +38,7 @@ include("SpatialShiftShare.jl")
 include("SpatialNetworks.jl")
 include("SpatialCommonFactors.jl")
 include("SpatioTemporalModels.jl")
+include("SpVAR.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -56,6 +57,7 @@ const ShiftShareMod = SpatialShiftShare
 const NetworksMod   = SpatialNetworks
 const FactorsMod    = SpatialCommonFactors
 const SpatioTempMod = SpatioTemporalModels
+const SpVARMod     = SpVAR
 const WeightsMod    = SpatialWeights
 const SelectionMod  = SpatialModelSelection
 const PanelDiagMod  = SpatialPanelDiagnostics
@@ -82,7 +84,7 @@ import .SpatialErrorModel: SpatialErrorRegressionModel, SpatialErrorPanelModel, 
 import .GWREstimation: GWRModel, MGWRModel, fit_gwr, fit_mgwr, BandwidthType, FixedBandwidth, AdaptiveBandwidth, KernelFunction, GaussianKernel, BisquareKernel, ExponentialKernel
 import .SpatialGravityModels: GravityModel, GravityVariant, PoissonGravity, NegBinGravity, GravityFE, OriginFE, DestinationFE, BilateralFE, fit_gravity, multilateral_resistance
 import .FormulaDSL: @formula, slag, fe, endo, ParsedSpatialFormula, extract_panel_permutation
-import .SpatialWeights: knn_weights, distance_weights, band_weights, block_diagonal_weights, row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!, SpatialConnectivity, spatial_connectivity, read_gal, write_gal, read_gwt, write_gwt
+import .SpatialWeights: knn_weights, distance_weights, band_weights, order_weights, order_weights_list, block_diagonal_weights, row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!, SpatialConnectivity, spatial_connectivity, read_gal, write_gal, read_gwt, write_gwt
 import .SpatialModelSelection: spatial_aic, spatial_bic, LRTestResult, lr_test, VuongTestResult, vuong_test, CommonFactorTestResult, common_factor_test, WaldTestResult, wald_test, KnnSelectionResult, select_knn_w, model_comparison_table, log_marginal_likelihood, bayes_spec_probs, SpecEvidence, SpecRoadmapResult, sdem_roadmap
 import .SpatialPanelDiagnostics: HausmanTestResult, spatial_hausman_test, ChowTestResult, spatial_chow_test, PanelLMTestResult, panel_lm_tests, PanelMoranResult, panel_moran
 import .HigherOrderSpatial: SLXModel, fit_slx, SACModel, fit_sac, SDEMModel, fit_sdem
@@ -95,6 +97,7 @@ import .SpatialShiftShare: ShiftShareDesign, shift_share_design, ShiftShareFit, 
 import .SpatialNetworks: network_weights, group_weights, PeerIdentification, peer_identification, PeerEffectsFit, fit_peer_effects, MultiplexSAR, fit_multiplex_sar, network_moran
 import .SpatialCommonFactors: CDTestResult, pesaran_cd, AlphaExponentResult, alpha_exponent, DependenceVerdict, dependence_verdict, SpCCEModel, fit_sp_cce
 import .SpatioTemporalModels: STARModel, fit_star, InteractiveFEModel, fit_interactive_fe, factor_projection, IRFResult, space_time_irf, spatial_forecast
+import .SpVAR: SpVARModel, fit_spvar, OrderConditionResult, spvar_order_condition, STIRResult, space_time_stir, spvar_irf, spvar_forecast, NestedPanelVARModel, fit_nested_panel_var, lr_spatial_interaction
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf, STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups
 
 """
@@ -489,7 +492,7 @@ export
     lm_test_robust_lag_durbin, lm_test_durbin_terms, sdm_tests,
     make_rook_weights, make_queen_weights,
     # SpatialWeights
-    knn_weights, distance_weights, band_weights, block_diagonal_weights,
+    knn_weights, distance_weights, band_weights, order_weights, order_weights_list, block_diagonal_weights,
     row_standardize, row_standardize!, spectral_standardize, spectral_standardize!, minmax_standardize, minmax_standardize!,
     SpatialConnectivity, spatial_connectivity,
     read_gal, write_gal, read_gwt, write_gwt,
@@ -558,6 +561,11 @@ export
     STARModel, fit_star,
     InteractiveFEModel, fit_interactive_fe, factor_projection,
     IRFResult, space_time_irf, spatial_forecast,
+    # Spatial VAR (Di Giacinto 2010)
+    SpVARModel, fit_spvar,
+    OrderConditionResult, spvar_order_condition,
+    STIRResult, space_time_stir, spvar_irf, spvar_forecast,
+    NestedPanelVARModel, fit_nested_panel_var, lr_spatial_interaction,
     # Extension entry points (methods live in ext/)
     AbstractBayesianSpatialResult,
     bayesian_sar, bayesian_sdm, bayesian_sem,

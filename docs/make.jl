@@ -48,6 +48,7 @@ makedocs(
             "Causal Inference" => "models/causal.md",
             "Networks" => "models/networks.md",
             "Common Factors & Spatio-Temporal" => "models/common_factors.md",
+            "Spatial VAR" => "models/spvar.md",
         ],
         "Diagnostics" => [
             "Spatial Diagnostics" => "diagnostics/spatial.md",
@@ -76,6 +77,7 @@ makedocs(
                 "Spatial Causal Inference" => "api/causal.md",
                 "Networks" => "api/networks.md",
                 "Common Factors & Spatio-Temporal" => "api/common_factors.md",
+                "Spatial VAR" => "api/spvar.md",
                 "Geographically Weighted Regression" => "api/gwr.md",
             ],
             "Panels" => [

@@ -14,6 +14,8 @@ distance_weights
 knn_weights
 minmax_standardize
 minmax_standardize!
+order_weights
+order_weights_list
 read_gal
 read_gwt
 row_standardize

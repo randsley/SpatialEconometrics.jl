@@ -2,19 +2,20 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 27 submodules, 3,415 test assertions in 55 top-level testsets with both
-> package extensions installed and 3,380 without them — the same counts on
+> 28 submodules, 3,718 test assertions in 56 top-level testsets with both
+> package extensions installed and 3,683 without them — the same counts on
 > Julia 1.13.3 and 1.10.13, since the difference is the extensions and not
-> the version. 28 examples, 12 notebooks, 2 package extensions, CI/CD and
-> 54 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> the version. 29 examples, 12 notebooks, 2 package extensions, CI/CD and
+> 56 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
 > item #15's exposure mapping and spatial difference-in-differences landed
 > on 2026-10-30, its spatial synthetic control and shift-share diagnostics
 > on 2026-10-31, and item #11 (Networks) on 2026-11-01. **Phase 7B is open
-> and half done:** items #1 (common factors) and #12 (spatio-temporal)
-> closed together on 2026-11-04, with SpVAR and time-varying `ρ` deferred to
-> a named follow-up row; #13 and #16 remain. Tier 3 is otherwise untouched,
+> and mostly done:** items #1 (common factors) and #12 (spatio-temporal)
+> closed together on 2026-11-04, and row 22's **SpVAR** closed the same day
+> in a second pass, with time-varying `ρ` re-filed under #13 where its
+> published method belongs; #13 and #16 remain. Tier 3 is otherwise untouched,
 > and the correctness audit in `docs/AUDIT.md` is closed — findings 1–25,
 > with 29–32 added afterwards from the benchmark suite and Phase 6C.
 >
@@ -874,9 +875,9 @@ and the identification machinery the estimate did not anticipate.
 | Feature | Description | Reference | Status |
 |---|---|---|---|
 | STAR model | Space-Time Autoregressive: `y_t = Σ_k ρ_k W^k y_{t-1} + Xβ + ε` with higher-order spatial and temporal lags | Pfeifer & Deutsch (1980) | ✅ |
-| SpVAR | Spatial Vector Autoregression: multivariate spatial panel VAR with impulse response functions | Di Giacinto (2010) | ⬜ **deferred** |
+| SpVAR | Spatial Vector Autoregression: multivariate spatial panel VAR with impulse response functions | Di Giacinto (2010) — **verified, read in full from Banca d'Italia Temi di discussione 746** | ✅ |
 | Space-time impulse response | Trace the propagation of a shock through space and time; compute cumulative spatial multipliers | LeSage & Pace (2009) | ✅ |
-| Time-varying spatial effects | Allow ρ_t to change over time via state-space or rolling-window estimation | — | ⬜ **deferred** |
+| Time-varying spatial effects | Allow `ρ_t` to change over time. **Moved to [#13](#13-semiparametric-spatial)** — the published method is local-linear concentrated QML, which shares its kernel-weighted likelihood with #13's partially linear model | Liang, Gao & Gong (2022) | ➡️ **moved to #13** |
 | Forecasting | `spatial_forecast(m, X_future, W; h=5)` — h-step ahead spatial panel forecasts | — | ✅ |
 | Interactive fixed effects with spatial lags | Joint estimation of a factor structure `λᵢ'f_t` alongside `Wy` and `WX`, separating genuine spatial interaction from global shocks | Bai (2009); Shi & Lee (2017) | ✅ |
 
@@ -884,10 +885,12 @@ The factor-structure row is the estimator that pairs with the cross-sectional
 dependence diagnostics under [#1](#1-spatial-panel-data-toolkit): the tests
 say whether a factor structure is there, this estimates it.
 
-**Status:** ✅ **Complete, with two rows deferred** (2026-11-04).
-`src/SpatioTemporalModels.jl`, submodule 27. Docs:
-`docs/src/models/common_factors.md`, `docs/src/api/common_factors.md`.
-Example: `examples/28_spatio_temporal.jl`. Tests: testset 39.
+**Status:** ✅ **Complete** (2026-11-04), in two passes.
+`src/SpatioTemporalModels.jl`, submodule 27, and `src/SpVAR.jl`, submodule
+28. Docs: `docs/src/models/common_factors.md`,
+`docs/src/api/common_factors.md`, `docs/src/models/spvar.md`,
+`docs/src/api/spvar.md`. Examples: `examples/28_spatio_temporal.jl`,
+`examples/29_spvar.jl`. Tests: testsets 39 and 40.
 
 `fit_star`, `fit_interactive_fe`, `factor_projection`, `space_time_irf`,
 `spatial_forecast`. `fit_star` places every spatial lag one or more periods
@@ -898,10 +901,42 @@ no contemporaneous `Wyₜ`. That specification is `fit_spatial_panel`, and
 `factor_projection(m)` because factors and loadings are identified only up to
 rotation; comparing `m.factors` across fits compares starting values.
 
-**SpVAR and time-varying `ρ` are deferred by explicit decision**, not
-dropped — see the follow-up row at the end of Phase 7B. Each is a
-substantial estimator in its own right and neither is needed by the factor
-story this pass delivers.
+**SpVAR shipped in a second pass the same day**, as `src/SpVAR.jl`:
+`fit_spvar`, `spvar_order_condition`, `space_time_stir`, `spvar_irf`,
+`spvar_forecast`, `fit_nested_panel_var`, `lr_spatial_interaction`. Di
+Giacinto makes `C₀` **block** triangular in the variable index rather than
+strictly triangular, because strict triangularity would impose a recursive
+causal ordering on the *locations* — a unilateral causal chain in space,
+when spatial interaction is bilateral. Two consequences: the parameter
+count is linear in `N`, and `|C₀| = Π_r |A⁽⁰⁾_rr|`, so concentrating `Λ` out
+splits the likelihood into `K` unrelated terms. A spatial VAR is `K`
+spatial autoregressions, not one `NK×NK` problem, and both identities are
+pinned at `0.000e+00`.
+
+`ordering` has **no default**, because reversing it on a 14-region ring
+moved the log-likelihood by 9.949 and the peak contemporaneous spillover by
+a factor of 5.25 — and moved its date from `h = 0` to `h = 2`. Its
+asymptotics are `T → ∞` at **fixed `N`**, the opposite of every other panel
+estimator here, which was measured rather than asserted: growing `T`
+removes the dynamic bias by a factor of 24, growing `N` eightfold does not
+move it at all.
+
+This pass also added `order_weights` / `order_weights_list` to
+`SpatialWeights.jl`, since Di Giacinto's `W⁽ˡ⁾` is the order-`l` weights
+matrix of Anselin & Smirnov (1996) and **`Wˡ` is not that** — powers count
+walks, sit on the diagonal and double-count paths. Nothing in the package
+built order-`l` weights and no row had planned one.
+
+**Time-varying `ρ` moved to [#13](#13-semiparametric-spatial)** rather than
+staying here. Its roadmap entry was unsourced — reference column `—`, method
+given as "state-space or rolling-window" — and there is no published
+treatment of `ρ_t` as a latent state for spatial panels; the obstacle is
+structural, since `ρ` enters the likelihood nonlinearly through
+`log|I − ρₜ W|`. Building it here would have meant inventing a method. The
+published approach is Liang, Gao & Gong (2022), local-linear concentrated
+QML, which belongs beside #13's Su & Jin (2010) partially linear model:
+both are concentrated QML with a nonparametric component, and built apart
+the kernel-weighted likelihood gets written twice.
 
 **Dependencies:** None
 
@@ -916,6 +951,7 @@ story this pass delivers.
 | Feature | Description | Reference |
 |---|---|---|
 | Partially linear spatial model | `y = ρWy + Xβ + f(z) + ε` where f(z) is estimated nonparametrically (kernel or P-spline) | Su & Jin (2010) |
+| Time-varying spatial dependence | `ρ_t` by local-linear concentrated QML. **Moved here from [#12](#12-spatio-temporal-models)**, where it sat unsourced: `ρ` enters the likelihood through `log|I − ρₜ W|`, so a state-space treatment would need a filter nobody has worked out for this model. The published method shares its kernel-weighted concentrated likelihood with the partially linear row above, so the two should be built together | Liang, Gao & Gong (2022) |
 | Spatial quantile regression | Effects vary across the conditional distribution: `Q_τ(y \| X, W) = ρ_τ Wy + Xβ_τ` | Kostov (2009) |
 | Spatial varying coefficient model | Generalization of GWR with penalized spline smoothing — avoids GWR's boundary bias and bandwidth sensitivity | Hastie & Tibshirani (1993); Geniaux & Martinetti (2017) |
 | Penalized spatial regression | LASSO / elastic net with spatial lag: variable selection in high-dimensional spatial models | Liu & Yang (2020) |
@@ -1108,12 +1144,12 @@ independent support enumeration.
 
 | Priority | Item | Est. Lines | Rationale |
 |---|---|---|---|
-| 18 | ✅ Spatio-Temporal Models (#12) | ~500 | STAR, forecasting, interactive FE — SpVAR and time-varying `ρ` deferred |
+| 18 | ✅ Spatio-Temporal Models (#12) | ~500 | STAR, forecasting, interactive FE; SpVAR in a second pass |
 | 19 | ✅ Common factors in panels (#1) | ~400 | SP-CCE and the CD / `α` exponent tests |
 | 20 | ⬜ Semiparametric Spatial (#13) | ~500 | Quantile regression, penalized models |
 | 21 | ⬜ Spatial GARCH (#16) | ~450 | Spatial structure in the variance |
-| 22 | ⬜ **Deferred from #12** | ~450 | SpVAR (Di Giacinto 2010) and time-varying `ρ_t` by state-space or rolling window |
-| | **Phase 7B total** | **~2,300** | Items 18 and 19 closed 2026-11-04; actual ~2,050 lines across two submodules |
+| 22 | ✅ **SpVAR** (deferred from #12) | ~450 | Di Giacinto (2010): block-triangular `C₀`, separable FIML, outward/inward STIR, the nested panel VAR and the LR test against it; plus `order_weights` |
+| | **Phase 7B total** | **~2,300** | Items 18, 19 and 22 closed 2026-11-04; actual ~3,450 lines across three submodules |
 
 **Items 18 and 19 were taken as one pass**, on 2026-11-04, because the
 roadmap cross-references them as two halves of one phenomenon and that is
@@ -1122,10 +1158,22 @@ interactive fixed effects *estimate* it. Shipping either alone would have
 delivered a test whose remedy does not exist, or a remedy with no test to
 motivate it.
 
-**Row 22 is the deferral, named rather than dropped.** SpVAR and
-time-varying `ρ` were both in item #12's deliverables and both were cut by
-explicit decision at the start of the pass. They are recorded here so the
-scope reduction is visible in the plan rather than only in the ledger.
+**Row 22 was the deferral, and it was split rather than carried.** SpVAR
+and time-varying `ρ` were both cut from item #12's first pass by explicit
+decision, recorded here so the scope reduction was visible in the plan
+rather than only in the ledger. On the same day the row was reopened, and
+reading the sources changed its shape: **SpVAR was built** (Di Giacinto
+2010, verified and read in full), and **time-varying `ρ` moved to #13**
+because its roadmap entry was unsourced and the published method — Liang,
+Gao & Gong (2022), local-linear concentrated QML — shares a kernel-weighted
+likelihood with #13's partially linear model.
+
+The lesson is worth keeping: **a deferred row is not a frozen row.** Row
+22's original description proposed "state-space or rolling-window" for
+`ρ_t`, with an empty reference column. Had it been implemented as written,
+the package would have shipped an invented method. The reference column
+being empty was the signal, and it was only read because the row was
+reopened and re-sourced rather than executed from its own summary.
 
 ### Phase 8 — ⬜ Ecosystem, benchmarks & JSS submission
 
@@ -1158,29 +1206,65 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #15 shift-share, so #15 complete) | 24 | 3,051 † | 19,085 |
 | **master** (+ #11 networks, so Phase 7A complete) | 25 | 3,217 † | 20,289 |
 | **master** (+ #1 and #12, so Phase 7B half done) | 27 | 3,415 † | 22,577 |
-| **v0.4.0** (= master today, unreleased) | 27 | 3,415 † | 22,577 |
+| **master** (+ row 22 SpVAR, so Phase 7B mostly done) | 28 | 3,718 † | 24,151 |
+| **v0.4.0** (= master today, unreleased) | 28 | 3,718 † | 24,151 |
 | — | | | |
-| **v1.0.0** (Phases 6C–8) | 28–30 | ~3,700 | ~24,500 |
+| **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
-Measured on master: 27 submodules plus the umbrella across 22,577 lines of
-`src/`, 8,536 lines of tests, 4,313 lines of examples across 28 scripts,
-398 lines of package extensions, 54 documentation pages and 12 notebooks
+Measured on master: 28 submodules plus the umbrella across 24,151 lines of
+`src/`, 9,303 lines of tests, 4,750 lines of examples across 29 scripts,
+398 lines of package extensions, 56 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
-The v1.0.0 projection moved up this pass rather than being met: the old
-`~22,000` line estimate is already exceeded at 22,577 with two Phase 7B
-rows still open, so it was recounted against what #13 and #16 plausibly
-add rather than left as a figure the repo had walked past.
+**Count `src/` the same way each time, and say which way.** The figures in
+the last column are `cat src/*.jl | wc -l`. That method gives **22,598** at
+the previous row's commit, which this table recorded as **22,577** — so the
+series carries a method difference of about twenty lines at that join. The
+gap is not worth retrofitting through eleven rows, but it is worth naming,
+because a column whose definition nobody writes down is a column that
+drifts. From this row on the method is the one stated here.
+
+**The v1.0.0 projection has now been passed twice in two days, and that is
+worth saying rather than quietly editing.** It read `~22,000` lines until
+2026-11-04, when #1 and #12 took `master` to 22,577 with two Phase 7B rows
+still open, and it was raised to `28–30` modules, `~3,700` assertions and
+`~24,500` lines. Row 22's SpVAR, **the next day**, took `master` to 28
+modules, 3,718 assertions and 24,151 lines — so the module count was met,
+the assertion figure **exceeded** (3,718 against `~3,700`), and the line
+figure 98.6% met, with #13 and #16 both still open. One row consumed a
+projection that was meant to cover three.
+
+Raised again, to `29–31` / `~4,100` / `~26,500`, on the same basis: #13
+(semiparametric, and now carrying time-varying `ρ` too) and #16 (spatial
+GARCH) are estimated at ~500 and ~450 lines of `src/`, and every submodule
+in Phases 7A and 7B has come in well above its estimate — `src/SpVAR.jl` is
+**1,401 lines against the ~700 the plan projected**, almost exactly double.
+
+The honest reading is that the per-item line estimates in these tables are
+low by roughly a factor of two, consistently, and have been for several
+passes. They are left as written rather than retrofitted, because the
+pattern is more useful than a set of corrected numbers: an estimate made
+before reading the primary source does not know how much of the paper will
+turn out to be load-bearing.
 
 **State the environment with the assertion count.** The figures above are
-3,415 with Makie and Turing **installed**, where testsets 25 and 26
-contribute 11 and 24 assertions, and 3,380 with both **absent**, where each
+3,718 with Makie and Turing **loadable**, where testsets 25 and 26
+contribute 11 and 24 assertions, and 3,683 with both **absent**, where each
 reports a single broken marker instead of running. Both were measured in the
 repository working tree, which matters — see the correction below. That
-difference is 35 passing assertions — 3,380 + 11 + 24 = 3,415, the two
+difference is 35 passing assertions — 3,683 + 11 + 24 = 3,718, the two
 broken markers being replaced rather than added, which is why the arithmetic
 is 35 and not 33. A count quoted without its environment can therefore look
 like a regression when nothing has regressed.
+
+**And state the entry point, which is easy to invert.** `Pkg.test()` is the
+command that genuinely **excludes** the extensions, so it is the one
+reporting the *lower* figure, 3,683 plus two broken markers — measured
+separately on 1.13.3 and 1.10.13 and identical on both. Running
+`test/runtests.jl` directly from `test/` leaves `@v1.13` on `LOAD_PATH`,
+the extensions load, and the total is 3,718 with no broken entries. The
+intuition that the more isolated-sounding command gives the higher number
+is backwards.
 
 **State the Julia version too, and re-read it rather than carrying it
 forward.** The figures above were measured on **1.13.3** and **1.10.13**.
@@ -1222,7 +1306,7 @@ and that block holds exactly six assertions — one `@test_logs` guarding
 testset 11b reports **12 in the repository and 6 in a `src`-and-`test`-only
 copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it, and
 the extensions-absent figure CI sees is the in-repository one — 2,395 then,
-3,380 now — never the copy's.
+3,683 now — never the copy's.
 
 Two consequences for anyone measuring this suite. A scratch copy must
 include `notebooks/data/` to be comparable with the repository at all. And
@@ -1252,7 +1336,16 @@ does not balance the right response is to find the three rather than to
 adjust the total.
 
 **The Phase 7B step balances, which is the useful outcome.** 3,217 to 3,415
-is 198, and testsets 38 and 39 are 117 and 81 — 198 exactly. So the two new
+is 198, and testsets 38 and 39 are 117 and 81 — 198 exactly.
+**The SpVAR step balances too**, and it was checked at each of the three
+times testset 40 grew. 3,380 to 3,683 without the extensions is 303, and
+testset 40 is 303 — measured in isolation before each suite run, which is
+how the `const`-in-`@testset` syntax error was caught before it could take
+the whole suite down. The intermediate figures were 255 and 284, as subsets
+`40a2` (`binary = false`) and `40n` (`p > 1`, `rho_bounds`) were added on
+finding those options untested. So nothing elsewhere was quietly adjusted,
+even though this pass touched `src/SpatialWeights.jl` to add
+`order_weights`. So the two new
 rows are purely additive and nothing elsewhere in the suite was quietly
 adjusted. That is worth one line of arithmetic: this pass touched two new
 submodules, the umbrella, `docs/make.jl` and two new doc pages, and a step
@@ -1306,6 +1399,7 @@ development line rather than across three releases.
 - Anselin, L. (1990). Spatial dependence and spatial structural instability in applied regression analysis. *Journal of Regional Science*, 30(2), 185–207.
 - Anselin, L. (2001). Rao's score test in spatial econometrics. *Journal of Statistical Planning and Inference*, 97(1), 113–139.
 - Anselin, L., Le Gallo, J., & Jayet, H. (2008). Spatial panel econometrics. In *The Econometrics of Panel Data* (pp. 625–660). Springer.
+- Anselin, L., & Smirnov, O. (1996). Efficient algorithms for constructing proper higher order spatial lag operators. *Journal of Regional Science*, 36(1), 67–89.
 - Assunção, R. M., Neves, M. C., Câmara, G., & Da Costa Freitas, C. (2006). Efficient regionalization techniques for socio-economic geographical units using minimum spanning trees. *International Journal of Geographical Information Science*, 20(7), 797–811.
 - Aune, E., Simpson, D. P., & Eidsvik, J. (2014). Parameter estimation in high dimensional Gaussian distributions. *Statistics and Computing*, 24(2), 247–263.
 - Bai, J. (2009). Panel data models with interactive fixed effects. *Econometrica*, 77(4), 1229–1279.
@@ -1320,7 +1414,7 @@ development line rather than across three releases.
 - Chagas, A. L. S., Azzoni, C. R., & Almeida, A. N. (2016). A spatial difference-in-differences analysis of the impact of sugarcane production on respiratory diseases. *Regional Science and Urban Economics*, 59, 24–36.
 - Chun, Y., Griffith, D. A., Lee, M., & Sinha, P. (2016). Eigenvector selection with stepwise regression techniques to construct eigenvector spatial filters. *Journal of Geographical Systems*, 18(1), 67–85.
 - Delgado, M. S., & Florax, R. J. G. M. (2015). Difference-in-differences techniques for spatial data: Local autocorrelation and spatial interaction. *Economics Letters*, 137, 123–126.
-- Di Giacinto, V. (2010). On vector autoregressive modeling in space and time. *Journal of Geographical Systems*, 12(2), 125–154.
+- Di Giacinto, V. (2010). On vector autoregressive modeling in space and time. *Journal of Geographical Systems*, 12(2), 125–154. doi:10.1007/s10109-010-0116-6. **Verified and read in full** from Banca d'Italia *Temi di discussione* 746, which is freely available and carries the same text.
 - Elhorst, J. P. (2010). Applied spatial econometrics: Raising the bar. *Spatial Economic Analysis*, 5(1), 9–28.
 - Ertur, C., & Musolesi, A. (2017). Weak and strong cross-sectional dependence: A panel data analysis of international technology diffusion. *Journal of Applied Econometrics*, 32(3), 477–503.
 - Fülle, M. J., & Otto, P. (2023). Spatial GARCH models for unknown spatial locations — an application to financial stock returns. *Spatial Economic Analysis*, 19(1), 92–105.
@@ -1342,6 +1436,7 @@ development line rather than across three releases.
 - LeSage, J. P. (2014). Spatial econometric panel data model specification: A Bayesian approach. *Spatial Statistics*, 9, 122–145.
 - LeSage, J. P. (2015). Software for Bayesian cross section and panel spatial model comparison. *Journal of Geographical Systems*, 17(4), 297–310.
 - LeSage, J., & Pace, R. K. (2009). *Introduction to Spatial Econometrics*. CRC Press.
+- Liang, X., Gao, J., & Gong, X. (2022). Semiparametric spatial autoregressive panel data model with fixed effects and time-varying coefficients. *Journal of Business & Economic Statistics*, 40(4), 1784–1802. doi:10.1080/07350015.2021.1979564. Title, journal, volume, issue, pages and DOI **verified**; the text itself is paywalled on tandfonline, but an open version circulates as Monash Econometrics and Business Statistics Working Paper 05/21 and MPRA Paper 108497, so it can be read from the source when #13 is built.
 - Liu, X., & Yang, Z. (2020). Variable selection in spatial autoregressive models. *Journal of Econometrics*, 218(1), 85–109.
 - Manski, C. F. (1993). Identification of endogenous social effects: The reflection problem. *Review of Economic Studies*, 60(3), 531–542.
 - Murakami, D., & Griffith, D. A. (2015). Random effects specifications in eigenvector spatial filtering. *Journal of Geographical Systems*, 17(4), 311–331.
