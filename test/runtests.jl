@@ -8548,6 +8548,160 @@ vcov(m::HausMock) = m.V
             @test_throws DimensionMismatch space_time_irf(m, cf_grid_W(3, 3);
                                                            horizon = 2)
         end
+
+        # ── 39j ───────────────────────────────────────────────
+        # Pfeifer & Deutsch define the spatial lag operator on order-k
+        # NEIGHBOURHOODS, not powers of W: w_ij^(k) is "nonzero only if
+        # sites i and j are kth order neighbors". `fit_star` has always
+        # computed powers. Both are now available; the default is still
+        # powers, so these tests pin (i) that the two agree exactly where
+        # the conventions agree, and (ii) that they genuinely differ where
+        # they do not -- an option that quietly made no difference would be
+        # worse than no option.
+        @testset "39j. powers of W versus order-k neighbours" begin
+            rng = MersenneTwister(3_910)
+            W = cf_grid_W(5, 4); N = size(W, 1); T = 40
+            Wd = Matrix(W)
+            X = randn(rng, N * T, 2)
+            y = Vector{Float64}(undef, N * T)
+            y[1:N] = randn(rng, N)
+            for t in 2:T
+                prev = y[((t - 2) * N + 1):((t - 1) * N)]
+                r = ((t - 1) * N + 1):(t * N)
+                y[r] = 0.30 .* prev .+ 0.25 .* (Wd * prev) .+
+                       X[r, :] * [0.8, -0.4] .+ randn(rng, N)
+            end
+
+            # At S = 1 the conventions coincide by definition: W^(1) IS the
+            # row-standardised first-order neighbour matrix. Identical to
+            # the last bit, not merely close -- a tolerance here would hide
+            # the case where :orders rebuilds W slightly differently.
+            m1p = fit_star(y, X, W, N, T; spatial_lags = 1,
+                           spatial_weights = :powers)
+            m1o = fit_star(y, X, W, N, T; spatial_lags = 1,
+                           spatial_weights = :orders)
+            @test m1p.coef == m1o.coef
+            @test m1p.loglik == m1o.loglik
+            @test m1p.spectral_radius == m1o.spectral_radius
+            @test Matrix(m1o.Wk[2]) == Wd
+            @test m1o.spatial_weights === :orders
+            @test m1p.spatial_weights === :powers
+
+            # S = 0 touches neither, so it cannot depend on the choice.
+            @test fit_star(y, X, W, N, T; spatial_lags = 0,
+                           spatial_weights = :orders).coef ==
+                  fit_star(y, X, W, N, T; spatial_lags = 0,
+                           spatial_weights = :powers).coef
+
+            m2p = fit_star(y, X, W, N, T; spatial_lags = 2,
+                           spatial_weights = :powers)
+            m2o = fit_star(y, X, W, N, T; spatial_lags = 2,
+                           spatial_weights = :orders)
+
+            # The structural difference. On a rook lattice there are no
+            # triangles, so every length-2 walk between distinct sites is a
+            # distance-2 pair and the ENTIRE discrepancy is the diagonal:
+            # W^2 puts weight on the unit itself and calls it a spatial lag.
+            let A2p = Matrix(m2p.Wk[3]), A2o = Matrix(m2o.Wk[3])
+                @test count(!iszero, diag(A2p)) == N      # all 20
+                @test count(!iszero, diag(A2o)) == 0
+                @test count(!iszero, A2p) == count(!iszero, A2o) + N
+                # off the diagonal the supports agree here, which is what
+                # isolates the diagonal as the whole of the difference
+                offp = [i == j ? false : A2p[i, j] != 0
+                        for i in 1:N, j in 1:N]
+                @test offp == (A2o .!= 0)
+                # ... and each is row-standardised in its own right
+                @test all(isapprox.(sum(A2o, dims = 2), 1.0; atol = 1e-12))
+            end
+
+            # So the fits must differ, and the coefficient on the order-2
+            # term is the one that moves.
+            @test m2p.coef != m2o.coef
+            @test abs(m2p.phi[3, 1] - m2o.phi[3, 1]) > 0.01
+            @test "W^2 y(t-1)" in coefnames(m2p)
+            @test "W⁽2⁾ y(t-1)" in coefnames(m2o)
+            @test !("W^2 y(t-1)" in coefnames(m2o))
+            @test occursin("order-k neighbours", sprint(show, m2o))
+            @test occursin("powers of W", sprint(show, m2p))
+
+            # Everything built on the fit must use the matrices the fit
+            # used. The long-run multiplier is the gate: if the IRF
+            # recomputed powers while the design used orders, this breaks.
+            for m in (m2p, m2o)
+                S = m.spatial_lags
+                irf = space_time_irf(m; horizon = 500)
+                @test irf.psi[1] == Matrix(1.0I, N, N)
+                A1 = ST._star_A(m.phi, m.Wk, N, S, 1)
+                @test maximum(abs, sum(irf.psi) .-
+                              inv(Matrix(1.0I, N, N) - A1)) < 1e-12
+            end
+
+            # L = 2 as well, so the companion block structure is exercised
+            # under the orders convention too.
+            let mL = fit_star(y, X, W, N, T; spatial_lags = 2,
+                              temporal_lags = 2, spatial_weights = :orders)
+                @test mL.stationary
+                Asum = ST._star_A(mL.phi, mL.Wk, N, 2, 1) .+
+                       ST._star_A(mL.phi, mL.Wk, N, 2, 2)
+                @test maximum(abs,
+                        sum(space_time_irf(mL; horizon = 500).psi) .-
+                        inv(Matrix(1.0I, N, N) - Asum)) < 1e-12
+            end
+
+            # Pfeifer & Deutsch's stationarity condition is determinantal:
+            # every x solving det[x^L I - sum_l A_l x^(L-l)] = 0 must lie
+            # inside the unit circle. This package reports a companion
+            # spectral radius instead. Assert they are the same statement
+            # by evaluating the paper's determinant AT the companion
+            # eigenvalues -- it must vanish.
+            let mL = fit_star(y, X, W, N, T; spatial_lags = 2,
+                              temporal_lags = 2, spatial_weights = :orders),
+                L = 2
+                As = [ST._star_A(mL.phi, mL.Wk, N, 2, l) for l in 1:L]
+                C = zeros(L * N, L * N)
+                for l in 1:L
+                    C[1:N, ((l - 1) * N + 1):(l * N)] = As[l]
+                end
+                C[(N + 1):(2N), 1:N] = Matrix(1.0I, N, N)
+                ev = eigvals(C)
+                @test isapprox(maximum(abs, ev), mL.spectral_radius;
+                               rtol = 1e-10)
+                worst = 0.0
+                for x in ev
+                    M = ComplexF64(x)^L * Matrix{ComplexF64}(I, N, N)
+                    for l in 1:L
+                        M .-= ComplexF64(x)^(L - l) .* As[l]
+                    end
+                    worst = max(worst, abs(det(M)))
+                end
+                @test worst < 1e-20
+            end
+
+            # Named failures specific to the option.
+            @test_throws ArgumentError fit_star(y, X, W, N, T;
+                spatial_weights = :order)
+            @test_throws ArgumentError fit_star(y, X, W, N, T;
+                spatial_weights = :neighbours)
+            # Past the graph's diameter an order matrix is empty, and that
+            # is refused with the diameter rather than fitted as zeros.
+            # The 5x4 rook lattice has diameter 7.
+            let e = try
+                        fit_star(y, X, W, N, T; spatial_lags = 20,
+                                 spatial_weights = :orders)
+                        nothing
+                    catch err
+                        err
+                    end
+                @test e isa ArgumentError
+                @test occursin("diameter is 7", sprint(showerror, e))
+            end
+            # Under :powers that same S fails for a different reason --
+            # rank deficiency, not emptiness -- so the two paths must not
+            # be reporting each other's diagnosis.
+            @test_throws ArgumentError fit_star(y, X, W, N, T;
+                spatial_lags = 20, spatial_weights = :powers)
+        end
     end
 
     # ═══════════════════════════════════════════════════════════════════

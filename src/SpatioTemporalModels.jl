@@ -7,8 +7,12 @@ unobserved factor structure sits alongside the spatial lag.
 Three things live here:
 
 - [`fit_star`](@ref) — the space-time autoregression of Pfeifer & Deutsch
-  (1980), `yₜ = Σₖ Σₗ φₖₗ Wᵏ yₜ₋ₗ + Xβ + ε`, with arbitrary spatial and
-  temporal lag orders.
+  (1980), `yₜ = Σₖ Σₗ φₖₗ W⁽ᵏ⁾ yₜ₋ₗ + Xβ + ε`, with arbitrary spatial
+  and temporal lag orders. `W⁽ᵏ⁾` is `Wᵏ` by default and the **order-`k`
+  neighbour matrix** — which is what the paper actually defines — under
+  `spatial_weights = :orders`. The default is the convention the paper does
+  *not* use; `fit_star`'s docstring says why, and the two coincide for
+  `S ≤ 1`.
 - [`fit_interactive_fe`](@ref) — a spatial panel with interactive fixed
   effects `λᵢ'fₜ`, by the iterative principal components of Bai (2009) as
   extended to a spatial lag by Shi & Lee (2017). This is the estimation
@@ -29,7 +33,12 @@ questions and neither nests the other.
 # References
 
 - Pfeifer, P. E., & Deutsch, S. J. (1980). A three-stage iterative
-  procedure for space-time modeling. *Technometrics*, 22(1), 35–47.
+  procedure for space-time modeling. *Technometrics*, 22(1), 35–47. Read
+  from the original (NCJRS 60692, the authors' reprint) — see
+  `docs/AUDIT.md` for what that reading changed here.
+- Anselin, L., & Smirnov, O. (1996). Efficient algorithms for constructing
+  proper higher order spatial lag operators. *Journal of Regional Science*,
+  36(1), 67–89.
 - Bai, J. (2009). Panel data models with interactive fixed effects.
   *Econometrica*, 77(4), 1229–1279.
 - Shi, W., & Lee, L. F. (2017). Spatial dynamic panel data models with
@@ -53,6 +62,11 @@ import ..SpatialUtils: _normcdf, _chi2_sf, _print_coef_table,
     within_transform, within_transform!, panel_spatial_lag!, panel_spatial_lag,
     check_design_rank, brent_maximize,
     LogDetMethod, ExactLU, ChebyshevApprox
+
+# `order_weights` itself is not called here; it is imported so that the
+# `fit_star` docstring's cross-reference to it resolves, since Documenter
+# resolves a docstring's @ref in the docstring's own module scope.
+import ..SpatialWeights: order_weights, order_weights_list
 
 export
     STARModel, fit_star,
@@ -139,6 +153,8 @@ struct STARModel{T<:AbstractFloat} <: StatsAPI.RegressionModel
     T_periods::Int
     T_eff::Int
     W::SparseMatrixCSC{T, Int}
+    Wk::Vector{SparseMatrixCSC{T, Int}}
+    spatial_weights::Symbol
     stationary::Bool
     spectral_radius::T
 end
@@ -154,8 +170,10 @@ StatsAPI.dof_residual(m::STARModel) = m.N * m.T_eff - length(m.coef)
 function Base.show(io::IO, m::STARModel)
     println(io, "Space-Time Autoregression (STAR)")
     println(io, "════════════════════════════════")
-    @printf(io, "  Spatial lags S = %d, temporal lags L = %d\n",
-        m.spatial_lags, m.temporal_lags)
+    @printf(io, "  Spatial lags S = %d (%s), temporal lags L = %d\n",
+        m.spatial_lags,
+        m.spatial_weights === :powers ? "powers of W" : "order-k neighbours",
+        m.temporal_lags)
     @printf(io, "  N = %d, T = %d (T_eff = %d after lagging)\n",
         m.N, m.T_periods, m.T_eff)
     println(io)
@@ -170,17 +188,47 @@ end
 
 """
     fit_star(y, X, W, N, T_per; spatial_lags = 1, temporal_lags = 1,
-             varnames = nothing, intercept = true)
+             spatial_weights = :powers, varnames = nothing,
+             intercept = true)
 
 Fit the space-time autoregression of Pfeifer & Deutsch (1980).
 
 ```
-yₜ = Σ_{k=0}^{S} Σ_{l=1}^{L} φₖₗ Wᵏ yₜ₋ₗ + Xₜβ + εₜ
+yₜ = Σ_{k=0}^{S} Σ_{l=1}^{L} φₖₗ W⁽ᵏ⁾ yₜ₋ₗ + Xₜβ + εₜ
 ```
 
-`spatial_lags = S` and `temporal_lags = L` set the two orders. `k = 0` is
-the identity, so `φ₀ₗ` are the plain temporal autoregressive coefficients
-and the model nests a non-spatial panel AR(`L`) at `S = 0`.
+`spatial_lags = S` and `temporal_lags = L` set the two orders. `W⁽⁰⁾ = I`, so
+`φ₀ₗ` are the plain temporal autoregressive coefficients and the model nests
+a non-spatial panel AR(`L`) at `S = 0`.
+
+# What `W⁽ᵏ⁾` is, and why the default is not the paper's
+
+`spatial_weights` chooses the sequence:
+
+| value | `W⁽ᵏ⁾` | |
+|---|---|---|
+| `:powers` (default) | `Wᵏ` | matrix powers |
+| `:orders` | the order-`k` neighbour matrix | **Pfeifer & Deutsch's own definition** |
+
+Pfeifer & Deutsch define a spatial lag operator `L⁽ᵏ⁾ z = W⁽ᵏ⁾ z` in which
+`wᵢⱼ⁽ᵏ⁾` is "nonzero only if sites `i` and `j` are `k`th order neighbors"
+(their Section 2), each `W⁽ᵏ⁾` row-standardised separately, and the orders
+required to form a hierarchy — successively more distant rings, drawn as
+such in their Figure 1 for a lattice and a line. That is
+[`order_weights`](@ref), not `Wᵏ`.
+
+`Wᵏ` is a different object: it counts *walks* of length `k`, is non-zero on
+its own diagonal, double-counts paths, and keeps first-order neighbours
+wherever the graph has triangles. The two agree at `k = 0` and `k = 1` and
+diverge from `k = 2`.
+
+**The default is `:powers` anyway**, because that is what this function has
+always computed and what its tests pin. A citation being read more
+carefully is not a reason to change the arithmetic under a user who has
+shipped results; `:orders` is the paper's model and is here for anyone who
+wants it. The distinction is invisible at the default `spatial_lags = 1`.
+Coefficient names tell you which you got: `W^2 y(t-1)` versus
+`W⁽²⁾ y(t-1)`.
 
 `y` is a stacked panel vector of length `N*T_per` in the package's
 unit-within-time layout; `X` has `N*T_per` rows. The first `L` periods are
@@ -197,11 +245,15 @@ spatial feedback.
 
 # Identification
 
-`W⁰ = I, W¹, …, W^S` must be linearly independent as matrices, or the
-design has exactly collinear blocks. On a row-standardised `W` with a
-regular structure this fails for modest `S` — a complete graph gives
-`W² ∝ W`, for instance. The design is checked with `check_design_rank` and
-the error names the offending columns rather than failing inside LAPACK.
+`W⁽⁰⁾ = I, W⁽¹⁾, …, W⁽ˢ⁾` must be linearly independent as matrices, or the
+design has exactly collinear blocks. Under `:powers` on a row-standardised
+`W` with a regular structure this fails for modest `S` — a complete graph
+gives `W² ∝ W`, for instance. The design is checked with
+`check_design_rank` and the error names the offending columns rather than
+failing inside LAPACK. Under `:orders` the binding constraint is different
+and caught earlier: once `S` exceeds the graph's diameter some `W⁽ᵏ⁾` is
+empty, and [`order_weights_list`](@ref) refuses with the diameter rather
+than handing back a column of zeros.
 
 # Example
 
@@ -214,7 +266,13 @@ f   = spatial_forecast(m, X_future; h = 4)
 # References
 
 Pfeifer, P. E., & Deutsch, S. J. (1980). A three-stage iterative procedure
-for space-time modeling. *Technometrics*, 22(1), 35–47.
+for space-time modeling. *Technometrics*, 22(1), 35–47. The spatial lag
+operator is defined in their Section 2; the stationarity condition quoted
+there is the determinantal one this function checks in companion form.
+
+Anselin, L., & Smirnov, O. (1996). Efficient algorithms for constructing
+proper higher order spatial lag operators. *Journal of Regional Science*,
+36(1), 67–89.
 """
 function fit_star(
     y::AbstractVector{T},
@@ -224,12 +282,17 @@ function fit_star(
     T_per::Int;
     spatial_lags::Int = 1,
     temporal_lags::Int = 1,
+    spatial_weights::Symbol = :powers,
     varnames::Union{Nothing, Vector{String}} = nothing,
     intercept::Bool = true
 ) where {T<:AbstractFloat}
 
     S, L = spatial_lags, temporal_lags
     S >= 0 || throw(ArgumentError("fit_star: spatial_lags must be ≥ 0, got $S"))
+    spatial_weights in (:powers, :orders) || throw(ArgumentError(
+        "fit_star: spatial_weights must be :powers (Wᵏ) or :orders " *
+        "(Pfeifer & Deutsch's order-k neighbour matrices), got " *
+        ":$spatial_weights"))
     L >= 1 || throw(ArgumentError("fit_star: temporal_lags must be ≥ 1, " *
         "got $L. With no temporal lag there is no autoregression and this " *
         "is an ordinary cross-sectional regression per period."))
@@ -249,13 +312,36 @@ function fit_star(
     T_eff = T_per - L
     n_obs = N * T_eff
 
-    # Spatial powers of y, W^k y, computed once by repeated multiplication
-    # rather than by forming W^k.
+    # The S + 1 spatial weight matrices the design uses. These are kept on
+    # the model rather than rebuilt downstream, so the IRF, the forecast
+    # and the spectral radius cannot silently disagree with the design
+    # about which convention was fitted.
+    Wk = Vector{SparseMatrixCSC{T, Int}}(undef, S + 1)
+    if spatial_weights === :powers
+        Wk[1] = sparse(one(T) * I, N, N)
+        for k in 1:S
+            Wk[k + 1] = Ws * Wk[k]
+        end
+    else
+        ol = order_weights_list(Ws, S)
+        for k in 0:S
+            Wk[k + 1] = SparseMatrixCSC{T, Int}(ol[k + 1])
+        end
+    end
+
     Ymat = _pmat(y, N, T_per)
     Wky = Vector{Matrix{T}}(undef, S + 1)
     Wky[1] = Matrix(Ymat)
-    for k in 1:S
-        Wky[k + 1] = Ws * Wky[k]
+    if spatial_weights === :powers
+        # Repeated multiplication, as before: W(W y) rather than (WW) y,
+        # so the design is unchanged to the last bit for existing callers.
+        for k in 1:S
+            Wky[k + 1] = Ws * Wky[k]
+        end
+    else
+        for k in 1:S
+            Wky[k + 1] = Matrix(Wk[k + 1] * Ymat)
+        end
     end
 
     # Design: the (k,l) blocks, then X, then an intercept.
@@ -267,7 +353,15 @@ function fit_star(
     col = 0
     for l in 1:L, k in 0:S
         col += 1
-        names[col] = k == 0 ? "y(t-$l)" : "W^$k y(t-$l)"
+        names[col] = if k == 0
+            "y(t-$l)"
+        elseif spatial_weights === :powers
+            "W^$k y(t-$l)"
+        else
+            # `⁾` is a valid identifier character, so the index must be
+            # interpolated as $(k) -- "W⁽$k⁾" parses as the variable `k⁾`.
+            "W⁽$(k)⁾ y(t-$l)"
+        end
         src = Wky[k + 1]
         @inbounds for t in 1:T_eff
             # period (L + t) uses lag l, i.e. source period L + t - l
@@ -305,12 +399,19 @@ function fit_star(
     end
 
     check_design_rank(D, names, "fit_star";
-        context = "The space-time design is rank-deficient. The usual cause " *
-                  "is that W^k is linearly dependent on lower powers — a " *
-                  "complete or otherwise highly regular W gives W² ∝ W, so " *
-                  "`spatial_lags` cannot be raised indefinitely. Reduce " *
-                  "`spatial_lags`, or drop the intercept if a unit-invariant " *
-                  "column is already present in X.")
+        context = spatial_weights === :powers ?
+            "The space-time design is rank-deficient. The usual cause " *
+            "is that W^k is linearly dependent on lower powers — a " *
+            "complete or otherwise highly regular W gives W² ∝ W, so " *
+            "`spatial_lags` cannot be raised indefinitely. Reduce " *
+            "`spatial_lags`, or drop the intercept if a unit-invariant " *
+            "column is already present in X." :
+            "The space-time design is rank-deficient. With " *
+            "`spatial_weights = :orders` the W⁽ᵏ⁾ are supported on disjoint " *
+            "sets of pairs, so exact dependence between them is unusual; " *
+            "suspect instead a constant column, a unit-invariant column " *
+            "in X alongside the intercept, or too little T. Reduce " *
+            "`spatial_lags` or drop the intercept.")
 
     F = qr(D, ColumnNorm())
     theta = F \ yv
@@ -339,31 +440,32 @@ function fit_star(
     #   y_t = sum_l A_l y_{t-l} + ...,  A_l = sum_k phi[k+1,l] W^k
     # and stationarity is the spectral radius of the L*N companion matrix.
     # For L = 1 that is just rho(A_1).
-    rad = _star_spectral_radius(Wky, phi, Ws, N, S, L)
+    rad = _star_spectral_radius(Wk, phi, N, S, L)
     stationary = rad < one(T)
 
     return STARModel{T}(phi, beta, icept, intercept, theta, V, names,
                         sigma2, loglik, resid, S, L, N, T_per, T_eff, Ws,
-                        stationary, rad)
+                        Wk, spatial_weights, stationary, rad)
 end
 
-# Build A_l = sum_k phi[k+1,l] W^k as a dense matrix (N is panel-sized, so
-# the companion eigenproblem is the binding cost, not this).
-function _star_A(phi::Matrix{T}, W::AbstractSparseMatrix{T}, N::Int,
-                 S::Int, l::Int) where {T}
+# Build A_l = sum_k phi[k+1,l] W^(k) as a dense matrix (N is panel-sized,
+# so the companion eigenproblem is the binding cost, not this). The W^(k)
+# are taken from the model rather than recomputed, which is what keeps the
+# :powers and :orders conventions from diverging between the design and
+# everything built on top of it.
+function _star_A(phi::Matrix{T}, Wk::Vector{SparseMatrixCSC{T, Int}},
+                 N::Int, S::Int, l::Int) where {T}
     A = zeros(T, N, N)
-    Wk = Matrix{T}(I, N, N)
     for k in 0:S
-        A .+= phi[k + 1, l] .* Wk
-        k < S && (Wk = Matrix(W) * Wk)
+        A .+= phi[k + 1, l] .* Matrix(Wk[k + 1])
     end
     return A
 end
 
-function _star_spectral_radius(::Vector{Matrix{T}}, phi::Matrix{T},
-                               W::AbstractSparseMatrix{T}, N::Int,
+function _star_spectral_radius(Wk::Vector{SparseMatrixCSC{T, Int}},
+                               phi::Matrix{T}, N::Int,
                                S::Int, L::Int) where {T}
-    As = [_star_A(phi, W, N, S, l) for l in 1:L]
+    As = [_star_A(phi, Wk, N, S, l) for l in 1:L]
     if L == 1
         return T(maximum(abs, eigvals(As[1])))
     end
@@ -900,7 +1002,7 @@ function space_time_irf(m::STARModel{T}; horizon::Int = 10,
     horizon >= 0 || throw(ArgumentError(
         "space_time_irf: horizon must be ≥ 0, got $horizon"))
     N, S, L = m.N, m.spatial_lags, m.temporal_lags
-    As = [_star_A(m.phi, m.W, N, S, l) for l in 1:L]
+    As = [_star_A(m.phi, m.Wk, N, S, l) for l in 1:L]
 
     psi = Vector{Matrix{T}}(undef, horizon + 1)
     psi[1] = Matrix{T}(I, N, N)
@@ -995,7 +1097,7 @@ function spatial_forecast(m::STARModel{T}, X_future::AbstractMatrix{T};
         "stationary (spectral radius $(round(m.spectral_radius, digits = 4)))," *
         " so these forecasts diverge with the horizon."
 
-    As = [_star_A(m.phi, m.W, N, S, l) for l in 1:L]
+    As = [_star_A(m.phi, m.Wk, N, S, l) for l in 1:L]
     c = m.intercept
 
     # hist[:, l] is y at lag l relative to the next period to forecast.

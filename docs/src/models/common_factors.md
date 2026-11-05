@@ -159,7 +159,7 @@ reproduces `fit_spatial_panel` with the log-likelihood agreeing to
 autoregression,
 
 ```
-yₜ = Σₖ Σₗ φₖₗ Wᵏ yₜ₋ₗ + Xₜβ + εₜ
+yₜ = Σₖ Σₗ φₖₗ W⁽ᵏ⁾ yₜ₋ₗ + Xₜβ + εₜ
 ```
 
 Every spatial lag is also *temporally* lagged, so all regressors are
@@ -177,8 +177,55 @@ exactly the boundary; drop the normalisation and the same coefficients
 diverge at `|a| + |b| = 0.8`, because the spectrum then reaches 3.65 on the
 same lattice. With `L > 1` there is no coefficient sum to check at all.
 
+That companion form is the same statement as the paper's own stationarity
+condition, which is determinantal: every `x` solving
+`det[xᴸ I − Σₗ Aₗ xᴸ⁻ˡ] = 0` lies inside the unit circle. Evaluating that
+determinant *at* the companion eigenvalues gives a maximum modulus of
+**6.6e-27**, so the two are not merely compatible — they are checked
+against each other.
+
+### `W⁽ᵏ⁾`: powers of `W`, or order-`k` neighbours?
+
+`spatial_weights` chooses what `W⁽ᵏ⁾` means:
+
+| value | `W⁽ᵏ⁾` | |
+|---|---|---|
+| `:powers` (default) | `Wᵏ` | matrix powers |
+| `:orders` | [`order_weights`](@ref)`(W, k)` | **Pfeifer & Deutsch's definition** |
+
+The paper defines a spatial lag operator whose weights are non-zero only
+between `k`th-order *neighbours*, each matrix row-standardised in its own
+right. `Wᵏ` is a different object: it counts walks, is non-zero on its own
+diagonal, and double-counts paths. The default is `:powers` because that is
+what this function has always computed and what its tests pin — a citation
+read more carefully is not a reason to change the arithmetic under a user
+who has shipped results.
+
+**The two coincide at `k = 0` and `k = 1`**, so at the default
+`spatial_lags = 1` the choice is vacuous: coefficients, log-likelihood and
+spectral radius agree to **0.000e+00**, and the test asserts `==` rather
+than a tolerance.
+
+They diverge from `k = 2`. On a 5×4 rook lattice the order-2 matrix has
+**92** non-zeros with **none on the diagonal**, while `W²` has **112** with
+**20** on the diagonal. A lattice has no triangles, so every length-2 walk
+between distinct sites joins a distance-2 pair and the off-diagonal
+supports agree exactly (112 − 20 = 92). The whole difference is that `W²`
+puts weight on **the unit itself** and offers it as a second-order spatial
+lag. Fitting the same data both ways, the coefficient on that term is
+−0.1069 under `:powers` against −0.0528 under `:orders` — it roughly
+halves, because under `:powers` it is partly picking up an own-lag effect
+that `y(t-1)` is already in the design to carry. Coefficient names record
+which you got: `W^2 y(t-1)` against `W⁽²⁾ y(t-1)`.
+
+The two conventions also fail differently, and each reports its own
+diagnosis. Under `:orders`, `S` past the graph's diameter makes some
+`W⁽ᵏ⁾` empty and the refusal names the diameter. Under `:powers` the same
+`S` is refused for rank deficiency instead, because `Wᵏ` becomes dependent
+on lower powers.
+
 [`space_time_irf`](@ref) traces a shock through both dimensions,
-`Ψ₀ = I`, `Ψₕ = Σₗ Aₗ Ψₕ₋ₗ` with `Aₗ = Σₖ φₖₗ Wᵏ`, splitting each horizon
+`Ψ₀ = I`, `Ψₕ = Σₗ Aₗ Ψₕ₋ₗ` with `Aₗ = Σₖ φₖₗ W⁽ᵏ⁾`, splitting each horizon
 into an own effect and a spillover. Summed over horizons it converges to
 the long-run multiplier `(I − ΣₗAₗ)⁻¹`, which is the identity it is tested
 against — agreement to `1.1e-15`.
@@ -216,6 +263,9 @@ omitting them throws rather than defaulting to zero.
   967–1012.
 - Pesaran, M. H. (2015). Testing weak cross-sectional dependence in large
   panels. *Econometric Reviews*, 34(6–10), 1089–1117.
+- Anselin, L., & Smirnov, O. (1996). Efficient algorithms for constructing
+  proper higher order spatial lag operators. *Journal of Regional Science*,
+  36(1), 67–89.
 - Pfeifer, P. E., & Deutsch, S. J. (1980). A three-stage iterative
   procedure for space-time modeling. *Technometrics*, 22(1), 35–47.
 - Shi, W., & Lee, L. F. (2017). Spatial dynamic panel data models with

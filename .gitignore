@@ -23,3 +23,7 @@ _backup*/
 # CI scratch environment for the extension tests
 ext-test-env/
 benchmark/results/
+
+# Primary sources read for the roadmap and the ledger. Local copies of
+# published papers -- never redistributed with the package.
+ExtRef/

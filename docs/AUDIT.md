@@ -3408,16 +3408,206 @@ its printed form is the heterogeneous one. No **`p > 1` worked example**, though
 implemented and now tested — see below; the sentence that first stood here
 claimed it was tested when it was not.
 
-**Pfeifer and Deutsch (1980)**, *Technometrics* 22(1), 35–47, could not be
-read. tandfonline returns 403 to automated access and JSTOR returns an
-interstitial, the same wall as the `stpca` sources. The open question it
-would settle is whether STARMA's `W⁽ˡ⁾` means order-`l` neighbourhoods
-rather than powers of `W`, which bears on `fit_star`'s docstring
-attribution and not on its behaviour: the two conventions **agree at
-`l = 0` and `l = 1` and diverge only at `S ≥ 2`**, and `spatial_lags = 1`
-is the default. The question is recorded as open rather than answered from
-recollection, which is the rule that caught the LeSage & Pace chapter error
-and the Ertur & Musolesi attribution gap. `order_weights_list` now exists,
-so if the answer turns out to be order-`l`, exposing it in `fit_star` is an
-option rather than a rewrite — and it would be filed as its own row, since
-shipped tested behaviour does not change silently to match a citation.
+## Pfeifer and Deutsch (1980): the question is now answered, and the answer was no
+
+This was logged as **open** one commit ago. tandfonline returned 403 to
+automated access and JSTOR an interstitial, the same wall as the `stpca`
+sources, so rather than answer it from recollection the ledger recorded the
+question and asked for the paper. The user supplied the authors' own
+reprint (NCJRS 60692, *Technometrics* 22(1), 35–47) and it was read.
+
+**The answer is order-`k` neighbourhoods, not powers.** Their Section 2
+defines a spatial lag operator `L⁽ᵏ⁾ z = W⁽ᵏ⁾ z` whose weights are
+"nonzero only if sites `i` and `j` are `k`th order neighbors", with each
+`W⁽ᵏ⁾` row-standardised in its own right and `W⁽⁰⁾ = I`; their Figure 1
+draws the first four orders as successively more distant rings around a
+site, for a lattice and for a line. The word *power* does not appear in the
+paper. `fit_star` has always computed `Wᵏ`.
+
+So the attribution was **inexact**, in the same weaker class as the
+LeSage & Pace chapter error and the Ertur & Musolesi attribution gap: the
+code did something defensible and cited a paper that specifies something
+else. It is weaker still than those two, because the default path was never
+affected.
+
+### What the discrepancy is worth, measured
+
+The two conventions coincide at `k = 0` and `k = 1`, so at the default
+`spatial_lags = 1` there is nothing to choose. Measured on a 5×4 rook
+lattice (`N = 20`, row-standardised, `T = 40`), fitting the same data both
+ways:
+
+| | `:powers` | `:orders` |
+|---|---|---|
+| `S = 1`: max abs coefficient difference | — | **0.000e+00** |
+| `S = 1`: log-likelihood difference | — | **0.000e+00** |
+| `S = 1`: spectral-radius difference | — | **0.000e+00** |
+| `S = 1`: `max abs(W⁽¹⁾ − W)` | — | **0.000e+00** |
+| `S = 2`: non-zeros in the order-2 matrix | 112 | 92 |
+| `S = 2`: non-zeros on its diagonal | **20** | **0** |
+| `S = 2`: coefficient on the order-2 term | −0.1069 | −0.0528 |
+| `S = 2`: log-likelihood | −1108.8118 | −1109.3331 |
+
+The `S = 1` column is zero to the last bit, not merely small, and the test
+asserts `==` rather than a tolerance — a tolerance there would hide the
+case where `:orders` rebuilds `W` slightly differently instead of
+reproducing it.
+
+The `S = 2` row that matters is the **diagonal**: 20 non-zeros against 0.
+A rook lattice has no triangles, so every length-2 walk between distinct
+sites joins a distance-2 pair, and the off-diagonal supports agree exactly
+(112 − 20 = 92, asserted as such). The *entire* difference on this graph
+is that `W²` puts weight on **the unit itself** and offers it as a
+second-order spatial lag. The coefficient then halves, −0.1069 to
+−0.0528, because under `:powers` it is partly estimating an own-lag effect
+that `y(t-1)` is already in the design to carry.
+
+### What was changed, and what was not
+
+`fit_star` gained `spatial_weights = :powers | :orders`. **The default is
+`:powers`**, which is the arithmetic the function has always done and which
+its tests pin. A citation being read more carefully is not a reason to
+change the numbers under a user who has already shipped results; the
+paper's own model is now available to anyone who wants it, and the
+coefficient names say which was fitted (`W^2 y(t-1)` against
+`W⁽²⁾ y(t-1)`), as does `show`.
+
+The weight matrices are now **stored on the model** rather than rebuilt
+downstream. That is the substantive internal change: `_star_A` previously
+re-derived `Wᵏ` from `m.W`, so an IRF, a forecast and a spectral radius
+could in principle have disagreed with the design about which convention
+was fitted. They now cannot, and the long-run multiplier is the gate that
+proves it — `Σ_h Ψ_h` against `(I − Σ_l A_l)⁻¹` under `:orders`:
+
+| | max abs difference |
+|---|---|
+| `S = 2, L = 1` | 6.661e-16 |
+| `S = 2, L = 2` | 8.882e-16 |
+| `S = 3, L = 2` | 1.332e-15 |
+
+### A second thing the paper settled, which was not the question
+
+Pfeifer & Deutsch state stationarity **determinantally**: every `x` solving
+`det[xᴸ I − Σ_l A_l xᴸ⁻ˡ] = 0` must lie inside the unit circle. This
+package reports a **companion spectral radius** instead, which is the same
+statement but had never been checked against the source's form. It is now:
+evaluating the paper's determinant *at* the companion eigenvalues gives a
+maximum modulus of **1.096e-25** under `:powers` and **6.620e-27** under
+`:orders` — it vanishes, as it must. The companion radius also matches
+`max|eigenvalue|` to `rtol = 1e-10`. This gate exists only because the
+paper was read; it was not available while the reference was unverified,
+and nothing had motivated it.
+
+### The failure modes differ, and each path reports its own
+
+Past the graph's diameter an order matrix is **empty**, so under `:orders`
+the refusal comes from `order_weights_list` and names the diameter: on this
+lattice, `S = 20` is refused with *the largest component's diameter is 7,
+so s ≤ 7*. Under `:powers` the same `S` fails for an unrelated reason —
+rank deficiency, since `Wᵏ` becomes dependent on lower powers. Both are
+refused; the test asserts that each path reports its own diagnosis rather
+than the other's, since a shared message would have been the easy mistake.
+
+**The lesson is about the asking, not the answer.** The rule that produced
+this was: when a publisher blocks automated access, record the question as
+open and ask for the source rather than guess. Had the convention been
+guessed either way, the guess would have gone into a docstring with a
+citation attached and been indistinguishable from a verified one. Asking
+cost one line in this ledger for one commit, and the answer turned out to
+be the one that made the citation wrong.
+
+## Liang, Gao and Gong (2022): verified as a record, wrong as a method
+
+The same session obtained a second blocked source, and it produced a worse
+finding than the first.
+
+`ROADMAP.md` had named **Liang, Gao & Gong (2022)**, *JBES* 40(4),
+1784–1802, as "the published method" for **time-varying `ρ`**. That claim
+was written one commit earlier, when row 22's `ρ_t` deliverable was moved to
+item #13. It is **false**.
+
+The paper's model is its eq (2.1):
+
+```
+Y_it = ρ₀ Σ_j w_ij Y_jt + X_it' β₀(τ) + α₀ᵢ + e_it
+```
+
+`ρ₀` is a **scalar constant** — the paper calls it the parameter measuring
+the strength of spatial dependence, with no time index. What varies is
+`β₀(τ)`, the vector of regressor coefficients, as an unknown smooth function
+of rescaled time `τ = t/T`. The paper states the limitation itself, in its
+introduction: a nonparametric spatial lag term would be less restrictive,
+since spatial dependence probably does change over time too, but the lag is
+endogenous and they leave that to future work.
+
+So the roadmap had cited, as the solution to time-varying `ρ`, a paper
+whose authors list time-varying `ρ` as a problem they did not solve.
+
+### Why it got through, which is the part worth keeping
+
+The reference entry carried the marker **"Title, journal, volume, issue,
+pages and DOI verified"**, and every one of those was correct. The text was
+paywalled on tandfonline, and the entry said an open version existed and
+could be read "when #13 is built". That deferral is where the error lived:
+
+**Verifying that a paper exists as cited is not verifying that it does what
+you say it does.** The first check had been performed and recorded; the
+second had not been performed and was not recorded as missing, because the
+verification marker made the entry *look* checked. A bibliographic marker
+answers "is this citation real", and the roadmap was using it to answer "is
+this citation apt".
+
+This is the **fourth citation in this project to fail on contact** and the
+first to fail on content:
+
+| | source | how it failed |
+|---|---|---|
+| 1 | LeSage & Pace (2009) | wrong chapter cited |
+| 2 | Cerqua et al. (2022) | **does not exist** as described |
+| 3 | Pfeifer & Deutsch (1980) | real and apt, but defines `W⁽ᵏ⁾` differently than the code computed |
+| 4 | Liang, Gao & Gong (2022) | real, correctly cited, **wrong method for the row** |
+
+Numbers 2 and 4 were both reached through a secondary summary or an
+abstract rather than the model equations. Number 4 is the more dangerous
+shape, because nothing about the citation is incorrect — a reader checking
+it against the published record would find it clean.
+
+### What changed
+
+- Item #13 now has **two** rows where it had one: a **time-varying `β(τ)`**
+  row, which Liang/Gao/Gong does source and which is worth building, with
+  the `√(NT)` and `√(NTh)` rates recorded; and a **time-varying `ρ_t`**
+  row marked unsourced and deliberately not scheduled.
+- Row 22's moved-to line records the withdrawn citation rather than
+  silently dropping it, as the Cerqua withdrawal was recorded.
+- The reference entry now says what the paper's model actually is, and that
+  MPRA 108497 and Monash WP 05/21 are **the same document** — both cover
+  pages sit in the one deposit, so the "two open versions" were one.
+- The move of `ρ_t` to #13 **stands**. LLQML genuinely shares a
+  kernel-weighted concentrated likelihood with #13's Su & Jin (2010)
+  partially linear model, so the row is in the right place. What was wrong
+  was the claim attached to it, not its address.
+
+### The standing rule gains a clause
+
+The existing rule is that references are verified against the published
+record before use. That is now insufficient as stated, and the rule reads:
+
+> A reference is **verified** when its bibliographic record matches the
+> published one. It is **read** when the specification it is cited for has
+> been seen in the paper's own equations. A roadmap row may cite only a
+> **read** source, and a verified-but-unread source must be marked as such
+> in the row, not only in the reference list.
+
+Three sources in this project were marked verified-but-unread at some
+point: Krzyśko et al. (`stpca`), Pfeifer & Deutsch, and Liang/Gao/Gong.
+All three have now been read, and **two of the three did not say what the
+roadmap said they said.**
+
+The five primary sources that are hard to reach — the two Krzyśko papers,
+Pfeifer & Deutsch, Di Giacinto and Liang/Gao/Gong — are now kept as local
+copies in an untracked `ExtRef/` folder, named by author, year, journal,
+volume, issue and pages, with an index recording each one's provenance.
+`.gitignore` excludes it: these are copyrighted works held for reading, not
+redistributed with the package. The point is that the next check is a file
+open rather than a fetch attempt against a publisher that refuses them.

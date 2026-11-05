@@ -9,8 +9,8 @@ models, HAC-robust inference, weight-matrix construction, input-output
 calibration, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.3.0** — 3,718 test assertions across 56 top-level testsets
-> with both package extensions installed, and 3,683 without them. Every
+> **Version 0.3.0** — 3,750 test assertions across 56 top-level testsets
+> with both package extensions installed, and 3,715 without them. Every
 > testset reports an identical count on Julia 1.13.3 and 1.10.13. See
 > [Validation Status](#validation-status) for Monte Carlo results.
 

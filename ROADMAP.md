@@ -2,8 +2,8 @@
 
 > **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
 >
-> 28 submodules, 3,718 test assertions in 56 top-level testsets with both
-> package extensions installed and 3,683 without them — the same counts on
+> 28 submodules, 3,750 test assertions in 56 top-level testsets with both
+> package extensions installed and 3,715 without them — the same counts on
 > Julia 1.13.3 and 1.10.13, since the difference is the extensions and not
 > the version. 29 examples, 12 notebooks, 2 package extensions, CI/CD and
 > 56 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
@@ -874,10 +874,10 @@ and the identification machinery the estimate did not anticipate.
 
 | Feature | Description | Reference | Status |
 |---|---|---|---|
-| STAR model | Space-Time Autoregressive: `y_t = Σ_k ρ_k W^k y_{t-1} + Xβ + ε` with higher-order spatial and temporal lags | Pfeifer & Deutsch (1980) | ✅ |
+| STAR model | Space-Time Autoregressive: `y_t = Σ_k φ_k W⁽ᵏ⁾ y_{t-l} + Xβ + ε` with higher-order spatial and temporal lags. `W⁽ᵏ⁾` is `Wᵏ` by default, or the order-`k` neighbour matrix — the paper's own definition — under `spatial_weights = :orders` | Pfeifer & Deutsch (1980) — **verified, read in full from the authors' reprint (NCJRS 60692)** | ✅ |
 | SpVAR | Spatial Vector Autoregression: multivariate spatial panel VAR with impulse response functions | Di Giacinto (2010) — **verified, read in full from Banca d'Italia Temi di discussione 746** | ✅ |
 | Space-time impulse response | Trace the propagation of a shock through space and time; compute cumulative spatial multipliers | LeSage & Pace (2009) | ✅ |
-| Time-varying spatial effects | Allow `ρ_t` to change over time. **Moved to [#13](#13-semiparametric-spatial)** — the published method is local-linear concentrated QML, which shares its kernel-weighted likelihood with #13's partially linear model | Liang, Gao & Gong (2022) | ➡️ **moved to #13** |
+| Time-varying spatial effects | Allow `ρ_t` to change over time. **Moved to [#13](#13-semiparametric-spatial)**, and **still unsourced there.** Liang, Gao & Gong (2022) was cited here for one commit as "the published method"; reading it showed its `ρ` is a **scalar constant** and only the regressor coefficients vary with time. That paper names a time-varying spatial lag as future work it did not attempt, because the lag is endogenous. See `docs/AUDIT.md` | — (the earlier citation was withdrawn) | ➡️ **moved to #13, unsourced** |
 | Forecasting | `spatial_forecast(m, X_future, W; h=5)` — h-step ahead spatial panel forecasts | — | ✅ |
 | Interactive fixed effects with spatial lags | Joint estimation of a factor structure `λᵢ'f_t` alongside `Wy` and `WX`, separating genuine spatial interaction from global shocks | Bai (2009); Shi & Lee (2017) | ✅ |
 
@@ -932,11 +932,23 @@ staying here. Its roadmap entry was unsourced — reference column `—`, method
 given as "state-space or rolling-window" — and there is no published
 treatment of `ρ_t` as a latent state for spatial panels; the obstacle is
 structural, since `ρ` enters the likelihood nonlinearly through
-`log|I − ρₜ W|`. Building it here would have meant inventing a method. The
-published approach is Liang, Gao & Gong (2022), local-linear concentrated
-QML, which belongs beside #13's Su & Jin (2010) partially linear model:
-both are concentrated QML with a nonparametric component, and built apart
-the kernel-weighted likelihood gets written twice.
+`log|I − ρₜ W|`. Building it here would have meant inventing a method.
+
+**The replacement citation was also wrong, and lasted one commit.** This
+paragraph previously named Liang, Gao & Gong (2022) as "the published
+approach" for `ρ_t`. The paper was then obtained and read. Its model is
+`Y_it = ρ₀ Σ_j w_ij Y_jt + X_it' β₀(τ) + α₀ᵢ + e_it`: **`ρ₀` is a scalar
+constant** and only the regressor coefficients are time-varying. The paper
+states the limitation itself — a nonparametric spatial lag term would be
+less restrictive, since spatial dependence probably does change over time,
+but the lag is endogenous and they leave it to future work. So it is the
+sourced method for **time-varying `β`**, which is a worthwhile row in its
+own right, and **not** for time-varying `ρ`, which remains unsourced.
+
+The move to #13 still stands, because local-linear concentrated QML does
+share a kernel-weighted likelihood with #13's Su & Jin (2010) partially
+linear model, and built apart that machinery gets written twice. What
+changed is the row's claim, not its address.
 
 **Dependencies:** None
 
@@ -951,7 +963,8 @@ the kernel-weighted likelihood gets written twice.
 | Feature | Description | Reference |
 |---|---|---|
 | Partially linear spatial model | `y = ρWy + Xβ + f(z) + ε` where f(z) is estimated nonparametrically (kernel or P-spline) | Su & Jin (2010) |
-| Time-varying spatial dependence | `ρ_t` by local-linear concentrated QML. **Moved here from [#12](#12-spatio-temporal-models)**, where it sat unsourced: `ρ` enters the likelihood through `log|I − ρₜ W|`, so a state-space treatment would need a filter nobody has worked out for this model. The published method shares its kernel-weighted concentrated likelihood with the partially linear row above, so the two should be built together | Liang, Gao & Gong (2022) |
+| Time-varying coefficients `β(τ)` | `y_t = ρWy_t + X_tβ(τ) + α_i + ε_t` with `β(·)` an unknown smooth function of rescaled time, by **local-linear concentrated QML** (LLQML). `ρ` is a constant here. Parametric components converge at `√(NT)`, the nonparametric ones at `√(NTh)`. Shares its kernel-weighted concentrated likelihood with the partially linear row above, so the two should be built together | Liang, Gao & Gong (2022) — **verified, read from MPRA 108497 / Monash WP 05/21** |
+| Time-varying spatial dependence `ρ_t` | **Unsourced, and deliberately not scheduled.** Moved here from [#12](#12-spatio-temporal-models) with a citation that did not survive reading — see the note under row 22. `ρ` enters the likelihood through `log\|I − ρₜ W\|` and the lag is endogenous, which is why the literature has not settled it; Liang, Gao & Gong name it as their own future work. Nothing is built until there is a method to follow | — |
 | Spatial quantile regression | Effects vary across the conditional distribution: `Q_τ(y \| X, W) = ρ_τ Wy + Xβ_τ` | Kostov (2009) |
 | Spatial varying coefficient model | Generalization of GWR with penalized spline smoothing — avoids GWR's boundary bias and bandwidth sensitivity | Hastie & Tibshirani (1993); Geniaux & Martinetti (2017) |
 | Penalized spatial regression | LASSO / elastic net with spatial lag: variable selection in high-dimensional spatial models | Liu & Yang (2020) |
@@ -1164,9 +1177,16 @@ decision, recorded here so the scope reduction was visible in the plan
 rather than only in the ledger. On the same day the row was reopened, and
 reading the sources changed its shape: **SpVAR was built** (Di Giacinto
 2010, verified and read in full), and **time-varying `ρ` moved to #13**
-because its roadmap entry was unsourced and the published method — Liang,
-Gao & Gong (2022), local-linear concentrated QML — shares a kernel-weighted
-likelihood with #13's partially linear model.
+because its roadmap entry was unsourced.
+
+**And then the replacement citation failed too.** The move named Liang,
+Gao & Gong (2022) as the published method for `ρ_t`. Its bibliographic
+record had been verified — title, journal, volume, issue, pages, DOI, all
+correct — but the **paper itself had not been read**, because tandfonline
+is paywalled and the open version was left for "when #13 is built". When it
+was finally obtained, its `ρ` turned out to be a scalar constant. Verifying
+that a paper *exists as cited* is not verifying that it *does what you say
+it does*, and the first check had been mistaken for the second.
 
 The lesson is worth keeping: **a deferred row is not a frozen row.** Row
 22's original description proposed "state-space or rolling-window" for
@@ -1207,12 +1227,13 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #11 networks, so Phase 7A complete) | 25 | 3,217 † | 20,289 |
 | **master** (+ #1 and #12, so Phase 7B half done) | 27 | 3,415 † | 22,577 |
 | **master** (+ row 22 SpVAR, so Phase 7B mostly done) | 28 | 3,718 † | 24,151 |
-| **v0.4.0** (= master today, unreleased) | 28 | 3,718 † | 24,151 |
+| **master** (+ Pfeifer & Deutsch read: STAR `spatial_weights`) | 28 | 3,750 † | 24,253 |
+| **v0.4.0** (= master today, unreleased) | 28 | 3,750 † | 24,253 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
-Measured on master: 28 submodules plus the umbrella across 24,151 lines of
-`src/`, 9,303 lines of tests, 4,750 lines of examples across 29 scripts,
+Measured on master: 28 submodules plus the umbrella across 24,253 lines of
+`src/`, 9,457 lines of tests, 4,750 lines of examples across 29 scripts,
 398 lines of package extensions, 56 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
 
@@ -1248,21 +1269,21 @@ before reading the primary source does not know how much of the paper will
 turn out to be load-bearing.
 
 **State the environment with the assertion count.** The figures above are
-3,718 with Makie and Turing **loadable**, where testsets 25 and 26
-contribute 11 and 24 assertions, and 3,683 with both **absent**, where each
+3,750 with Makie and Turing **loadable**, where testsets 25 and 26
+contribute 11 and 24 assertions, and 3,715 with both **absent**, where each
 reports a single broken marker instead of running. Both were measured in the
 repository working tree, which matters — see the correction below. That
-difference is 35 passing assertions — 3,683 + 11 + 24 = 3,718, the two
+difference is 35 passing assertions — 3,715 + 11 + 24 = 3,750, the two
 broken markers being replaced rather than added, which is why the arithmetic
 is 35 and not 33. A count quoted without its environment can therefore look
 like a regression when nothing has regressed.
 
 **And state the entry point, which is easy to invert.** `Pkg.test()` is the
 command that genuinely **excludes** the extensions, so it is the one
-reporting the *lower* figure, 3,683 plus two broken markers — measured
+reporting the *lower* figure, 3,715 plus two broken markers — measured
 separately on 1.13.3 and 1.10.13 and identical on both. Running
 `test/runtests.jl` directly from `test/` leaves `@v1.13` on `LOAD_PATH`,
-the extensions load, and the total is 3,718 with no broken entries. The
+the extensions load, and the total is 3,750 with no broken entries. The
 intuition that the more isolated-sounding command gives the higher number
 is backwards.
 
@@ -1306,7 +1327,7 @@ and that block holds exactly six assertions — one `@test_logs` guarding
 testset 11b reports **12 in the repository and 6 in a `src`-and-`test`-only
 copy**. `notebooks/data/columbus.csv` is tracked, so CI always has it, and
 the extensions-absent figure CI sees is the in-repository one — 2,395 then,
-3,683 now — never the copy's.
+3,715 now — never the copy's.
 
 Two consequences for anyone measuring this suite. A scratch copy must
 include `notebooks/data/` to be comparable with the repository at all. And
@@ -1345,7 +1366,17 @@ the whole suite down. The intermediate figures were 255 and 284, as subsets
 `40a2` (`binary = false`) and `40n` (`p > 1`, `rho_bounds`) were added on
 finding those options untested. So nothing elsewhere was quietly adjusted,
 even though this pass touched `src/SpatialWeights.jl` to add
-`order_weights`. So the two new
+`order_weights`.
+
+**The Pfeifer & Deutsch step balances as well**, and this one is the
+tightest of the three because the pass changed shipped code rather than
+only adding to it. 3,683 to 3,715 without the extensions is 32, and testset
+`39j` holds 32 assertions — 30 written lines, one of which sits in a
+two-iteration loop over both weight conventions. That matters here: the
+pass moved `fit_star`'s weight matrices onto the model and rewrote
+`_star_A`'s signature, so a step that balances is the evidence that
+testsets 39a–i, which exercise the old path, still run and still count the
+same. So the two new
 rows are purely additive and nothing elsewhere in the suite was quietly
 adjusted. That is worth one line of arithmetic: this pass touched two new
 submodules, the umbrella, `docs/make.jl` and two new doc pages, and a step
@@ -1436,14 +1467,14 @@ development line rather than across three releases.
 - LeSage, J. P. (2014). Spatial econometric panel data model specification: A Bayesian approach. *Spatial Statistics*, 9, 122–145.
 - LeSage, J. P. (2015). Software for Bayesian cross section and panel spatial model comparison. *Journal of Geographical Systems*, 17(4), 297–310.
 - LeSage, J., & Pace, R. K. (2009). *Introduction to Spatial Econometrics*. CRC Press.
-- Liang, X., Gao, J., & Gong, X. (2022). Semiparametric spatial autoregressive panel data model with fixed effects and time-varying coefficients. *Journal of Business & Economic Statistics*, 40(4), 1784–1802. doi:10.1080/07350015.2021.1979564. Title, journal, volume, issue, pages and DOI **verified**; the text itself is paywalled on tandfonline, but an open version circulates as Monash Econometrics and Business Statistics Working Paper 05/21 and MPRA Paper 108497, so it can be read from the source when #13 is built.
+- Liang, X., Gao, J., & Gong, X. (2022). Semiparametric spatial autoregressive panel data model with fixed effects and time-varying coefficients. *Journal of Business & Economic Statistics*, 40(4), 1784–1802. doi:10.1080/07350015.2021.1979564. **Verified and read**, from MPRA Paper 108497 — which is the same document as Monash Econometrics and Business Statistics Working Paper 05/21, both cover pages being in the one deposit, so the "two open versions" listed here previously were one. The model is eq (2.1): the **time-varying coefficients are the regressor coefficients `β₀(τ)`, while `ρ₀` is a scalar constant.** This reference therefore supports a time-varying-`β` row and **not** the time-varying-`ρ` row it was briefly attached to; see `docs/AUDIT.md`.
 - Liu, X., & Yang, Z. (2020). Variable selection in spatial autoregressive models. *Journal of Econometrics*, 218(1), 85–109.
 - Manski, C. F. (1993). Identification of endogenous social effects: The reflection problem. *Review of Economic Studies*, 60(3), 531–542.
 - Murakami, D., & Griffith, D. A. (2015). Random effects specifications in eigenvector spatial filtering. *Journal of Geographical Systems*, 17(4), 311–331.
 - Mutl, J., & Pfaffermayr, M. (2011). The Hausman test in a Cliff and Ord panel model. *Econometrics Journal*, 14(1), 48–76.
 - Pesaran, M. H. (2006). Estimation and inference in large heterogeneous panels with a multifactor error structure. *Econometrica*, 74(4), 967–1012.
 - Pesaran, M. H. (2015). Testing weak cross-sectional dependence in large panels. *Econometric Reviews*, 34(6–10), 1089–1117.
-- Pfeifer, P. E., & Deutsch, S. J. (1980). A three-stage iterative procedure for space-time modeling. *Technometrics*, 22(1), 35–47.
+- Pfeifer, P. E., & Deutsch, S. J. (1980). A three-stage iterative procedure for space-time modeling. *Technometrics*, 22(1), 35–47. **Verified**; read in full from the authors' reprint, NCJRS 60692, after tandfonline and JSTOR both refused automated access. Their spatial lag operator is defined on order-`k` neighbourhoods, not powers of `W` — see `docs/AUDIT.md`.
 - Qu, X., & Lee, L. F. (2015). Estimating a spatial autoregressive model with an endogenous spatial weight matrix. *Journal of Econometrics*, 184(2), 209–232.
 - Santi, F., Dickson, M. M., Espa, G., Taufer, E., & Mazzitelli, A. (2021). Handling spatial dependence under unknown unit locations. *Spatial Economic Analysis*, 16(2), 194–216.
 - Shi, W., & Lee, L. F. (2017). Spatial dynamic panel data models with interactive fixed effects. *Journal of Econometrics*, 197(2), 323–347.
