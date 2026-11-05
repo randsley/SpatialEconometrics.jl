@@ -3823,3 +3823,60 @@ hopeless for the log-determinant — at `N = 1600` the noise is about
 sufficient for the estimate, where `S = 50` already gives 1e-04. The
 roadmap's parked SLQ row is now closed on measured grounds rather than left
 open on plausible ones.
+
+### The survey from the other ecosystem, and the graphs it uses
+
+**Bivand (2010)**, *Computing the Jacobian in spatial models: an applied
+survey*, NHH Discussion Paper SAM 20/2010, was supplied and read. Bivand
+wrote R's `spdep`, so this is the same question answered inside the
+environment most spatial econometrics is done in. Three things it settles.
+
+**It confirms the implementation.** Bivand gives the Chebyshev form as
+`log|I − αW| ≈ Σ_j c_j(α) tr(T_{j−1}(W)) − (n/2) c_1(α)`. The package halves
+the `k = 0` coefficient, which is algebraically that correction term. The
+implementation matches the published formula rather than a paraphrase of it.
+
+**There is a published recommendation against this method, and it is
+wrong.** Walde, Larch and Tappeiner (2008) advise against the Chebyshev
+approximation. Bivand notes they "only tried `q = 2`", shows `q = 5`
+performs well, and footnotes that a correction to that paper was to be
+submitted after collaboration "in throwing light on a number of
+counter-intuitive conclusions". The package's default is order 6. Had the
+roadmap taken Walde et al. at face value, the package would have dropped a
+sound method on an under-powered test — the same failure mode as citing a
+paper for a method it does not contain, arriving from the opposite
+direction.
+
+**Its graphs are not ours.** All six of Bivand's data sets have "multiple
+disjoint connected subgraphs, including islands with no neighbours", and his
+Table 6 reports Jacobian differences in the hundreds, to −1742 on the Lucas
+County housing data. Every graph benchmarked above was connected. So the
+gap was closed:
+
+| graph | N | zero rows | components | q=6 err at ρ=0.9 | at ρ=0.99 |
+|---|---|---|---|---|---|
+| connected 50×50 lattice | 2500 | 0 | 1 | 7.87e-01 | 4.46e+00 |
+| 5 blocks of 22×22 | 2420 | 0 | 5 | 6.77e-01 | 1.70e+00 |
+| 5 blocks **+ 80 islands** | 2500 | 80 | 5 | 6.77e-01 | 1.70e+00 |
+| 20 blocks **+ 480 islands** | 2900 | 480 | 20 | 4.56e-01 | 5.13e+00 |
+
+**Islands change nothing at all** — the island and no-island rows agree to
+four significant figures, because an island is a zero row, contributes an
+eigenvalue of 0, and `log(1 − ρ·0) = 0`, which the traces absorb exactly.
+Fragmentation does not degrade the approximation either; it mildly improves
+it at `ρ = 0.9`.
+
+And it still does not reach the estimate:
+
+| graph | ρ | `ρ̂` err q=6 | `ρ̂` err q=12 | log-determinant err q=6 |
+|---|---|---|---|---|
+| connected lattice | 0.9 | 3.8e-04 | 4.5e-06 | 6.96e-01 |
+| 5 blocks + 80 islands | 0.9 | 3.2e-04 | 4.4e-06 | 8.04e-01 |
+| 20 blocks + 480 islands | 0.9 | 9.2e-05 | 9.0e-07 | 4.71e-01 |
+
+So the three-to-four order gap between log-determinant error and `ρ̂` error
+survives disconnection and islands. Bivand's large Jacobian differences are
+explained by low order (`q = 2` and `q = 5` against 6 and 12 here), by much
+larger `N` — the error is a sum over `N` terms — and by the extremes of the
+`ρ` range, which is where his own text says performance falls off and where
+his quoted minima and maxima sit. His medians for `q = 5` are 0.0025 to 7.3.
