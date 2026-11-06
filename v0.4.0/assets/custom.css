@@ -1,0 +1,287 @@
+/*
+ * SpatialEconometrics.jl documentation theme.
+ *
+ * Restrained academic: slate ink, one accent, serif headings, booktabs
+ * rules on tables. Loaded after Documenter's own stylesheet, so the
+ * selectors here only need to match its specificity, not beat it by much.
+ */
+
+:root {
+    --se-ink: #1e293b;
+    --se-ink-soft: #334155;
+    --se-muted: #64748b;
+    --se-rule: #e2e8f0;
+    --se-rule-strong: #94a3b8;
+    --se-accent: #2f4b7c;
+    --se-accent-hover: #1d3357;
+    --se-accent-soft: #e8eef7;
+    --se-surface: #f8fafc;
+    --se-page: #ffffff;
+    --se-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+        Georgia, ui-serif, serif;
+}
+
+html.theme--documenter-dark {
+    --se-ink: #e2e8f0;
+    --se-ink-soft: #cbd5e1;
+    --se-muted: #94a3b8;
+    --se-rule: #3a4452;
+    --se-rule-strong: #64748b;
+    --se-accent: #93b4e3;
+    --se-accent-hover: #bcd2f0;
+    --se-accent-soft: #2b3a52;
+    --se-surface: #282f2f;
+    --se-page: #1f2424;
+}
+
+/* ---------------------------------------------------------------- type */
+
+#documenter .docs-main h1,
+#documenter .docs-main h2,
+#documenter .docs-main h3,
+#documenter .docs-main h4,
+#documenter .docs-main h5 {
+    font-family: var(--se-serif);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--se-ink);
+}
+
+#documenter .docs-main h1 {
+    font-size: 2.1rem;
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid var(--se-rule);
+}
+
+#documenter .docs-main h2 {
+    font-size: 1.5rem;
+    margin-top: 2.2rem;
+}
+
+#documenter .docs-main .content p,
+#documenter .docs-main .content li {
+    color: var(--se-ink-soft);
+    line-height: 1.7;
+}
+
+#documenter .docs-main .content a {
+    color: var(--se-accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+#documenter .docs-main .content a:hover {
+    color: var(--se-accent-hover);
+}
+
+/* -------------------------------------------------------------- tables */
+
+/* Booktabs: horizontal rules only, and heavier ones top and bottom. */
+#documenter .docs-main .content table {
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    border-top: 1.5px solid var(--se-rule-strong);
+    border-bottom: 1.5px solid var(--se-rule-strong);
+}
+
+#documenter .docs-main .content table th {
+    font-family: var(--se-serif);
+    font-weight: 600;
+    color: var(--se-ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--se-rule-strong);
+}
+
+/* Documenter writes an inline `text-align: right` onto every cell of a
+   table whose markdown separator carries no alignment colons, which is
+   all of them, docstring tables included. Only !important reaches past
+   an inline style; cells that genuinely want another alignment should
+   say so with colons in the separator row. */
+#documenter .docs-main .content table th,
+#documenter .docs-main .content table td {
+    text-align: left !important;
+}
+
+#documenter .docs-main .content table td {
+    border: none;
+    border-bottom: 1px solid var(--se-rule);
+    color: var(--se-ink-soft);
+}
+
+#documenter .docs-main .content table tr:last-child td {
+    border-bottom: none;
+}
+
+#documenter .docs-main .content table tr:hover td {
+    background: var(--se-surface);
+}
+
+/* ---------------------------------------------------------------- code */
+
+#documenter .docs-main .content pre {
+    background: var(--se-surface);
+    border: 1px solid var(--se-rule);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+}
+
+#documenter .docs-main .content code {
+    background: var(--se-surface);
+    border: 1px solid var(--se-rule);
+    border-radius: 3px;
+    color: var(--se-ink);
+    font-size: 0.88em;
+    padding: 0.1em 0.35em;
+}
+
+#documenter .docs-main .content pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+}
+
+/* Docstring blocks: lighten the frame, keep the signature prominent. */
+#documenter .docs-main article.docstring {
+    border: 1px solid var(--se-rule);
+    border-radius: 4px;
+}
+
+#documenter .docs-main article.docstring header {
+    background: var(--se-surface);
+    border-bottom: 1px solid var(--se-rule);
+}
+
+/* -------------------------------------------------------- admonitions */
+
+/* Flatten to a left rule rather than a filled card. */
+#documenter .docs-main .admonition {
+    border: 1px solid var(--se-rule);
+    border-left: 3px solid var(--se-rule-strong);
+    border-radius: 3px;
+    box-shadow: none;
+    background: var(--se-page);
+}
+
+#documenter .docs-main .admonition-header {
+    font-family: var(--se-serif);
+    font-weight: 600;
+}
+
+/* ------------------------------------------------------------- sidebar */
+
+#documenter .docs-sidebar {
+    border-right: 1px solid var(--se-rule);
+}
+
+#documenter .docs-sidebar .docs-package-name a {
+    font-family: var(--se-serif);
+    font-weight: 600;
+    color: var(--se-ink);
+}
+
+#documenter .docs-sidebar .docs-menu a.tocitem {
+    color: var(--se-ink-soft);
+    border-left: 3px solid transparent;
+}
+
+#documenter .docs-sidebar .docs-menu a.tocitem:hover {
+    background: var(--se-surface);
+    color: var(--se-ink);
+}
+
+#documenter .docs-sidebar .docs-menu a.tocitem.is-active {
+    background: var(--se-accent-soft);
+    border-left: 3px solid var(--se-accent);
+    color: var(--se-ink);
+    font-weight: 600;
+}
+
+#documenter .docs-navbar {
+    border-bottom: 1px solid var(--se-rule);
+}
+
+/* ------------------------------------------------- landing-page pieces */
+
+#documenter .docs-main .content .se-tagline {
+    font-family: var(--se-serif);
+    font-size: 1.22rem;
+    line-height: 1.6;
+    color: var(--se-muted);
+    max-width: 44rem;
+    margin: 0 0 1.4rem 0;
+}
+
+#documenter .docs-main .content .se-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0 0 2.2rem 0;
+}
+
+#documenter .docs-main .content .se-badge {
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--se-muted);
+    background: var(--se-surface);
+    border: 1px solid var(--se-rule);
+    border-radius: 3px;
+    padding: 0.22rem 0.55rem;
+    white-space: nowrap;
+}
+
+#documenter .docs-main .content .se-badge-accent {
+    color: var(--se-accent);
+    background: var(--se-accent-soft);
+    border-color: var(--se-accent);
+}
+
+#documenter .docs-main .content .se-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+    margin: 1.2rem 0 2rem 0;
+}
+
+#documenter .docs-main .content .se-card {
+    border: 1px solid var(--se-rule);
+    border-top: 2px solid var(--se-accent);
+    border-radius: 4px;
+    padding: 0.9rem 1.1rem 1rem 1.1rem;
+    background: var(--se-page);
+}
+
+#documenter .docs-main .content .se-card h3 {
+    font-family: var(--se-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: var(--se-ink);
+}
+
+#documenter .docs-main .content .se-card ul {
+    margin: 0;
+    padding-left: 1.05rem;
+    list-style: square;
+}
+
+#documenter .docs-main .content .se-card li {
+    font-size: 0.87rem;
+    line-height: 1.55;
+    color: var(--se-ink-soft);
+    margin: 0.15rem 0;
+}
+
+#documenter .docs-main .content .se-card code {
+    font-size: 0.82em;
+}
+
+@media screen and (max-width: 48rem) {
+    #documenter .docs-main .content .se-grid {
+        grid-template-columns: 1fr;
+    }
+}
