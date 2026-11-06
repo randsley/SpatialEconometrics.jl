@@ -4072,6 +4072,27 @@ observed ratios are `3.000000, 3.000000, 1.000000` to six figures. Under the
 bug they would have been `c^5 = 243` and `c^4 = 81`. The test is two fits and
 costs nothing, and it would have caught this on the day the line was written.
 
+Its tolerance took two attempts, and the first one failed in CI, which is the
+cross-version rule earning its place again. `rtol = 1e-8` passed locally on
+1.13.3 and **failed on Julia 1.10.13**. Nothing is wrong on 1.10: the
+equivariance is exact only in exact arithmetic, and `rho` comes from a
+numerical search that converges to a slightly different point on each version.
+Measured, the two fits' `rho` differ by `2e-11` on 1.13.3 and `4e-8` on
+1.10.13, and the Driscoll-Kraay standard error amplifies the second to
+`6.3e-7` relative. `1e-8` was not a tolerance derived from anything — it was
+the tightest round number that happened to pass on the machine it was written
+on. The margin is now measured on both versions and the test is set at
+`1e-4`: 160x above the worst observed deviation, about `1e6` below the
+relative deviation of 80 to 240 the bug produced. The other two assertions
+were checked on 1.10 as well and clear their tolerances by factors of
+`2e7` and `2e5`, so only the panel equivariance was ever close.
+
+The general form of this, worth applying to any assertion added from here:
+**a tolerance that has not been measured on both ends of the supported version
+range is a guess**, and the suite totals matching across versions does not
+show otherwise — the 1.10 job failed while reporting a total only three
+assertions short of the passing one.
+
 The second rebuilds the sandwich from the formula and the model's own public
 fields — `Z = [X_tilde, W(I - rho*W)^-1 X_tilde*beta]`, meat `sum_t H_t H_t'`,
 bread `vcov(m) / sigma2` — and compares it to `robust_vcov` at `rtol = 1e-10`,

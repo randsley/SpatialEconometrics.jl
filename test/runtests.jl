@@ -692,13 +692,25 @@ vcov(m::HausMock) = m.V
         # instead. Every assertion above passes under that bug -- they test
         # shape, symmetry and positive-semidefiniteness, all of which a
         # misscaled sandwich keeps -- so the scale needs pinning on its own.
+        # On the tolerance, which is measured rather than guessed. The
+        # equivariance is exact in exact arithmetic, but rho comes from a
+        # numerical search that lands differently per Julia version, so the
+        # two fits are not bit-identical: rho differs by 2e-11 between them on
+        # 1.13.3 and by 4e-8 on 1.10.13, and the Driscoll-Kraay standard error
+        # amplifies the latter to 6.3e-7 relative. An earlier rtol of 1e-8 was
+        # chosen because it passed on 1.13, where the worst deviation is
+        # 2.6e-11; it failed on 1.10 in CI. That is the argument for measuring
+        # a margin instead of taking the tightest number that happens to pass.
+        # 1e-4 sits 160x above the worst observed deviation and roughly 1e6
+        # below the relative deviation of 80 to 240 that the bug produced, so
+        # it discriminates with room at both ends.
         c_scale = 3.0
         m_scaled = fit_spatial_panel(SAR(), TwoWayFE(), W, X, c_scale .* y, N, T_per)
         for spec in (DriscollKraayVCOV(), ConleySpatialHAC(coords, 3.0))
             se_1 = sqrt.(diag(robust_vcov(m_pan, spec)))
             se_c = sqrt.(diag(robust_vcov(m_scaled, spec)))
-            @test se_c[1:2] ≈ c_scale .* se_1[1:2] rtol = 1e-8
-            @test se_c[end] ≈ se_1[end] rtol = 1e-8
+            @test se_c[1:2] ≈ c_scale .* se_1[1:2] rtol = 1e-4
+            @test se_c[end] ≈ se_1[end] rtol = 1e-4
         end
 
         # ── and pinned against the sandwich built by hand ──
@@ -3489,8 +3501,8 @@ vcov(m::HausMock) = m.V
         m_sar_c = fit_spatial(CSx.SAR(), W, X, 3.0 .* y; varnames=["x1", "x2"])
         se_cs_1 = rt.se_robust
         se_cs_c = robust_coeftable(m_sar_c, ConleySpatialHAC(coords, 3.0)).se_robust
-        @test se_cs_c[1:(end - 1)] ≈ 3.0 .* se_cs_1[1:(end - 1)] rtol = 1e-8
-        @test se_cs_c[end] ≈ se_cs_1[end] rtol = 1e-8
+        @test se_cs_c[1:(end - 1)] ≈ 3.0 .* se_cs_1[1:(end - 1)] rtol = 1e-4
+        @test se_cs_c[end] ≈ se_cs_1[end] rtol = 1e-4
 
         # Panel variants exercise the other robust_vcov methods.
         Lp = 7; Np = Lp * Lp; Tp = 4; NTp = Np * Tp
