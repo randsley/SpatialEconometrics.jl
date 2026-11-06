@@ -520,7 +520,7 @@ function extract_spatial_jacobian_scores(X_aug::Matrix{T}, W::AbstractSparseMatr
     S_lu = lu(sparse(one(T) * I, N, N) - ρ * W)
     Xb = X_aug * β; GXb = similar(Xb)
     mul!(reshape(GXb, N, T_per), W, S_lu \ reshape(Xb, N, T_per))
-    return hcat(X_aug, GXb), sigma2 .* vcov_qml
+    return hcat(X_aug, GXb), vcov_qml ./ sigma2
 end
 
 """

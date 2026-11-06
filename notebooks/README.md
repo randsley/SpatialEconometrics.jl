@@ -35,6 +35,17 @@ which takes a few minutes the first time.
 | `03_gwr_gravity.ipynb` | Geographically weighted regression, gravity models |
 | `04_columbus_crime.ipynb` | **Real data.** The Anselin (1988) Columbus analysis end to end |
 | `05_spatial_heterogeneity.ipynb` | **Real data.** Regimes, Chow tests, SKATER regionalisation |
+| `06_spatial_causal.ipynb` | Spatial DiD with exposure, synthetic control with neighbour exclusion, shift-share, peer effects and the reflection problem |
+| `07_space_time.ipynb` | STAR, spatio-temporal impulse responses, SpVAR with a causal ordering |
+| `08_networks_and_factors.ipynb` | Common factors: the CD test, the alpha exponent, CCE, spatio-temporal principal components |
+| `09_model_selection.ipynb` | Information criteria, Bayesian specification probabilities, convex combinations of weights |
+| `10_diagnostics_and_robust_inference.ipynb` | The full LM battery, and Driscoll-Kraay and Conley standard errors checked against a sampling distribution |
+
+`06` to `10` use simulated data throughout and print the data-generating
+process before each fit, so every number has a known answer to be read against.
+That is deliberate: these five cover the parts of the package where a plausible
+wrong answer is hardest to spot, and three of them turn on a result that
+contradicts the obvious reading.
 
 ## Interactive
 

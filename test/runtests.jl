@@ -677,6 +677,59 @@ vcov(m::HausMock) = m.V
         V_con = robust_vcov(m_pan, ConleySpatialHAC(coords, 3.0))
         @test size(V_con) == size(vcov(m_pan))
         @test all(eigvals(Symmetric(V_con)) .>= -1e-10)
+
+        # ── the scale of the sandwich, pinned exactly ──
+        # A sandwich covariance is equivariant in the scale of y: multiply y
+        # by c and every beta standard error must scale by exactly c, while
+        # rho's is unchanged because rho is dimensionless. This held only
+        # by accident of sigma2 ~ 1. `extract_spatial_jacobian_scores`
+        # returned `sigma2 .* vcov_qml` as the bread, but `vcov_qml` is
+        # already sigma2 * (Z'Z)^-1 and the meat is built from Z'e with no
+        # 1/sigma2, so the bread carried sigma2 twice over: the variance
+        # came out scaled by sigma2^4 and the standard error by sigma2^2.
+        # Against a 200-replication sampling distribution the robust errors
+        # were four times too small; with sigma2 > 1 they are too large
+        # instead. Every assertion above passes under that bug -- they test
+        # shape, symmetry and positive-semidefiniteness, all of which a
+        # misscaled sandwich keeps -- so the scale needs pinning on its own.
+        c_scale = 3.0
+        m_scaled = fit_spatial_panel(SAR(), TwoWayFE(), W, X, c_scale .* y, N, T_per)
+        for spec in (DriscollKraayVCOV(), ConleySpatialHAC(coords, 3.0))
+            se_1 = sqrt.(diag(robust_vcov(m_pan, spec)))
+            se_c = sqrt.(diag(robust_vcov(m_scaled, spec)))
+            @test se_c[1:2] ≈ c_scale .* se_1[1:2] rtol = 1e-8
+            @test se_c[end] ≈ se_1[end] rtol = 1e-8
+        end
+
+        # ── and pinned against the sandwich built by hand ──
+        # Rebuilt from the formula and the model's own public fields:
+        # Z = [X_tilde, W(I-rho*W)^-1 X_tilde*beta], meat = sum_t (Z_t'e_t)(Z_t'e_t)',
+        # and bread = vcov / sigma2. The bread is the QML covariance de-scaled,
+        # not (Z'Z)^-1: that is deliberate, and a first version of this test
+        # asserted (Z'Z)^-1 and failed. The two agree on the beta block, but
+        # the QML information matrix's rho block carries the log-determinant
+        # trace terms, which (Z'Z)^-1 knows nothing about, and because that
+        # matrix is inverted jointly its beta block is not (Z'Z)^-1 either --
+        # measured 1.7% away, the Schur complement of the beta-rho cross
+        # terms. Using the model's own covariance as bread is what makes the
+        # rho row of the robust table mean anything. max_lag = 0 and no
+        # small-sample correction leave the meat as H*H' with nothing folded
+        # in, so this is exact.
+        beta_hat = coef(m_pan)[1:2]
+        Slu_h = lu(sparse(1.0I, N, N) - m_pan.rho * W)
+        Xb_h = m_pan.X_tilde * beta_hat
+        GXb_h = vec(W * (Slu_h \ reshape(Xb_h, N, T_per)))
+        Z_h = hcat(m_pan.X_tilde, GXb_h)
+        H_h = zeros(size(Z_h, 2), T_per)
+        for t in 1:T_per
+            idx = ((t - 1) * N + 1):(t * N)
+            H_h[:, t] = Z_h[idx, :]' * m_pan.residuals[idx]
+        end
+        bread_h = vcov(m_pan) ./ m_pan.sigma2
+        V_hand = bread_h * (H_h * H_h') * bread_h'
+        V_got = robust_vcov(m_pan, DriscollKraayVCOV(max_lag = 0,
+                                                     small_sample_correct = false))
+        @test V_got ≈ V_hand rtol = 1e-10
     end
 
     @testset "8. FormulaDSL.jl (@formula, slag, fe, endo)" begin
@@ -3429,6 +3482,15 @@ vcov(m::HausMock) = m.V
         @test all(rt.se_robust .< 50 .* rt.se_baseline)
         # t-stats must be coef / robust se.
         @test rt.z_robust ≈ coef(m_sar) ./ rt.se_robust rtol = 1e-10
+        # The cross-section path shares the misscaled bread described in
+        # testset 7, so it gets the same exact scale check: scaling y by c
+        # scales every coefficient's robust standard error by exactly c and
+        # leaves rho's alone.
+        m_sar_c = fit_spatial(CSx.SAR(), W, X, 3.0 .* y; varnames=["x1", "x2"])
+        se_cs_1 = rt.se_robust
+        se_cs_c = robust_coeftable(m_sar_c, ConleySpatialHAC(coords, 3.0)).se_robust
+        @test se_cs_c[1:(end - 1)] ≈ 3.0 .* se_cs_1[1:(end - 1)] rtol = 1e-8
+        @test se_cs_c[end] ≈ se_cs_1[end] rtol = 1e-8
 
         # Panel variants exercise the other robust_vcov methods.
         Lp = 7; Np = Lp * Lp; Tp = 4; NTp = Np * Tp

@@ -3968,3 +3968,146 @@ fragmented graphs, and every accuracy figure in this literature is still a
 log-determinant figure. Only the size of the gap was misstated. The original
 section is left as it stands, per the convention that a closed entry is the
 record of its commit; this note is the correction.
+
+## The robust sandwich carried sigma2 twice, and the suite could not see it
+
+Found on 2026-11-06 while writing `notebooks/10_diagnostics_and_robust_inference.ipynb`,
+by the ordinary route: a demonstration printed a number that contradicted its
+own caption. The notebook set out to show robust standard errors widening in
+the presence of dependence the model does not capture. Driscoll-Kraay and
+Conley both came out **three times smaller** than the model's own.
+
+### The defect
+
+`SpatialHAC.extract_spatial_jacobian_scores` returned the bread of the
+sandwich as
+
+    return hcat(X_aug, GXb), sigma2 .* vcov_qml
+
+`vcov_qml` is already the QML covariance, `sigma2 * (Z'Z)^-1`. The meat built
+by `vcov_driscoll_kraay` and `vcov_conley` is `sum_t (Z_t'e_t)(Z_t'e_t)'`,
+which omits the `1/sigma2` that the Gaussian score carries. For the sandwich
+to come out right the bread must therefore be `(Z'Z)^-1`, which is
+`vcov_qml / sigma2`. The line multiplied where it should have divided, so the
+bread carried `sigma2` twice over rather than not at all. Bread enters
+squared, so the **variance was wrong by a factor of `sigma2^4` and the
+standard error by `sigma2^2`**.
+
+The fix is the one character of arithmetic that was wrong:
+
+    return hcat(X_aug, GXb), vcov_qml ./ sigma2
+
+### Confirmed by its own scaling law
+
+A misscaled sandwich is identifiable: the error is a known function of
+`sigma2`, so it can be dialled. Holding `X`, `W` and the seed fixed and
+scaling the error standard deviation, the ratio of the Driscoll-Kraay standard
+error to the model's own, for `x1`, went
+
+| error sd | `sigma2` | ratio, before | `sigma2^2` | ratio / `sigma2^2` | ratio, after |
+|---|---|---|---|---|---|
+| 0.5 | 0.2405 | 0.021 | 0.058 | 0.36 | 0.356 |
+| 1.0 | 0.9620 | 0.329 | 0.925 | 0.356 | 0.356 |
+| 2.0 | 3.8374 | 5.217 | 14.725 | 0.354 | 0.354 |
+
+The third column tracks the fourth exactly: dividing them gives the same
+0.354 to 0.356 every time, which is the legitimate ratio the estimator should
+have reported all along, and which the last column confirms it now does at
+every scale. Note the sign of the error is not fixed. At `sigma2 < 1` the
+robust errors were too small; at `sigma2 = 3.84` they were five times too
+**large**. A bug that flatters or alarms depending on the units of the
+dependent variable is worse than one that does only one of them.
+
+### Measured against the sampling distribution
+
+The scaling law proves the arithmetic. What it is worth takes a simulation:
+200 replications of a SAR panel with two-way fixed effects on an 8 x 8 rook
+lattice, `T = 10`, errors heteroskedastic in `x1` with standard deviation
+`0.3 + 0.5*|x1|`. The standard deviation of the 200 estimates is the quantity
+every standard error in the table is trying to estimate.
+
+| | MC sd | model | DK, before | DK, after | Conley, after |
+|---|---|---|---|---|---|
+| `x1` | 0.05099 | 0.03190 | 0.01160 | 0.03463 | 0.04205 |
+| `x2` | 0.03241 | 0.03180 | 0.00822 | 0.02470 | 0.02990 |
+| `rho` | 0.03516 | 0.03442 | 0.00670 | 0.02015 | 0.02294 |
+
+Before the fix the robust errors were out by a factor of four to five on every
+parameter. After it they are the right size, and the qualitative story is the
+one the estimators exist to tell: the model's own covariance is accurate for
+`x2` and `rho` and understates `x1` by a third, which is exactly the regressor
+the heteroskedasticity was built on, and Conley is the only estimator that
+gets closer to the truth than the model does on that coefficient. Both robust
+estimators remain mildly conservative on the other two at this sample size,
+which is a finite-sample property and is reported as such in the notebook
+rather than smoothed over.
+
+### Why the suite could not see it
+
+Every existing assertion on these functions tested a property a misscaled
+sandwich keeps. In testset 7:
+
+    @test size(V_dk) == size(vcov(m_pan))
+    @test all(eigvals(Symmetric(V_dk)) .>= -1e-10)
+
+and in the regression testset, finiteness, non-negativity, the `z` identity,
+and a one-sided bound 50 times wide:
+
+    @test all(rt.se_robust .< 50 .* rt.se_baseline)
+
+Shape, symmetry, positive-semidefiniteness and finiteness are all invariant to
+multiplying the matrix by `sigma2^4`. A factor-of-50 bound does not bind on a
+factor of four. **The suite passed, before and after.** This is finding 1
+again in a new place: assertions that pin signs, ranges and shapes instead of
+values, and the standing rule of this ledger exists because of it.
+
+### What was added
+
+Two assertions, both exact, neither a range.
+
+The first pins the scale by an equivariance the estimator cannot avoid.
+Multiply `y` by `c` and every beta standard error must scale by exactly `c`,
+while `rho`'s must not move at all, `rho` being dimensionless. At `c = 3` the
+observed ratios are `3.000000, 3.000000, 1.000000` to six figures. Under the
+bug they would have been `c^5 = 243` and `c^4 = 81`. The test is two fits and
+costs nothing, and it would have caught this on the day the line was written.
+
+The second rebuilds the sandwich from the formula and the model's own public
+fields — `Z = [X_tilde, W(I - rho*W)^-1 X_tilde*beta]`, meat `sum_t H_t H_t'`,
+bread `vcov(m) / sigma2` — and compares it to `robust_vcov` at `rtol = 1e-10`,
+with `max_lag = 0` and the small-sample correction off so that nothing else is
+folded in. It reconstructs from the definition rather than calling the helper
+under test, so it checks the specification rather than restating the code.
+
+The first version of that test asserted the bread was `(Z'Z)^-1` and **failed**,
+which is worth recording because the failure is informative and the test was
+the thing that was wrong. The bread is the QML covariance de-scaled, and that
+is deliberate: its `rho` block carries the log-determinant trace terms, which
+`(Z'Z)^-1` knows nothing about, and because the information matrix is inverted
+jointly even its `beta` block is not `(Z'Z)^-1` — measured 1.7% away, the Schur
+complement of the `beta`-`rho` cross terms. Using the model's own covariance as
+bread is what makes the `rho` row of the robust table mean anything, so the
+right conclusion was to fix the assertion, not the source. The division by
+`sigma2` is the only thing that was ever wrong.
+
+### What this says about where to look next
+
+The bug was in a line of scaling, in a function with no test of its own,
+reached only through two public entry points, and it survived the audit
+because the audit read the estimators and not their plumbing. The notebooks
+found it in an afternoon because a notebook has to print a number and say what
+it means, and a caption is an assertion that a reviewer reads. That is an
+argument for the remaining uncovered functions getting a worked example each.
+
+Measured after the five new notebooks landed: of 275 exported names, 99 appear
+nowhere in `examples/` or `notebooks/`, but 92 of those are types that are only
+ever returned, never written by name, and need no example of their own. The
+real gap is **seven callable functions**:
+
+    balance_generalized_ce   donor_weights        extract_panel_permutation
+    fourier_basis            minmax_standardize!  row_standardize!
+    spectral_standardize!
+
+Those seven are the place to look next, and `row_standardize!` is the one to
+look at first: it is reached indirectly by every weights constructor in the
+package and demonstrated directly by none of them.

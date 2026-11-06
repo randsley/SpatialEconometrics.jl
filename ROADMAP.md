@@ -3,10 +3,11 @@
 > **Current version:** 0.4.0 (on `master`, unreleased; `Project.toml` carries
 > it since 2026-11-06)
 >
-> 28 submodules, 3,750 test assertions in 56 top-level testsets with both
-> package extensions installed and 3,715 without them — the same counts on
-> Julia 1.13.3 and 1.10.13, since the difference is the extensions and not
-> the version. 29 examples, 12 notebooks, 2 package extensions, CI/CD and
+> 28 submodules, 3,722 test assertions in 56 top-level testsets without the
+> package extensions, measured on 2026-11-06 on Julia 1.13.3. The
+> with-extensions figure was 3,750 before the seven assertions added that day
+> and is not re-measured here, the extensions not being installed on this
+> machine; the seven touch neither of them, so CI should report 3,757. 29 examples, 17 notebooks, 2 package extensions, CI/CD and
 > 56 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
@@ -1235,13 +1236,19 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ row 22 SpVAR, so Phase 7B mostly done) | 28 | 3,718 † | 24,151 |
 | **master** (+ Pfeifer & Deutsch read: STAR `spatial_weights`) | 28 | 3,750 † | 24,253 |
 | **v0.4.0** (= master today, unreleased) | 28 | 3,750 † | 24,321 |
+| **master** (+ the robust-sandwich fix and seven exact assertions) | 28 | 3,757 †† | 24,321 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
+†† Arithmetic, not a measurement: 3,722 was measured locally without the
+extensions and the seven new assertions touch neither, so the with-extensions
+total should be 3,757. CI settles it on the next push. The `src/` count is
+unchanged because the fix altered one existing line.
+
 Measured on master: 28 submodules plus the umbrella across 24,321 lines of
-`src/`, 9,457 lines of tests, 4,750 lines of examples across 29 scripts,
-398 lines of package extensions, 56 documentation pages and 12 notebooks
-(5 Jupyter, 7 Pluto).
+`src/`, 9,519 lines of tests, 4,750 lines of examples across 29 scripts,
+398 lines of package extensions, 56 documentation pages and 17 notebooks
+(10 Jupyter, 7 Pluto).
 
 The `v0.4.0` row sits 68 lines above the measured row before it, and no
 feature accounts for the difference: it is docstring prose, from the two
@@ -1352,8 +1359,8 @@ Note also that `--project=<dir>` does not hide the extensions: `@v1.13`
 stays on `LOAD_PATH`, so Makie and Turing load from the default environment
 anyway. `Pkg.test()` is the only entry point that genuinely excludes them.
 
-† The last five rows count the extension testsets; the Phase 6C row above
-them does not. So the step from 2,036 to 2,233 is **not** testset 34's
+† The five rows marked † count the extension testsets, as does the †† row
+that ends the table; the Phase 6C row above them does not. So the step from 2,036 to 2,233 is **not** testset 34's
 size: that testset is 162 assertions, and the other 35 is testsets 25 and 26
 running rather than reporting a marker. The next two steps **are** exactly
 the new testset's size: 2,233 to 2,430 is testset 35's 197, and 2,430 to
