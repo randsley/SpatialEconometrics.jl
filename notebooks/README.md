@@ -107,9 +107,29 @@ gives every unit neighbours. And `purchasing_power`, `pp_share_national` and
 `pp_dynamism` all come from the same INE study, so they are not independent of
 one another.
 
-**There is no `W` in this extract yet.** A contiguity matrix needs boundaries,
-which come from INE's BGRI and are a separate download from the indicator API.
-Until then, supply your own or build one from coordinates.
+The weights are here too. `portugal_municipalities_queen.gal` and
+`..._rook.gal` are GeoDa GAL contiguity files over the 278 mainland
+municipalities, and `..._centroids.csv` has their area-weighted centroids for
+distance- or neighbour-based weightings. `read_gal` reads them directly, and
+the DICO ordering matches the attribute CSV once both are sorted.
+
+Queen has 739 links and rook 737: they differ by exactly two pairs, Mêda with
+Sernancelhe and Lisboa with Vila Franca de Xira, which meet at a single point
+rather than along a border. Mean degree is 5.32, the minimum is 1 (Nazaré) and
+no municipality is isolated.
+
+The spatial dependence is real and strong, not a teaching fiction: Moran's I on
+purchasing power is **0.445** with z = 12.1. The LM battery rejects both ways
+(lag 40.0, error 77.6) and the robust pair points at the error model more
+firmly than the lag (robust lag 8.8, p 0.003; robust error 46.4, p 1e-11),
+which makes it a better discussion than a clean verdict would be. A SAR fit
+gives ρ = 0.379, log density +3.57 and the ageing ratio −2.44: denser
+municipalities richer, older ones poorer.
+
+Boundaries are CAOP2025 from Direção-Geral do Território, CC-BY-4.0, and that
+licence requires its own credit alongside INE's:
+
+> Informação geográfica cedida pela Direção-Geral do Território
 
 Produced by `scripts/build_spatial_dataset.py` in
 [PortugalINE.jl](https://github.com/randsley/PortugalINE.jl), pulled through
