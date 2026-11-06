@@ -1,6 +1,6 @@
 name = "SpatialEconometrics"
 uuid = "a8e52d14-7b3c-4f91-9a2e-6d8c1f0e3b5a"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Nigel Randsley"]
 
 [deps]

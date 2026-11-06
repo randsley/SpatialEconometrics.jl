@@ -1,6 +1,7 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.3.0 → 0.4.0 (on `master`, unreleased)
+> **Current version:** 0.4.0 (on `master`, unreleased; `Project.toml` carries
+> it since 2026-11-06)
 >
 > 28 submodules, 3,750 test assertions in 56 top-level testsets with both
 > package extensions installed and 3,715 without them — the same counts on
@@ -1233,14 +1234,20 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | **master** (+ #1 and #12, so Phase 7B half done) | 27 | 3,415 † | 22,577 |
 | **master** (+ row 22 SpVAR, so Phase 7B mostly done) | 28 | 3,718 † | 24,151 |
 | **master** (+ Pfeifer & Deutsch read: STAR `spatial_weights`) | 28 | 3,750 † | 24,253 |
-| **v0.4.0** (= master today, unreleased) | 28 | 3,750 † | 24,253 |
+| **v0.4.0** (= master today, unreleased) | 28 | 3,750 † | 24,321 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
-Measured on master: 28 submodules plus the umbrella across 24,253 lines of
+Measured on master: 28 submodules plus the umbrella across 24,321 lines of
 `src/`, 9,457 lines of tests, 4,750 lines of examples across 29 scripts,
 398 lines of package extensions, 56 documentation pages and 12 notebooks
 (5 Jupyter, 7 Pluto).
+
+The `v0.4.0` row sits 68 lines above the measured row before it, and no
+feature accounts for the difference: it is docstring prose, from the two
+citation corrections of 2026-11-05 and 2026-11-06 in `SpatialCausal.jl` and
+`SpatialUtils.jl`. Test assertions and module count are unchanged at 3,750
+and 28, which is the check that says so.
 
 **Count `src/` the same way each time, and say which way.** The figures in
 the last column are `cat src/*.jl | wc -l`. That method gives **22,598** at
