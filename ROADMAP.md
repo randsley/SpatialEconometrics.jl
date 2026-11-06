@@ -3,11 +3,10 @@
 > **Current version:** 0.4.0 (on `master`, unreleased; `Project.toml` carries
 > it since 2026-11-06)
 >
-> 28 submodules, 3,722 test assertions in 56 top-level testsets without the
-> package extensions, measured on 2026-11-06 on Julia 1.13.3. The
-> with-extensions figure was 3,750 before the seven assertions added that day
-> and is not re-measured here, the extensions not being installed on this
-> machine; the seven touch neither of them, so CI should report 3,757. 29 examples, 17 notebooks, 2 package extensions, CI/CD and
+> 28 submodules, 3,757 test assertions in 56 top-level testsets with both
+> package extensions installed and 3,722 without them, measured on 2026-11-06
+> on Julia 1.13.3 and confirmed by CI on 1.10.13, 1.13 and nightly across
+> Linux, Windows and macOS. 29 examples, 17 notebooks, 2 package extensions, CI/CD and
 > 56 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
@@ -1240,10 +1239,11 @@ holds today, and the figures it once projected — ~1,200 assertions and
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
-†† Arithmetic, not a measurement: 3,722 was measured locally without the
-extensions and the seven new assertions touch neither, so the with-extensions
-total should be 3,757. CI settles it on the next push. The `src/` count is
-unchanged because the fix altered one existing line.
+†† Measured by CI on 2026-11-06: 3,757 with both extensions live and no
+broken entries, against 3,722 and two broken locally without them. The figure
+was first entered as arithmetic from the local run and CI agreed with it
+exactly. The `src/` count is unchanged because the fix altered one existing
+line.
 
 Measured on master: 28 submodules plus the umbrella across 24,321 lines of
 `src/`, 9,519 lines of tests, 4,750 lines of examples across 29 scripts,
