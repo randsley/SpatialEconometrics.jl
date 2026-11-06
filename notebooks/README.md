@@ -82,10 +82,52 @@ answer, and a few (the power question in `05`, the weight-matrix question in
 
 ## Data
 
-`data/columbus.csv` and `data/columbus.gal` are the Columbus, Ohio 1980
-neighbourhood crime data: 49 contiguous planning neighbourhoods, with crime
-rate, household income and housing value, plus the first-order contiguity
-structure in GeoDa GAL format.
+Two real datasets, both in `data/`.
+
+### Portuguese municipalities, 2023
+
+`portugal_municipalities.csv` carries **308 municipalities**
+(278 mainland, 30 in Madeira and the Azores) with per capita purchasing power,
+its share of the national total, the purchasing-power dynamism factor,
+population density and the ageing ratio, all for 2023.
+
+It is a better teaching set than Columbus in every dimension that matters.
+Columbus has 49 units; this has 278 contiguous ones, which is enough for the
+asymptotics the estimators assume to mean something. It has a real
+coastal/interior split, which the regimes, Chow and SKATER examples currently
+demonstrate on simulated data. And purchasing power across Portuguese
+municipalities is spatially dependent for reasons nobody has to invent:
+Lisboa at 181.4 and Porto at 162.2 against a municipal mean of 82.5.
+
+Two warnings, both in `portugal_municipalities_PROVENANCE.md` and both worth
+repeating. The 30 island municipalities share no land border with anything, so
+a contiguity `W` over all 308 has 30 entirely zero rows and row-standardising
+divides by zero — filter on the `mainland` column, or use a weighting that
+gives every unit neighbours. And `purchasing_power`, `pp_share_national` and
+`pp_dynamism` all come from the same INE study, so they are not independent of
+one another.
+
+**There is no `W` in this extract yet.** A contiguity matrix needs boundaries,
+which come from INE's BGRI and are a separate download from the indicator API.
+Until then, supply your own or build one from coordinates.
+
+Produced by `scripts/build_spatial_dataset.py` in
+[PortugalINE.jl](https://github.com/randsley/PortugalINE.jl), pulled through
+[pyptine](https://github.com/randsley/pyptine). The data is open for reuse
+under EU Directive 2019/1024, INE retains copyright, and reuse is conditional
+on citing the source:
+
+> Source: Statistics Portugal (INE), indicators 0014580, 0014581, 0014582,
+> 0013189 and 0012909, reference period 2023, extracted 2026-11-06.
+
+### Columbus, Ohio, 1980
+
+`columbus.csv` and `columbus.gal` are the Columbus, Ohio 1980 neighbourhood
+crime data: 49 contiguous planning neighbourhoods, with crime rate, household
+income and housing value, plus the first-order contiguity structure in GeoDa
+GAL format. Smaller and older than the Portuguese set, and kept because it is
+the dataset the field has used since 1988 and the one with a published result
+to check against.
 
 Taken from the [libpysal](https://github.com/pysal/libpysal) example
 collection, which carries the values published in:
