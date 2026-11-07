@@ -99,8 +99,8 @@ demonstrate on simulated data. And purchasing power across Portuguese
 municipalities is spatially dependent for reasons nobody has to invent:
 Lisboa at 181.4 and Porto at 162.2 against a municipal mean of 82.5.
 
-Two warnings, both in `portugal_municipalities_PROVENANCE.md` and both worth
-repeating. The 30 island municipalities share no land border with anything, so
+Two of the warnings in `portugal_municipalities_PROVENANCE.md` are worth
+repeating here. The 30 island municipalities share no land border with anything, so
 a contiguity `W` over all 308 has 30 entirely zero rows and row-standardising
 divides by zero — filter on the `mainland` column, or use a weighting that
 gives every unit neighbours. And `purchasing_power`, `pp_share_national` and
@@ -110,8 +110,10 @@ one another.
 The weights are here too. `portugal_municipalities_queen.gal` and
 `..._rook.gal` are GeoDa GAL contiguity files over the 278 mainland
 municipalities, and `..._centroids.csv` has their area-weighted centroids for
-distance- or neighbour-based weightings. `read_gal` reads them directly, and
-the DICO ordering matches the attribute CSV once both are sorted.
+distance- or neighbour-based weightings. `read_gal` reads them directly and
+row-standardises on the way in; the files themselves hold binary contiguity.
+The DICO ordering matches the attribute CSV once both are sorted, so no lookup
+table is needed.
 
 Queen has 739 links and rook 737: they differ by exactly two pairs, Mêda with
 Sernancelhe and Lisboa with Vila Franca de Xira, which meet at a single point
@@ -126,19 +128,22 @@ which makes it a better discussion than a clean verdict would be. A SAR fit
 gives ρ = 0.379, log density +3.57 and the ageing ratio −2.44: denser
 municipalities richer, older ones poorer.
 
-Boundaries are CAOP2025 from Direção-Geral do Território, CC-BY-4.0, and that
-licence requires its own credit alongside INE's:
+All five files come from one run of `scripts/build_notebook_dataset.jl` in
+[PortugalINE.jl](https://github.com/randsley/PortugalINE.jl): indicators from
+INE's API, boundaries from DGT's CAOP, joined on DICO. Full provenance,
+including every indicator's title and the reasons behind each choice, is in
+`portugal_municipalities_PROVENANCE.md`.
 
-> Informação geográfica cedida pela Direção-Geral do Território
-
-Produced by `scripts/build_spatial_dataset.py` in
-[PortugalINE.jl](https://github.com/randsley/PortugalINE.jl), pulled through
-[pyptine](https://github.com/randsley/pyptine). The data is open for reuse
-under EU Directive 2019/1024, INE retains copyright, and reuse is conditional
-on citing the source:
+Two licences apply and each requires its credit, so keep both with any
+published result:
 
 > Source: Statistics Portugal (INE), indicators 0014580, 0014581, 0014582,
-> 0013189 and 0012909, reference period 2023, extracted 2026-11-06.
+> 0013189 and 0012909, reference period 2023, extracted 2026-11-07.
+>
+> Informação geográfica cedida pela Direção-Geral do Território
+
+INE data is open for reuse under EU Directive 2019/1024 with copyright
+retained, and CAOP2025 is CC-BY-4.0.
 
 ### Columbus, Ohio, 1980
 
