@@ -91,14 +91,17 @@ default. The yardstick that matters is the sampling uncertainty in `ρ̂`,
 and the approximation error is **fixed in `N`** while `se(ρ̂)` falls like
 `1/sqrt(N)` — so the damage grows with the sample size the approximation
 exists to serve. Order 6 on a row-standardised lattice, as a fraction of
-the profile `se(ρ̂)`, worst of five draws:
+the profile `se(ρ̂)`, worst of three draws:
 
 | `ρ` | `N = 900` | `N = 3600` |
 |:----|----------:|-----------:|
 | 0.50 | 0.000 | 0.000 |
-| 0.90 | 0.045 | 0.113 |
-| 0.95 | 0.095 | 0.228 |
-| 0.99 | 0.208 | 0.212 |
+| 0.90 | 0.046 | 0.114 |
+| 0.95 | 0.098 | 0.232 |
+| 0.99 | 0.215 | 0.222 |
+
+These re-execute in chapter 6 of the book repo, which is where they are
+measured; the figures here follow that table.
 
 Order 12 holds that ratio at or below `0.015` for `ρ ≤ 0.95` at both
 sizes. The default is 6 for **cost**: with exact traces on a `W` that
