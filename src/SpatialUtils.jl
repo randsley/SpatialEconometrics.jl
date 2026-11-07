@@ -59,8 +59,9 @@ affordable.
 
 # Arguments
 - `order`: degree of the expansion, at least 2. Accuracy improves with
-  order; 6 is adequate for point estimation and 12 is accurate to several
-  decimal places across `ρ ∈ (-1, 1)`, degrading mildly as `|ρ| → 1`.
+  order, and the default 6 is a **cost compromise rather than an accuracy
+  verdict** — see *Why the default is 6* below before leaving it alone on a
+  large `N` or a large `ρ`.
 - `n_probes`: number of Hutchinson random probes used to estimate the
   traces. `0` computes them deterministically from sparse matrix powers,
   which is exact and preferred unless `W` is too large for that.
@@ -78,12 +79,41 @@ Hutchinson costs 1 to 10. On a lattice the recursion stays cheap and is
 exact. Decide on `W`'s fill, not on the error.
 
 # Accuracy, and what it is accuracy *in*
-Order 6 is adequate for point estimation because the error in `ρ̂` runs
-two to three orders of magnitude below the error in the
-log-determinant: at `N = 2500, ρ = 0.9`, a log-determinant error of
-`7.8e-01` cost `3.4e-04` in `ρ̂`, a ratio of 2,294. The profile
-maximiser depends on the shape of the approximation near the peak, not
-on its level.
+The error in `ρ̂` runs two to three orders of magnitude below the error
+in the log-determinant, because the profile maximiser depends on the
+shape of the approximation near the peak and not on its level: at
+`N = 2500, ρ = 0.9`, a log-determinant error of `7.8e-01` cost `3.4e-04`
+in `ρ̂`, a ratio of 2,294.
+
+# Why the default is 6, and when to raise it
+That ratio is reassuring, but it is the wrong yardstick for choosing a
+default. The yardstick that matters is the sampling uncertainty in `ρ̂`,
+and the approximation error is **fixed in `N`** while `se(ρ̂)` falls like
+`1/sqrt(N)` — so the damage grows with the sample size the approximation
+exists to serve. Order 6 on a row-standardised lattice, as a fraction of
+the profile `se(ρ̂)`, worst of five draws:
+
+| `ρ` | `N = 900` | `N = 3600` |
+|:----|----------:|-----------:|
+| 0.50 | 0.000 | 0.000 |
+| 0.90 | 0.045 | 0.113 |
+| 0.95 | 0.095 | 0.228 |
+| 0.99 | 0.208 | 0.212 |
+
+Order 12 holds that ratio at or below `0.015` for `ρ ≤ 0.95` at both
+sizes. The default is 6 for **cost**: with exact traces on a `W` that
+fills, order 12 costs 43 to 54 LU-equivalents against an optimiser
+budget of about 42 — slower than not approximating at all — where order 6
+costs 6 to 12. On a sparse lattice order 12 costs 11 and order 20 costs
+36, both inside the budget.
+
+So raise the order on a sparse `W`, where it is nearly free. On a filling
+`W`, raise the order **and** set `n_probes > 0` rather than paying for
+exact traces: stochastic trace noise of about `1e-4` is some `0.035` of
+an `se(ρ̂)` at `N = 3600, ρ = 0.95`, far below order 6's `0.228` there.
+Past roughly `ρ = 0.97` no order is a reliable fix — the error stops
+falling cleanly with order, so order 8 can beat order 12 — and
+[`ExactLU`](@ref) is the honest choice.
 
 # Why this basis, and not the power series
 The truncated power series `-Σ_j (ρ^j / j) tr(W^j)` needs the same
