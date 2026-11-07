@@ -85,6 +85,25 @@ log-determinant: at `N = 2500, ρ = 0.9`, a log-determinant error of
 maximiser depends on the shape of the approximation near the peak, not
 on its level.
 
+# Why this basis, and not the power series
+The truncated power series `-Σ_j (ρ^j / j) tr(W^j)` needs the same
+traces from the same recursion, costs a small constant factor less per
+order, and is the route a reader meeting this problem usually
+reinvents. Measured against it on a row-standardised 40x40 lattice, at
+equal degree and with both sets of traces exact, this basis wins in
+every case: at order 20 the series' log-determinant error is 400 times
+larger at `ρ = 0.99` and 63,000 times larger at `ρ = 0.9`.
+
+Its error in `ρ̂` is also **signed**, which matters more. `tr(W^j)` sums
+the weights of closed walks of length `j`, so for a non-negative `W` no
+trace in the series can be negative and every term the truncation drops
+is non-positive. The series therefore over-states `log|I - ρW|`,
+under-penalises a large `ρ`, and places `ρ̂` too close to the boundary:
+`+4.3e-03` at `ρ = 0.99` and order 20, against `-2.7e-05` here. By
+order 160 — eight times the sparse matrix products — it still has not
+matched this method's order-20 accuracy in `ρ̂`. A prior that shrinks
+`ρ` away from `±1` masks that bias rather than removing it.
+
 # Reference
 Pace, R. K. & LeSage, J. P. (2004). Chebyshev approximation of
 log-determinants of spatial weight matrices. *Computational Statistics
