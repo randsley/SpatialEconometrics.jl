@@ -36,8 +36,14 @@ A fitted SLX model, `y = X*beta + W*X*theta + e`, returned by
 
 The simplest way to admit spillovers: covariates of neighbours enter, but
 `y` does not depend on `W*y`. That makes it OLS on `[X W*X]`, so there is
-no log-determinant and no endogeneity, and `theta` is the spillover
-directly — no `(I - rho*W)^{-1}` decomposition needed.
+no log-determinant and no endogeneity, and `theta` is read off the
+coefficient vector — no `(I - rho*W)^{-1}` decomposition needed.
+
+"No endogeneity" is a statement about the *estimator*: `W*X` is not a
+function of `y`, so OLS is consistent for the coefficients of this
+regression. Whether `theta` is a causal spillover is a separate question
+that depends on how the neighbourhoods arose, and fitting this model does
+not settle it.
 
 Often the right starting point before reaching for a lag model.
 """
@@ -62,7 +68,7 @@ Fit the SLX (Spatial Lag of X) model by OLS:
 No spatial lag of y and no spatial error structure.
 Recommended as a starting point before SAR/SDM (Halleck Vega & Elhorst, 2015).
 
-!!! note "Identification"
+!!! note "Full column rank, which is not identification"
     The design has to have full column rank. `X` goes in without an
     intercept, since one is added, and no covariate may be a linear
     combination of the others. A design that fails this throws an
@@ -72,6 +78,16 @@ Recommended as a starting point before SAR/SDM (Halleck Vega & Elhorst, 2015).
 
     The design also carries `W*X`, so a `W` for which `W*X` lies in the
     span of `X` is rank deficient too.
+
+    Rank is **estimability, not identification**. Passing this check means
+    the coefficients are separately computable from this design; it says
+    nothing about whether `θ̂` measures a spillover. Reading `θ̂` as the
+    effect of a neighbour's `x` on one's own `y` additionally requires that
+    the neighbourhood composition be exogenous to `y` — which is an
+    assumption about where the data came from, and no rank check, test
+    statistic or information criterion in this package can supply it. The
+    two senses of the word are kept apart here deliberately: this package
+    says "rank deficient" when it means the linear algebra.
 
 """
 function fit_slx(
@@ -87,7 +103,7 @@ function fit_slx(
     WX = W * X
     X_aug = hcat(ones(T, N), X, WX)
     cnames = vcat(["(Intercept)"], vnames, ["W_" * v for v in vnames])
-    check_design_rank(X_aug, cnames, "fit_slx"; context = "`X` must not contain its own intercept, since one is added. Check also that `W*X` does not lie in the span of `X`, which is what makes the spillover terms unidentified.")
+    check_design_rank(X_aug, cnames, "fit_slx"; context = "`X` must not contain its own intercept, since one is added. Check also that `W*X` does not lie in the span of `X`, which makes the design rank deficient so that the spillover terms cannot be computed separately from `X`.")
 
     β = X_aug \ Vector{T}(y)
     res = y .- X_aug * β
@@ -446,7 +462,7 @@ Fit the SDEM (Spatial Durbin Error Model) via concentrated ML:
 Combines the SDM covariate structure with SEM error structure.
 LeSage & Pace (2009).
 
-!!! note "Identification"
+!!! note "Full column rank, which is not identification"
     The design has to have full column rank. `X` goes in without an
     intercept, since one is added, and no covariate may be a linear
     combination of the others. A design that fails this throws an
@@ -456,6 +472,16 @@ LeSage & Pace (2009).
 
     The design also carries `W*X`, so a `W` for which `W*X` lies in the
     span of `X` is rank deficient too.
+
+    Rank is **estimability, not identification**. Passing this check means
+    the coefficients are separately computable from this design; it says
+    nothing about whether `θ̂` measures a spillover. Reading `θ̂` as the
+    effect of a neighbour's `x` on one's own `y` additionally requires that
+    the neighbourhood composition be exogenous to `y` — which is an
+    assumption about where the data came from, and no rank check, test
+    statistic or information criterion in this package can supply it. The
+    two senses of the word are kept apart here deliberately: this package
+    says "rank deficient" when it means the linear algebra.
 
 """
 function fit_sdem(
@@ -477,7 +503,7 @@ function fit_sdem(
     X_aug = hcat(ones(T, N), X, WX)
     P = size(X_aug, 2)
     cnames = vcat(["(Intercept)"], vnames, ["W_" * v for v in vnames], ["λ"])
-    check_design_rank(X_aug, cnames, "fit_sdem"; context = "`X` must not contain its own intercept, since one is added. Check also that `W*X` does not lie in the span of `X`, which is what makes the spillover terms unidentified.")
+    check_design_rank(X_aug, cnames, "fit_sdem"; context = "`X` must not contain its own intercept, since one is added. Check also that `W*X` does not lie in the span of `X`, which makes the design rank deficient so that the spillover terms cannot be computed separately from `X`.")
 
     Wy = W * y
     W_Xaug = W * X_aug

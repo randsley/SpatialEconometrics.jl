@@ -1002,9 +1002,11 @@ end
 Posterior probabilities over spatial specifications **and** weight matrices,
 computed from the log marginal likelihoods of every combination.
 
-This is the global-versus-local spillover question of LeSage (2014) put
-jointly with the choice of `W`: with equal prior weight on every cell of the
-`specs × Ws` grid, the posterior is
+LeSage (2014) contrasts specifications whose spillovers run through `y`
+with those whose run through `W*X` or the disturbance, and labels the two
+reaches *global* and *local*. This puts that contrast jointly with the choice
+of `W`: with equal prior weight on every cell of the `specs × Ws` grid, the
+posterior is
 
 ```
 P(spec, W) ∝ exp(log p(y | spec, W))
@@ -1012,9 +1014,25 @@ P(spec, W) ∝ exp(log p(y | spec, W))
 
 normalised over the grid, with the maximum subtracted before exponentiating.
 `prob_spec` and `prob_w` are its margins, so a comparison that is decisive
-about the spillover structure while being indifferent between weight
-matrices — or the other way round — is visible rather than hidden in a
-single winner.
+about the specification while being indifferent between weight matrices — or
+the other way round — is visible rather than hidden in a single winner.
+
+!!! warning "What this ranks, and what it does not"
+    These are posterior probabilities over **reduced forms**, computed from
+    marginal likelihoods. `prob_global` and `prob_local` aggregate the mass
+    on `(:sar, :sdm)` and on `(:slx, :sem, :sdem)` respectively; the names
+    say which specifications are summed, not which mechanism generated the
+    data.
+
+    A high `prob_global` means the data are better described by a model with
+    `ρ` on `y` than by the alternatives offered. It is not evidence that
+    outcomes propagate between neighbours, because a model with dependence
+    in the disturbance and one with dependence in the outcome can imply the
+    same covariance, and because the grid can only rank the specifications
+    it was given. Choosing between *mechanisms* needs variation in the
+    neighbourhood that is exogenous to the outcome; no quantity on this
+    object supplies that, and reporting a winning cell as though it did is
+    the step to avoid.
 
 `Ws` is a vector of weight matrices; pass one to compare specifications
 alone. `specs` defaults to `[:ols, :slx, :sar, :sdm, :sem, :sdem]`.

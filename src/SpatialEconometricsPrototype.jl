@@ -118,7 +118,9 @@ end
 # about a zero pivot -- which says nothing about the design that caused it.
 # The commonest cause by far is an `X` that already carries its own intercept,
 # since every `build_design_matrix` prepends one; next commonest is a W for
-# which `W*X` lands in the span of `X`, which makes an SDM unidentified.
+# which `W*X` lands in the span of `X`, which leaves an SDM design rank
+# deficient. "Rank deficient" and not "unidentified": the second word is
+# reserved here for the causal sense, which no rank check speaks to.
 function _check_design_rank(X_aug::AbstractMatrix{T},
                             coefnames::Vector{String}) where {T<:AbstractFloat}
     # `coefnames` ends with the spatial parameter, which is not a column.

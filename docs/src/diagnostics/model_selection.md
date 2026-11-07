@@ -67,8 +67,8 @@ println(ev)
 # ev.prob         — the posterior over the (specification, W) grid
 # ev.prob_spec    — its specification margin
 # ev.prob_w       — its weight-matrix margin
-# ev.prob_global  — mass on :sar and :sdm, spillovers running through y
-# ev.prob_local   — mass on :slx, :sem and :sdem, spillovers in the errors
+# ev.prob_global  — mass on :sar and :sdm, the specifications with ρ on y
+# ev.prob_local   — mass on :slx, :sem and :sdem, the rest
 ```
 
 The six specifications, their designs, and where each puts the dependence:
@@ -82,10 +82,21 @@ The six specifications, their designs, and where each puts the dependence:
 | `:sem` | `[1 X]` | `λ` on `u` | local |
 | `:sdem` | `[1 X WX]` | `λ` on `u` | local |
 
-Global against local is the substantive question, and it is not a nesting
-question: `:sdm` and `:sdem` have the same design and the same number of
-parameters, and no likelihood-ratio test runs between them. `prob_global`
-and `prob_local` answer it directly.
+Global against local is not a nesting question: `:sdm` and `:sdem` have the
+same design and the same number of parameters, and no likelihood-ratio test
+runs between them. That is why a posterior over the grid is useful where a
+test is unavailable, and `prob_global` and `prob_local` are its two sums.
+
+Be careful what they are taken to answer. They rank **reduced forms** by
+marginal likelihood over the specifications supplied, and the `Spillovers`
+column above names the reach each specification *assumes*, not one the
+comparison discovers. A model with dependence in the disturbance and one
+with dependence in the outcome can imply the same covariance, so a decisive
+`prob_global` is evidence that `ρ` on `y` describes these data better than
+the offered alternatives — not that outcomes propagate between neighbours.
+Separating mechanisms needs neighbourhood variation that is exogenous to the
+outcome, which no information criterion or posterior in this package can
+manufacture.
 
 ### What is integrated, and what is not
 
@@ -193,8 +204,8 @@ not a tie to break by taking the maximum.
 
 !!! note "The roadmap is the local case"
     `:sar` and `:sdm` put the dependence on `y`. Pass them through `specs` if
-    you want them in the same table, but the global-versus-local comparison
-    is what `bayes_spec_probs` is for; the roadmap holds the reach fixed and
+    you want them in the same table, but comparing across the two reaches is
+    what `bayes_spec_probs` is for; the roadmap holds the reach fixed and
     searches within it.
 
 ## Choosing `k` for a knn `W`
