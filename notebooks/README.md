@@ -40,12 +40,21 @@ which takes a few minutes the first time.
 | `08_networks_and_factors.ipynb` | Common factors: the CD test, the alpha exponent, CCE, spatio-temporal principal components |
 | `09_model_selection.ipynb` | Information criteria, Bayesian specification probabilities, convex combinations of weights |
 | `10_diagnostics_and_robust_inference.ipynb` | The full LM battery, and Driscoll-Kraay and Conley standard errors checked against a sampling distribution |
+| `11_portugal_municipalities.ipynb` | **Real data.** 278 Portuguese municipalities: the battery, SAR/SEM/SDM, a coastal/interior regime split that rejects, and a Conley bandwidth sweep |
 
 `06` to `10` use simulated data throughout and print the data-generating
 process before each fit, so every number has a known answer to be read against.
 That is deliberate: these five cover the parts of the package where a plausible
 wrong answer is hardest to spot, and three of them turn on a result that
 contradicts the obvious reading.
+
+`11` is the counterpart on real data at a sample size that supports it, and it
+is worth reading against `04` and `05`, which run the same tests on 49
+Columbus neighbourhoods. The LM battery settles nothing on Columbus and
+predicts the right model here; the Chow test fails to reject on Columbus's
+north/south split and rejects on Portugal's coastal/interior one. Same tests,
+same package, opposite conclusions — which is the most useful thing a pair of
+notebooks can show.
 
 ## Interactive
 
@@ -93,9 +102,10 @@ population density and the ageing ratio, all for 2023.
 
 It is a better teaching set than Columbus in every dimension that matters.
 Columbus has 49 units; this has 278 contiguous ones, which is enough for the
-asymptotics the estimators assume to mean something. It has a real
-coastal/interior split, which the regimes, Chow and SKATER examples currently
-demonstrate on simulated data. And purchasing power across Portuguese
+asymptotics the estimators assume to mean something. Its coastal/interior split
+is a regime boundary that corresponds to something, where Columbus offers a
+north/south dummy on which the Chow test declines to reject. And purchasing
+power across Portuguese
 municipalities is spatially dependent for reasons nobody has to invent:
 Lisboa at 181.4 and Porto at 162.2 against a municipal mean of 82.5.
 
@@ -121,12 +131,16 @@ rather than along a border. Mean degree is 5.32, the minimum is 1 (Nazaré) and
 no municipality is isolated.
 
 The spatial dependence is real and strong, not a teaching fiction: Moran's I on
-purchasing power is **0.445** with z = 12.1. The LM battery rejects both ways
-(lag 40.0, error 77.6) and the robust pair points at the error model more
-firmly than the lag (robust lag 8.8, p 0.003; robust error 46.4, p 1e-11),
-which makes it a better discussion than a clean verdict would be. A SAR fit
-gives ρ = 0.379, log density +3.57 and the ageing ratio −2.44: denser
-municipalities richer, older ones poorer.
+purchasing power is **0.445** with z = 12.1, and still **0.336** on the OLS
+residuals, so it is not merely inherited from density and age. The LM battery
+rejects both ways (lag 40.0, error 77.6) and the robust pair points at the
+error model five times more firmly than the lag (robust lag 8.8, p 0.003;
+robust error 46.4, p 1e-11). The likelihood then agrees: SEM beats SAR by 34
+AIC points. A SAR fit gives ρ = 0.379, log density +3.57 and the ageing ratio
+−0.0244 per point of the ratio, or about −2.4 index points per hundred:
+denser municipalities richer, older ones poorer.
+
+`11_portugal_municipalities.ipynb` works all of that through.
 
 All five files come from one run of `scripts/build_notebook_dataset.jl` in
 [PortugalINE.jl](https://github.com/randsley/PortugalINE.jl): indicators from

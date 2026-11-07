@@ -6,7 +6,7 @@
 > 28 submodules, 3,757 test assertions in 56 top-level testsets with both
 > package extensions installed and 3,722 without them, measured on 2026-11-06
 > on Julia 1.13.3 and confirmed by CI on 1.10.13, 1.13 and nightly across
-> Linux, Windows and macOS. 29 examples, 17 notebooks, 2 package extensions, CI/CD and
+> Linux, Windows and macOS. 29 examples, 18 notebooks, 2 package extensions, CI/CD and
 > 56 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
@@ -1247,8 +1247,8 @@ line.
 
 Measured on master: 28 submodules plus the umbrella across 24,321 lines of
 `src/`, 9,519 lines of tests, 4,750 lines of examples across 29 scripts,
-398 lines of package extensions, 56 documentation pages and 17 notebooks
-(10 Jupyter, 7 Pluto).
+398 lines of package extensions, 56 documentation pages and 18 notebooks
+(11 Jupyter, 7 Pluto).
 
 The `v0.4.0` row sits 68 lines above the measured row before it, and no
 feature accounts for the difference: it is docstring prose, from the two
