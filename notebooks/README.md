@@ -91,7 +91,7 @@ answer, and a few (the power question in `05`, the weight-matrix question in
 
 ## Data
 
-Two real datasets, both in `data/`.
+Three real datasets, all in `data/`.
 
 ### Portuguese municipalities, 2023
 
@@ -158,6 +158,42 @@ published result:
 
 INE data is open for reuse under EU Directive 2019/1024 with copyright
 retained, and CAOP2025 is CC-BY-4.0.
+
+### European regions and countries
+
+Two panels, built together by `data/build/build_europe.jl` and documented in
+`europe_PROVENANCE.md`.
+
+`europe_nuts2.csv` is a **regional panel of 247 NUTS-2 regions** (2024
+classification) in the EU27, Norway and Switzerland, 1999-2025: GDP in euros
+and in PPS per head, a real GDP volume index, population, employment,
+unemployment and investment, from Eurostat's regional tables. The outermost
+regions, Ceuta, Melilla and Svalbard are left out. The panel is unbalanced,
+because NUTS 2024 redrew regions in several countries and some tables have no
+back series for the new units; real growth over 2010-2022 is complete for 234
+regions. Ten regions are islands with no land neighbour, so the queen and rook
+files have ten zero rows: drop them, or build k-nearest-neighbour weights from
+the EPSG:3035 centroids in `europe_nuts2_regions.csv`.
+
+`europe_ameco.csv` is a **country panel of 30 countries** (the EU27, Norway,
+Switzerland and Iceland) from the Commission's AMECO database: GDP, real
+GDP, population, employment, unemployment, investment, compensation, capital
+stock and trade, with the Commission's forecast years removed. Thirty units
+suit a static spatial panel, not methods whose asymptotics need many units.
+
+Three credits apply, and the boundary terms are narrower than the rest:
+
+> Source: Eurostat, regional statistics, extracted 2026-11-09.
+>
+> Source: European Commission, DG ECFIN, AMECO database, 2026 release,
+> extracted 2026-11-09.
+>
+> © EuroGeographics for the administrative boundaries
+
+Eurostat and AMECO values may be reused with the source acknowledged. The
+five files derived from GISCO's boundaries (the two centroid files and the
+three `.gal` files) are for **non-commercial use only**, under GISCO's terms;
+the package's MIT licence does not extend to them.
 
 ### Columbus, Ohio, 1980
 

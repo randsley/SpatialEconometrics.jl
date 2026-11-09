@@ -292,3 +292,11 @@ studies reported in [Validation Status](#validation-status).
 - Santos Silva, J. M. C. & Tenreyro, S. (2006). *Review of Economics and Statistics*, 88(4).
 - Windmeijer, F. (2005). *Journal of Econometrics*, 126(1).
 - Yu, J., de Jong, R. & Lee, L.-F. (2008). *Journal of Econometrics*, 146(1).
+
+## License
+
+MIT; see [`LICENSE`](LICENSE). The licence covers the code. The datasets in
+[`notebooks/data/`](notebooks/data/) keep their sources' terms, set out in
+each `*_PROVENANCE.md` file there. Five of the European files are derived from
+GISCO's NUTS boundaries and are for **non-commercial use only**; see
+[`europe_PROVENANCE.md`](notebooks/data/europe_PROVENANCE.md).
