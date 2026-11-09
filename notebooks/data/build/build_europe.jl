@@ -1,4 +1,5 @@
-# Build the European datasets in notebooks/data from Eurostat, GISCO and AMECO.
+# Build the European datasets in notebooks/data from Eurostat, OpenStreetMap
+# and AMECO.
 #
 #     julia --project=notebooks/data/build notebooks/data/build/build_europe.jl
 #
@@ -7,16 +8,18 @@
 #
 # Writes, into notebooks/data/:
 #   europe_nuts2.csv            regional panel, NUTS-2 2024, one row per region-year
-#   europe_nuts2_regions.csv    one row per region: name, centroid, area
-#   europe_nuts2_queen.gal      contiguity by shared vertex
-#   europe_nuts2_rook.gal       contiguity by shared edge
+#   europe_nuts2_regions.csv    one row per region: name, centroid, land area
+#   europe_nuts2_queen.gal      contiguity by shared boundary node
+#   europe_nuts2_rook.gal       contiguity by shared boundary way
 #   europe_ameco.csv            country panel from AMECO, one row per country-year
-#   europe_countries.csv        one row per country: name, centroid, area
-#   europe_countries_queen.gal  country contiguity by shared vertex
+#   europe_countries.csv        one row per country: name, centroid, land area
+#   europe_countries_queen.gal  country contiguity, from the regional links
 #   europe_PROVENANCE.md        sources, vintages, hashes, choices, credits
 #
 # Raw downloads are cached in notebooks/data/build/cache/ (gitignored). Delete
-# the cache to force a fresh pull.
+# the cache to force a fresh pull. A cold build spends most of its time on the
+# Overpass queries for the boundaries (about half an hour, one country at a
+# time, retried with backoff when the public server is busy).
 
 using CSV, Dates, Downloads, JSON3, Printf, SHA
 
@@ -26,7 +29,6 @@ const CACHE = joinpath(HERE, "cache")
 mkpath(CACHE)
 
 const EUROSTAT = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
-const GISCO    = "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson"
 const AMECO    = "https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1/data"
 
 # EU27 plus Norway and Switzerland for the regions; Iceland as well for the
@@ -72,14 +74,16 @@ end
 # ── Eurostat JSON-stat ────────────────────────────────────────────────────────
 
 """
-    eurostat(dataset, fixed) -> (values, updated)
+    eurostat(dataset, fixed; level = "nuts2") -> (values, updated, labels)
 
 `values[(geo, year)]` for one series of a JSON-stat 2.0 response, every
 dimension other than `geo` and `time` pinned by `fixed`. A pinned category
-the dataset does not have is an error, not an empty series.
+the dataset does not have is an error, not an empty series. `labels` maps
+each geo code to Eurostat's English name for it.
 """
-function eurostat(dataset, fixed::Dict{String,String})
-    path = download_cached("$EUROSTAT/$dataset?format=JSON&lang=EN&geoLevel=nuts2", "$dataset.json")
+function eurostat(dataset, fixed::Dict{String,String}; level = "nuts2")
+    path = download_cached("$EUROSTAT/$dataset?format=JSON&lang=EN&geoLevel=$level",
+                           level == "nuts2" ? "$dataset.json" : "$(dataset)_$level.json")
     d = JSON3.read(read(path, String))
     ids  = String.(d.id)
     sz = Int.(d.size)
@@ -105,8 +109,12 @@ function eurostat(dataset, fixed::Dict{String,String})
         v = get_value(base + gi * gs + ti * ts)
         v === nothing || (out[(g, parse(Int, t))] = Float64(v))
     end
-    return out, String(d.updated)
+    labels = Dict(String(k) => String(v) for (k, v) in d.dimension.geo.category.label)
+    return out, String(d.updated), labels
 end
+
+"""Most recent value per geo code."""
+latest(vals) = Dict(g => v for ((g, t), v) in sort(collect(vals); by = x -> x[1][2]))
 
 const REGIONAL = [
     # column              dataset              pinned categories
@@ -119,68 +127,9 @@ const REGIONAL = [
     ("gfcf_mio_eur",      "nama_10r_2gfcf",    Dict("freq"=>"A", "sector"=>"S1", "currency"=>"MIO_EUR", "nace_r2"=>"TOTAL")),
 ]
 
-# ── GISCO geometry: centroids, areas, contiguity ──────────────────────────────
+# ── geometry: OpenStreetMap ───────────────────────────────────────────────────
 
-# Every coordinate ring in a GeoJSON geometry, with a flag for the exterior
-# ring of each polygon (holes are subtracted from area and centroid).
-function rings(geom)
-    out = Tuple{Vector{Tuple{Float64,Float64}},Bool}[]
-    polys = geom.type == "Polygon" ? [geom.coordinates] : geom.coordinates
-    for poly in polys, (k, ring) in enumerate(poly)
-        push!(out, ([(Float64(p[1]), Float64(p[2])) for p in ring], k == 1))
-    end
-    return out
-end
-
-# Area and area-weighted centroid by the shoelace formula, in the units of the
-# coordinates. Meaningful in metres on EPSG:3035 (equal-area); on longitude and
-# latitude it is a planar approximation, good enough to place a label.
-function area_centroid(rs)
-    A = 0.0; cx = 0.0; cy = 0.0
-    for (ring, exterior) in rs
-        a = 0.0; x = 0.0; y = 0.0
-        for i in 1:length(ring)-1
-            (x0, y0), (x1, y1) = ring[i], ring[i+1]
-            c = x0 * y1 - x1 * y0
-            a += c; x += (x0 + x1) * c; y += (y0 + y1) * c
-        end
-        a /= 2
-        s = (exterior ? 1 : -1) * sign(a)    # exterior counts, holes subtract
-        A += s * a; cx += s * x / 6; cy += s * y / 6
-    end
-    return abs(A), cx / A, cy / A
-end
-
-"""
-Contiguity by shared vertex (queen) or shared edge (rook). GISCO builds the
-NUTS layers from one topology, so neighbouring units carry identical vertex
-coordinates along a common boundary and exact hashing finds them; no geometry
-engine is needed (the same method as the Portuguese weights).
-"""
-function contiguity(ids, geoms)
-    at = Dict{Tuple{Float64,Float64},Set{Int}}()
-    along = Dict{Tuple{Tuple{Float64,Float64},Tuple{Float64,Float64}},Set{Int}}()
-    for (u, g) in enumerate(geoms), (ring, _) in rings(g)
-        for i in eachindex(ring)
-            push!(get!(Set{Int}, at, ring[i]), u)
-            if i < length(ring)
-                e = minmax(ring[i], ring[i+1])
-                push!(get!(Set{Int}, along, e), u)
-            end
-        end
-    end
-    links(sets) = begin
-        nb = [Set{Int}() for _ in ids]
-        for s in values(sets)
-            length(s) < 2 && continue
-            for a in s, b in s
-                a == b || push!(nb[a], b)
-            end
-        end
-        [sort!(collect(n)) for n in nb]
-    end
-    return links(at), links(along)
-end
+include(joinpath(HERE, "osm_geometry.jl"))
 
 function write_gal(path, ids, nbrs, label)
     open(path, "w") do io
@@ -192,31 +141,19 @@ function write_gal(path, ids, nbrs, label)
     end
 end
 
-function units(level, keep::Function)
-    g3035 = JSON3.read(read(download_cached("$GISCO/NUTS_RG_01M_2024_3035_LEVL_$level.geojson",
-                                  "NUTS_RG_01M_2024_3035_LEVL_$level.geojson"), String))
-    g4326 = JSON3.read(read(download_cached("$GISCO/NUTS_RG_01M_2024_4326_LEVL_$level.geojson",
-                                  "NUTS_RG_01M_2024_4326_LEVL_$level.geojson"), String))
-    lonlat = Dict(String(f.properties.NUTS_ID) => f.geometry for f in g4326.features)
-    feats = sort([f for f in g3035.features if keep(String(f.properties.NUTS_ID))];
-                 by = f -> String(f.properties.NUTS_ID))
-    ids   = [String(f.properties.NUTS_ID) for f in feats]
-    names = [String(f.properties.NAME_LATN) for f in feats]
-    geoms = [f.geometry for f in feats]
-    geo = map(enumerate(geoms)) do (i, g)
-        a, x, y = area_centroid(rings(g))
-        _, lon, lat = area_centroid(rings(lonlat[ids[i]]))
-        (area_km2 = a / 1e6, x = x, y = y, lon = lon, lat = lat)
-    end
-    queen, rook = contiguity(ids, geoms)
-    return ids, names, geo, queen, rook
-end
-
 csvfield(s) = occursin(r"[,\"]", s) ? "\"" * replace(s, "\"" => "\"\"") * "\"" : s
 # Fixed-point, never scientific notation, so the files read the same in any tool.
 num(v; digits = 6) = v === nothing || (v isa Float64 && isnan(v)) ? "" :
     (s = Printf.format(Printf.Format("%.$(digits)f"), v);
      occursin('.', s) ? rstrip(rstrip(s, '0'), '.') : s)
+
+const COUNTRY_NAMES = Dict(
+    "AT"=>"Austria","BE"=>"Belgium","BG"=>"Bulgaria","CY"=>"Cyprus","CZ"=>"Czechia",
+    "DE"=>"Germany","DK"=>"Denmark","EE"=>"Estonia","EL"=>"Greece","ES"=>"Spain",
+    "FI"=>"Finland","FR"=>"France","HR"=>"Croatia","HU"=>"Hungary","IE"=>"Ireland",
+    "IT"=>"Italy","LT"=>"Lithuania","LU"=>"Luxembourg","LV"=>"Latvia","MT"=>"Malta",
+    "NL"=>"Netherlands","PL"=>"Poland","PT"=>"Portugal","RO"=>"Romania","SE"=>"Sweden",
+    "SI"=>"Slovenia","SK"=>"Slovakia","NO"=>"Norway","CH"=>"Switzerland","IS"=>"Iceland")
 
 # ── AMECO SDMX ────────────────────────────────────────────────────────────────
 
@@ -260,17 +197,31 @@ end
 
 function main()
     # Regions ------------------------------------------------------------------
-    keep_region(id) = length(id) == 4 && id[1:2] in REGION_COUNTRIES && !haskey(EXCLUDED, id)
-    rid, rname, rgeo, rqueen, rrook = units(2, keep_region)
-    @info "regions" length(rid)
-
     series = Dict{String,Dict{Tuple{String,Int},Float64}}()
     updated = Dict{String,String}()
+    labels = Dict{String,String}()
     for (col, ds, fixed) in REGIONAL
-        series[col], updated[ds] = eurostat(ds, fixed)
+        series[col], updated[ds], l = eurostat(ds, fixed)
+        merge!(labels, l)
     end
-    years = sort(unique(t for s in values(series) for ((g, t), _) in s if g in rid))
+    # The region list is NUTS 2024 as Eurostat's regional accounts publish it.
+    keep_region(id) = length(id) == 4 && id[1:2] in REGION_COUNTRIES &&
+                      !endswith(id, "ZZ") && !haskey(EXCLUDED, id)
+    rid = sort(unique(g for ((g, _), _) in series["gdp_mio_eur"] if keep_region(g)))
+    @info "regions" length(rid)
+    rname = [labels[id] for id in rid]
 
+    area_vals, updated["reg_area3"], _ = eurostat("reg_area3",
+        Dict("freq" => "A", "landuse" => "L0008", "unit" => "KM2"))
+    rarea = latest(area_vals)
+    missing_area = [id for id in rid if !haskey(rarea, id)]
+    isempty(missing_area) || error("no land area for $(join(missing_area, ", "))")
+
+    osm = osm_regions(REGION_COUNTRIES, rid)
+    rgeo = [osm.geo[id] for id in rid]
+    rqueen, rrook = osm.queen, osm.rook
+
+    years = sort(unique(t for s in values(series) for ((g, t), _) in s if g in rid))
     open(joinpath(OUT, "europe_nuts2.csv"), "w") do io
         println(io, join(["nuts_id", "country", "year", first.(REGIONAL)...], ","))
         for id in rid, t in years
@@ -280,11 +231,11 @@ function main()
         end
     end
     open(joinpath(OUT, "europe_nuts2_regions.csv"), "w") do io
-        println(io, "nuts_id,country,x_laea,y_laea,lon,lat,area_km2,queen_neighbours,rook_neighbours,name")
+        println(io, "nuts_id,country,x_laea,y_laea,lon,lat,land_area_km2,queen_neighbours,rook_neighbours,name")
         for (i, id) in enumerate(rid)
             g = rgeo[i]
             println(io, join([id, id[1:2], num(g.x; digits = 1), num(g.y; digits = 1),
-                              num(g.lon), num(g.lat), num(g.area_km2; digits = 1),
+                              num(g.lon), num(g.lat), num(rarea[id]; digits = 1),
                               string(length(rqueen[i])), string(length(rrook[i])),
                               csvfield(rname[i])], ","))
         end
@@ -293,8 +244,33 @@ function main()
     write_gal(joinpath(OUT, "europe_nuts2_rook.gal"),  rid, rrook,  "europe_nuts2")
 
     # Countries ----------------------------------------------------------------
-    keep_country(id) = id in COUNTRY_COUNTRIES
-    cid, cname, cgeo, cqueen, _ = units(0, keep_country)
+    # Geometry from the regions: a country's centroid is the land-area-weighted
+    # mean of its regions' centroids (so the excluded outermost regions do not
+    # pull it out to sea), and two countries are neighbours when any of their
+    # regions are. Iceland has no regions here and is fetched on its own.
+    cid = sort(COUNTRY_COUNTRIES)
+    carea_vals, _, _ = eurostat("reg_area3",
+        Dict("freq" => "A", "landuse" => "L0008", "unit" => "KM2"); level = "country")
+    carea = latest(carea_vals)
+    cgeo = map(cid) do c
+        members = [i for (i, id) in enumerate(rid) if id[1:2] == c]
+        if isempty(members)
+            g = osm_single(c)
+            return (x = g.x, y = g.y, lon = g.lon, lat = g.lat)
+        end
+        w = [rarea[rid[i]] for i in members]; w ./= sum(w)
+        (x = sum(w .* [rgeo[i].x for i in members]), y = sum(w .* [rgeo[i].y for i in members]),
+         lon = sum(w .* [rgeo[i].lon for i in members]), lat = sum(w .* [rgeo[i].lat for i in members]))
+    end
+    cidx = Dict(c => k for (k, c) in enumerate(cid))
+    cn = [Set{Int}() for _ in cid]
+    for (i, nb) in enumerate(rqueen), j in nb
+        a, b = cidx[rid[i][1:2]], cidx[rid[j][1:2]]
+        a == b || (push!(cn[a], b); push!(cn[b], a))
+    end
+    cqueen = [sort!(collect(s)) for s in cn]
+    cname = [COUNTRY_NAMES[c] for c in cid]
+
     am = Dict{String,Dict{Tuple{String,Int},Float64}}()
     releases = Set{Int}()
     for (col, ch, item, unit) in AMECO_SERIES
@@ -321,18 +297,18 @@ function main()
         end
     end
     open(joinpath(OUT, "europe_countries.csv"), "w") do io
-        println(io, "nuts_id,iso3,x_laea,y_laea,lon,lat,area_km2,queen_neighbours,name")
+        println(io, "nuts_id,iso3,x_laea,y_laea,lon,lat,land_area_km2,queen_neighbours,name")
         for (i, c) in enumerate(cid)
             g = cgeo[i]
             println(io, join([c, ISO3[c], num(g.x; digits = 1), num(g.y; digits = 1),
-                              num(g.lon), num(g.lat), num(g.area_km2; digits = 1),
+                              num(g.lon), num(g.lat), num(get(carea, c, nothing); digits = 1),
                               string(length(cqueen[i])), csvfield(cname[i])], ","))
         end
     end
     write_gal(joinpath(OUT, "europe_countries_queen.gal"), cid, cqueen, "europe_countries")
 
-    write_provenance(rid, rname, rqueen, rrook, series, updated, years,
-                     cid, cname, cqueen, am, release, last_actual, ayears)
+    write_provenance(rid, rname, rqueen, rrook, osm, series, updated, years,
+                     cid, cname, cqueen, release, last_actual, ayears)
 end
 
 function coverage(series, ids, cols, years)
@@ -343,11 +319,12 @@ function coverage(series, ids, cols, years)
     end
 end
 
-function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
-                          cid, cname, cqueen, am, release, last_actual, ayears)
+function write_provenance(rid, rname, rqueen, rrook, osm, series, updated, years,
+                          cid, cname, cqueen, release, last_actual, ayears)
     today = Dates.format(Dates.today(), "yyyy-mm-dd")
     isolated(ids, nb) = [ids[i] for i in eachindex(ids) if isempty(nb[i])]
     nlinks(nb) = sum(length, nb) ÷ 2
+    named(ids, names, sel) = join(["`$x` " * names[findfirst(==(x), ids)] for x in sel], ", ")
     open(joinpath(OUT, "europe_PROVENANCE.md"), "w") do io
         print(io, """
         # European regions and countries: provenance and attribution
@@ -359,39 +336,47 @@ function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
         >
         > Source: European Commission, DG ECFIN, AMECO database, $(release) release, extracted $today.
         >
-        > © EuroGeographics for the administrative boundaries
+        > Boundaries: © OpenStreetMap contributors, available under the Open Database License (ODbL)
 
         **Eurostat** statistical data may be reused, commercially or not, provided
         the source is acknowledged (Commission Decision 2011/833/EU; Eurostat
         copyright notice). **AMECO** is Commission content under the same
         decision, licensed CC BY 4.0: credit the source and indicate changes.
-        The **boundaries** are GISCO's NUTS 2024 layer, and their terms differ:
-        Eurostat grants a non-exclusive, non-transferable right to use and
-        process them for **non-commercial purposes only**, with the EuroGeographics
-        notice above visible on any publication. No boundary geometry is
-        redistributed here, but five files are derived from it and are offered
-        under those same non-commercial terms: `europe_nuts2_regions.csv`,
-        `europe_nuts2_queen.gal`, `europe_nuts2_rook.gal`,
-        `europe_countries.csv` and `europe_countries_queen.gal`. Commercial use
-        of those five needs a licence from EuroGeographics. The package's MIT
-        licence covers its code, not these files.
 
-        Built by `notebooks/data/build/build_europe.jl`, which writes every file
-        listed here in one run. The changes made to the sources are the ones
-        this file describes: series selected and pinned, units converted only
-        where stated, forecast years removed, regions excluded.
+        **Boundaries** come from **OpenStreetMap**, under the Open Database
+        License 1.0 (<https://opendatacommons.org/licenses/odbl/1-0/>), which
+        permits commercial use. No boundary geometry is redistributed here, but
+        five files are derived from it: `europe_nuts2_regions.csv` (the
+        centroid columns), `europe_nuts2_queen.gal`, `europe_nuts2_rook.gal`,
+        `europe_countries.csv` (the centroid columns) and
+        `europe_countries_queen.gal`. As a database derived from OSM they are
+        offered under the **ODbL**: credit "© OpenStreetMap contributors", and
+        if you publicly use an adapted version of them, offer that version
+        under the ODbL too. The land areas in those files are Eurostat's, not
+        OSM's. The package's MIT licence covers its code, not these files.
+
+        GISCO's NUTS boundaries were the first choice and are not used: Eurostat
+        licenses them for non-commercial use only, and anything derived from
+        them would carry that restriction.
+
+        Built by `notebooks/data/build/build_europe.jl` (with
+        `osm_geometry.jl`), which writes every file listed here in one run. The
+        changes made to the sources are the ones this file describes: series
+        selected and pinned, units converted only where stated, forecast years
+        removed, regions excluded, sea boundaries dropped from the contiguity,
+        Lake Constance links added to it, and boundary gaps closed.
 
         ## Files
 
         | file | units | contents |
         |---|---|---|
         | `europe_nuts2.csv` | $(length(rid)) | regional panel, $(first(years))-$(last(years)), one row per region-year with any value |
-        | `europe_nuts2_regions.csv` | $(length(rid)) | name, centroid (EPSG:3035 metres and approximate WGS84), area, neighbour counts |
-        | `europe_nuts2_queen.gal` | $(length(rid)) | contiguity by shared vertex, $(nlinks(rqueen)) links |
-        | `europe_nuts2_rook.gal` | $(length(rid)) | contiguity by shared edge, $(nlinks(rrook)) links |
+        | `europe_nuts2_regions.csv` | $(length(rid)) | Eurostat name, centroid (EPSG:3035 metres and approximate WGS84), Eurostat land area, neighbour counts |
+        | `europe_nuts2_queen.gal` | $(length(rid)) | contiguity by shared land boundary node, $(nlinks(rqueen)) links |
+        | `europe_nuts2_rook.gal` | $(length(rid)) | contiguity by shared land boundary way, $(nlinks(rrook)) links |
         | `europe_ameco.csv` | $(length(cid)) | country panel, $(first(ayears))-$(last(ayears)), one row per country-year |
-        | `europe_countries.csv` | $(length(cid)) | name, centroid, area, neighbour count |
-        | `europe_countries_queen.gal` | $(length(cid)) | country contiguity by shared vertex, $(nlinks(cqueen)) links |
+        | `europe_countries.csv` | $(length(cid)) | name, centroid, Eurostat land area, neighbour count |
+        | `europe_countries_queen.gal` | $(length(cid)) | country contiguity, $(nlinks(cqueen)) links |
 
         Regions are keyed by the **NUTS 2024** code and countries by the NUTS
         country code (`EL` for Greece), with the ISO-3 code AMECO uses beside it
@@ -400,8 +385,9 @@ function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
 
         ## Regions
 
-        NUTS-2 regions (2024 classification) of the EU27, Norway and Switzerland.
-        Excluded, because they have no place in a contiguity analysis of Europe:
+        NUTS-2 regions (2024 classification) of the EU27, Norway and Switzerland,
+        as Eurostat's regional accounts list them. Excluded, because they have
+        no place in a contiguity analysis of Europe:
 
         | code | reason |
         |---|---|
@@ -410,10 +396,22 @@ function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
             println(io, "| `", k, "` | ", EXCLUDED[k], " |")
         end
         iso = isolated(rid, rqueen)
+        built = sort([c for (c, h) in osm.how if startswith(h, "union")])
+        builtnote = isempty(built) ? "" :
+            "OSM has no NUTS-2 relation for " * join(["`$c`" for c in built], ", ") *
+            ", new in NUTS 2024, so each is assembled from its NUTS-3 relations: " *
+            "its boundary is the set of ways that exactly one of them uses."
+        brokennote = isempty(osm.broken) ? "" :
+            "Where an OSM boundary does not close, the open ends are joined across " *
+            "the shortest gap (widths in metres): " *
+            join(["`$c` ($(join([string(round(g; digits = 1)) for g in gs], ", ")))"
+                  for (c, gs) in sort(collect(osm.broken))], "; ") * "."
+        linklist(s) = join(["`$(a)`–`$(b)`" for (a, b) in sort(collect(s))], ", ")
+        sealinks = linklist(SEA_LINKS)
         print(io, """
 
         **$(length(iso)) regions have no land neighbour** in the queen file:
-        $(join(["`$x` " * rname[findfirst(==(x), rid)] for x in iso], ", ")).
+        $(named(rid, rname, iso)).
         A contiguity matrix over all $(length(rid)) therefore has $(length(iso))
         zero rows, and row-standardising divides by zero. Drop them, or use a
         k-nearest-neighbour matrix from the centroids
@@ -421,9 +419,29 @@ function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
         neighbours. Distances should come from the EPSG:3035 coordinates, which
         are in metres; the WGS84 centroids are a planar approximation for labels.
 
-        The contiguity is exact-vertex matching on the 1:1 million layer. The
-        coarser 1:20 million layer generalises some boundaries away and loses
-        links, which is why it is not used.
+        ### How the geometry was built
+
+        Each region is the OSM boundary relation tagged with its NUTS code
+        (`ref:nuts:2`, or `ref:NUTS`/`ref:nuts`), preferring a statistical
+        boundary over an administrative or historic one with the same code.
+        $builtnote
+
+        Contiguity needs no geometry engine. OSM stores a boundary between two
+        regions once, as a way both relations list, so two regions share an
+        edge (rook) when they share a way and touch (queen) when their ways
+        share a node. Only land boundaries count: ways tagged `maritime=yes`,
+        `boundary=maritime` or `natural=coastline` are dropped, and so are
+        $(length(SEA_LINKS)) sea links OSM does not tag as such: $sealinks.
+        Lake Constance is the exception the other way: no state has divided
+        it, so OSM leaves it outside every region, and the links that the
+        conventional NUTS split of the lake creates are added by hand: rook
+        $(linklist(LAKE_ROOK)); queen $(linklist(LAKE_QUEEN)).
+
+        Centroids are area-weighted over each region's OSM polygon in
+        ETRS89-LAEA (EPSG:3035). OSM's coastal regions extend into territorial
+        waters, so a coastal centroid sits slightly seaward of the land
+        centroid; that is also why areas come from Eurostat (`reg_area3`, land
+        area), not from the polygons. $brokennote
 
         ### Regional series
 
@@ -442,7 +460,9 @@ function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
         print(io, """
 
         `real_gdp_index` is the chain-linked volume index of GDP, 2020 = 100;
-        growth rates come from it, not from current-price GDP.
+        growth rates come from it, not from current-price GDP. Land area is
+        `reg_area3` (`landuse=L0008`, updated $(updated["reg_area3"][1:10])), the
+        most recent year published for each region.
 
         ## Countries (AMECO)
 
@@ -471,8 +491,14 @@ function write_provenance(rid, rname, rqueen, rrook, series, updated, years,
         (investment share, wage share, openness) should be formed from the EUR
         columns, and level comparisons from the PPS column.
 
+        A country's centroid is the land-area-weighted mean of its regions'
+        centroids, so the excluded outermost regions do not pull it out to sea
+        (France is metropolitan France, Portugal mainland Portugal); Iceland,
+        which has no regions here, has its own. Two countries are neighbours
+        when any of their regions are.
+
         **$(length(ciso)) countries have no land neighbour** inside the set:
-        $(join(["`$x` " * cname[findfirst(==(x), cid)] for x in ciso], ", ")).
+        $(named(cid, cname, ciso)).
         Ireland's only land border is with the United Kingdom, which is outside
         it. With about 30 countries the country panel suits a static spatial
         panel, not methods whose asymptotics need many units; use the regions

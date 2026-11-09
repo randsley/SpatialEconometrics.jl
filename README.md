@@ -298,5 +298,7 @@ studies reported in [Validation Status](#validation-status).
 MIT; see [`LICENSE`](LICENSE). The licence covers the code. The datasets in
 [`notebooks/data/`](notebooks/data/) keep their sources' terms, set out in
 each `*_PROVENANCE.md` file there. Five of the European files are derived from
-GISCO's NUTS boundaries and are for **non-commercial use only**; see
+OpenStreetMap boundaries and are offered under the
+[Open Database License](https://opendatacommons.org/licenses/odbl/1-0/)
+(© OpenStreetMap contributors); see
 [`europe_PROVENANCE.md`](notebooks/data/europe_PROVENANCE.md).

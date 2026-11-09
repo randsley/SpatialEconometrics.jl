@@ -171,8 +171,8 @@ unemployment and investment, from Eurostat's regional tables. The outermost
 regions, Ceuta, Melilla and Svalbard are left out. The panel is unbalanced,
 because NUTS 2024 redrew regions in several countries and some tables have no
 back series for the new units; real growth over 2010-2022 is complete for 234
-regions. Ten regions are islands with no land neighbour, so the queen and rook
-files have ten zero rows: drop them, or build k-nearest-neighbour weights from
+regions. Eleven regions are islands with no land neighbour, so the queen and
+rook files have eleven zero rows: drop them, or build k-nearest-neighbour weights from
 the EPSG:3035 centroids in `europe_nuts2_regions.csv`.
 
 `europe_ameco.csv` is a **country panel of 30 countries** (the EU27, Norway,
@@ -181,19 +181,22 @@ GDP, population, employment, unemployment, investment, compensation, capital
 stock and trade, with the Commission's forecast years removed. Thirty units
 suit a static spatial panel, not methods whose asymptotics need many units.
 
-Three credits apply, and the boundary terms are narrower than the rest:
+Three credits apply:
 
 > Source: Eurostat, regional statistics, extracted 2026-11-09.
 >
 > Source: European Commission, DG ECFIN, AMECO database, 2026 release,
 > extracted 2026-11-09.
 >
-> © EuroGeographics for the administrative boundaries
+> Boundaries: © OpenStreetMap contributors, available under the Open
+> Database License (ODbL)
 
-Eurostat and AMECO values may be reused with the source acknowledged. The
-five files derived from GISCO's boundaries (the two centroid files and the
-three `.gal` files) are for **non-commercial use only**, under GISCO's terms;
-the package's MIT licence does not extend to them.
+Eurostat and AMECO values may be reused, commercially or not, with the
+source acknowledged. The five files derived from OpenStreetMap boundaries
+(the two centroid files and the three `.gal` files) are offered under the
+ODbL, which also permits commercial use: credit OpenStreetMap, and offer any
+adapted version you publish under the ODbL too. The package's MIT licence
+does not extend to them.
 
 ### Columbus, Ohio, 1980
 
