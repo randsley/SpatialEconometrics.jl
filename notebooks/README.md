@@ -41,6 +41,8 @@ which takes a few minutes the first time.
 | `09_model_selection.ipynb` | Information criteria, Bayesian specification probabilities, convex combinations of weights |
 | `10_diagnostics_and_robust_inference.ipynb` | The full LM battery, and Driscoll-Kraay and Conley standard errors checked against a sampling distribution |
 | `11_portugal_municipalities.ipynb` | **Real data.** 278 Portuguese municipalities: the battery, SAR/SEM/SDM, a coastal/interior regime split that rejects, and a Conley bandwidth sweep |
+| `12_europe_regions.ipynb` | **Real data.** 223 EU NUTS-2 regions, growth 2012-2022: β-convergence that a spatial lag removes, country dummies that flip it to divergence, an old/new member-state regime split |
+| `13_europe_countries.ipynb` | **Real data.** 30 European economies, 1996-2025, from AMECO: spillovers against common shocks, with ρ̂ from −0.04 to 0.70 depending on the treatment, and a coefficient that does not move |
 
 `06` to `10` use simulated data throughout and print the data-generating
 process before each fit, so every number has a known answer to be read against.
@@ -55,6 +57,13 @@ predicts the right model here; the Chow test fails to reject on Columbus's
 north/south split and rejects on Portugal's coastal/interior one. Same tests,
 same package, opposite conclusions — which is the most useful thing a pair of
 notebooks can show.
+
+`12` and `13` take the same tools across borders, and both turn on the same
+point: in Europe, much of what a spatial lag finds is national or common to
+everyone. In `12`, country dummies explain 60% of regional growth and turn ρ̂
+from +0.58 to −0.23. In `13`, year effects and common correlated effects take
+ρ̂ from 0.70 to 0.48 and then to −0.04, and the last estimator fails its own
+Sargan test. `13` is the real-data counterpart of the simulation in `08`.
 
 ## Interactive
 
@@ -180,6 +189,9 @@ Switzerland and Iceland) from the Commission's AMECO database: GDP, real
 GDP, population, employment, unemployment, investment, compensation, capital
 stock and trade, with the Commission's forecast years removed. Thirty units
 suit a static spatial panel, not methods whose asymptotics need many units.
+
+`12_europe_regions.ipynb` uses the regional panel and `13_europe_countries.ipynb`
+the country panel.
 
 Three credits apply:
 
