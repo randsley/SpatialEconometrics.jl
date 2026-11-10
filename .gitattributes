@@ -1,0 +1,5 @@
+# Store text files with LF line endings and check them out with LF on every
+# OS, including Windows. Without this, a Windows checkout with
+# core.autocrlf=false and a CRLF-writing editor or Jupyter rewrites whole
+# notebooks as CRLF-only diffs. Binary files are detected automatically.
+* text=auto eol=lf
