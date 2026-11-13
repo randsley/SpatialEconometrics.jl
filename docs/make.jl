@@ -49,6 +49,7 @@ makedocs(
             "Networks" => "models/networks.md",
             "Common Factors & Spatio-Temporal" => "models/common_factors.md",
             "Spatial VAR" => "models/spvar.md",
+            "Semiparametric Models" => "models/semiparametric.md",
         ],
         "Diagnostics" => [
             "Spatial Diagnostics" => "diagnostics/spatial.md",
@@ -78,6 +79,7 @@ makedocs(
                 "Networks" => "api/networks.md",
                 "Common Factors & Spatio-Temporal" => "api/common_factors.md",
                 "Spatial VAR" => "api/spvar.md",
+                "Semiparametric Models" => "api/semiparametric.md",
                 "Geographically Weighted Regression" => "api/gwr.md",
             ],
             "Panels" => [

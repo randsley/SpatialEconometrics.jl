@@ -4132,3 +4132,165 @@ real gap is **seven callable functions**:
 Those seven are the place to look next, and `row_standardize!` is the one to
 look at first: it is reached indirectly by every weights constructor in the
 package and demonstrated directly by none of them.
+
+## #13 pass 1: the semiparametric estimators, measured before they are believed
+
+Built on 2026-11-13: `src/SemiparametricSpatial.jl`, with Su & Jin's (2010)
+partially linear SAR, Smirnov's closed-form `ρ` on the same first stage, the
+Geniaux overlap `π̄`, and Liang, Gao & Gong's `β(τ)`. Two parts of it have no
+proof behind them in this form, so the standing rule applies:
+
+- the closed form with a kernel first stage is outside Geniaux's fixed-basis
+  proof;
+- `π̄` is a diagnostic, and its source gives it no null distribution.
+
+Both were measured by Monte Carlo before the docs said anything about them.
+
+### What was verified exactly first
+
+Each estimator reduces to one the package already has. Testset 41 checks
+each reduction against the existing estimator's values, to a measured
+tolerance:
+
+- **The profile QML.** At a bandwidth of `1e5` a local-linear smoother is the
+  projection on `[1, z]`, and the profile QML is then
+  `fit_spatial(SAR(), W, [x z], y)`. `ρ`, `β`, both standard errors and the
+  log-likelihood agree to between `1e-13` and `3e-10`. The worst margin to
+  the tolerance is 1,872× on Julia 1.13 and 3,520× on 1.10.
+- **The closed form.** On that model it equals Smirnov's linear estimator.
+  Its root equals the root of the quadratic, built by hand from the
+  residuals.
+- **`β(τ)`.** At a bandwidth of `1e4` it is the within estimator on
+  `[x, τ, τx]`: `ρ` agrees to `3e-11`, the log-likelihood to `5e-8`, and
+  `β̂_x(τ)` with the global line to `8e-10`. The worst margin is 208×.
+- **The standard error of `ρ` in `β(τ)`** differs from `DirectQML` by one
+  convention, and the difference is verified exactly. Liang, Gao & Gong scale
+  the trace terms of the information by `T`; the package's panel code scales
+  them by `T − 1` under individual fixed effects. The test rebuilds the SE
+  from the fit's own pieces with each convention, and each matches its side
+  to `1e-8`.
+
+### A failure the first Monte Carlo found
+
+The first run lost fits in the safe design: 221 of 500 at `n = 400`, and
+242 at `n = 1000`. The cause was the smoother's window, not the estimator:
+- a local fit of order `p` needs `2p + 1` points inside its window;
+- with `z` normal and the rule-of-thumb bandwidth, some points in the tail of
+  `z` have fewer, so their local design is singular;
+- that cause accounts for 17 of the 40 failures inspected.
+
+The fix:
+- the smoother now widens such a window to just beyond the nearest `2p + 1`
+  points (5% wider);
+- the fit reports how many windows it widened (`n_widened`), about 1.2 per
+  fit at `n = 400`;
+- after the fix, no fit failed in any cell.
+
+The rows from the first run were discarded, and the study was run again from
+the same seeds.
+
+### The design
+
+The design is the same in every cell:
+- 500 replications per cell, seed `20261113`;
+- `W` is a row-standardised 6-nearest-neighbour graph on `n` uniform points in
+  the unit square, `(u, v)`;
+- `β = 1`, the rule-of-thumb bandwidth, and `ExactLU` log-determinants.
+
+The two designs:
+- **Safe** (Su & Jin §6): `z ~ N(0,1)` independent of location,
+  `x = 0.2z² − z + η`, and `m(z) = 2·logistic(z)`.
+- **Trap**: `z = (u, v)`, the coordinates; `m = 2 sin(πu) cos(πv)`; and
+  `x = u + η`, so the covariate carries geography too.
+
+In both designs `η ~ N(0,1)`.
+
+The errors are standard normal, or a centred `χ²₃/√6` (skewness 1.63, excess
+kurtosis 4). Only the safe design is run with the skewed errors.
+
+The second run hit a memory failure:
+- it shared the machine with two full test suites, and OpenBLAS failed to
+  allocate memory in the eighth cell;
+- the seven cells already completed were kept;
+- the other five were run alone, each from its own seed;
+- each cell resets its generator, so the table is what one run without the
+  failure would print.
+
+### The table
+
+| design | errors | n | ρ | QML bias | QML RMSE | cover ρ | cover β | CFE bias | CFE RMSE | CFE cl | CFE HC0 | CFE SHAC | π̄ | widened | fails |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| safe | normal | 400 | 0.25 | −0.0051 | 0.0473 | 0.956 | 0.956 | −0.0046 | 0.0475 | 0.968 | 0.916 | 0.924 | 0.118 | 1.2 | 0 |
+| safe | normal | 400 | 0.75 | −0.0040 | 0.0239 | 0.954 | 0.954 | −0.0027 | 0.0253 | 0.996 | 0.920 | 0.928 | 0.118 | 1.2 | 0 |
+| safe | normal | 1000 | 0.25 | −0.0017 | 0.0298 | 0.966 | 0.950 | −0.0015 | 0.0303 | 0.972 | 0.930 | 0.952 | 0.084 | 1.4 | 0 |
+| safe | normal | 1000 | 0.75 | −0.0013 | 0.0142 | 0.968 | 0.948 | −0.0008 | 0.0160 | 0.998 | 0.930 | 0.954 | 0.084 | 1.4 | 0 |
+| safe | skewed | 400 | 0.25 | −0.0045 | 0.0497 | 0.968 | 0.952 | −0.0034 | 0.0495 | 0.980 | 0.914 | 0.926 | 0.119 | 1.2 | 0 |
+| safe | skewed | 400 | 0.75 | −0.0044 | 0.0256 | 0.946 | 0.958 | −0.0020 | 0.0263 | 1.000 | 0.914 | 0.930 | 0.119 | 1.2 | 0 |
+| safe | skewed | 1000 | 0.25 | −0.0036 | 0.0318 | 0.944 | 0.968 | −0.0031 | 0.0321 | 0.970 | 0.896 | 0.936 | 0.085 | 1.4 | 0 |
+| safe | skewed | 1000 | 0.75 | −0.0025 | 0.0157 | 0.954 | 0.964 | −0.0017 | 0.0170 | 0.998 | 0.896 | 0.936 | 0.085 | 1.4 | 0 |
+| trap | normal | 400 | 0.25 | −0.0993 | 0.1156 | 0.626 | 0.948 | −0.0940 | 0.1122 | 0.706 | 0.578 | 0.674 | 0.597 | 0.0 | 0 |
+| trap | normal | 400 | 0.75 | −0.0688 | 0.0767 | 0.430 | 0.942 | −0.0558 | 0.0666 | 0.880 | 0.578 | 0.678 | 0.597 | 0.0 | 0 |
+| trap | normal | 1000 | 0.25 | −0.0520 | 0.0650 | 0.690 | 0.944 | −0.0482 | 0.0626 | 0.772 | 0.618 | 0.726 | 0.583 | 0.0 | 0 |
+| trap | normal | 1000 | 0.75 | −0.0350 | 0.0404 | 0.526 | 0.940 | −0.0273 | 0.0356 | 0.906 | 0.616 | 0.740 | 0.583 | 0.0 | 0 |
+
+With 500 replications, a coverage of 0.95 has a Monte Carlo standard error of
+about 0.010, so differences smaller than about 0.02 between cells are noise.
+
+### What it settles, and what it does not
+
+**The profile QML is sound in the safe design, and normality did not matter
+here.**
+- In all eight safe cells, skewed errors included, coverage of `ρ` is
+  0.944–0.968 and coverage of `β` is 0.948–0.968.
+- So leaving out Su & Jin's `Ω` term had no measurable cost at these sizes
+  and this skewness.
+- That is a finding about these cells only. It does not prove that `Ω` is
+  negligible: a heavier tail or a smaller `n` could change the result.
+
+**The closed form is a usable point estimate, but no interval for it is
+reliable.**
+- In the safe cells its bias and RMSE are close to the QML's. At `ρ = 0.75`
+  its RMSE is 3–13% larger.
+- The classical SE over-covers, and more so as `ρ` rises: 0.996–1.000 at
+  `ρ = 0.75`. Geniaux calls it "conservative" for the same reason.
+- HC0 under-covers in every cell: 0.896–0.930.
+- SHAC reaches nominal coverage only with normal errors at `n = 1000`. Under
+  skewed errors it stays at 0.926–0.936.
+- This reproduces the pattern of Geniaux's spline results with a kernel first
+  stage. It is evidence only, not the missing proof, and the docs page tells
+  users to use the QML interval.
+
+**The trap is a bias, and it does not wash out at these sizes.**
+- `ρ̂` is biased down in every trap cell.
+- From `n = 400` to `n = 1000` the bias falls by about half, but the
+  standard error falls with it. So the QML coverage of `ρ` moves only from
+  0.43–0.63 to 0.53–0.69.
+- Coverage of `β` stays at nominal, so the smoother takes `ρ`'s variation,
+  not `β`'s.
+- No standard error repairs this. SHAC reaches at most 0.74. The closed
+  form's classical interval reaches 0.906 at `ρ = 0.75`, but only because it
+  is too wide everywhere, as the safe cells show.
+- The study did not measure whether the bias vanishes at a larger `n`.
+
+**`π̄` separates these two designs, and that is all it is shown to do.**
+- Its mean is 0.084–0.119 in the safe design, falling with `n`.
+- In the trap it is 0.583–0.597, nearly flat in `n`.
+- This is the first measured evidence in the package that the overlap moves
+  with the condition it is meant to flag.
+- It is **not** a null distribution. The study recorded only the mean, not
+  the spread, and `π̄` depends on `n`, `W` and the bandwidth.
+- So `π̄` still supports no threshold and no p-value, and the package still
+  attaches neither.
+- A calibrated test would need the distribution of `π̄` across a family of
+  safe designs. None of the sources gives one.
+
+### Standing items from this pass
+
+- **Geniaux's remedy is not built:** no spectral penalty, plateau rule or
+  spatial cross-fitting. The trap rows above show what a user gets without
+  it, and the docs say so.
+- **The `β(τ)` band was not measured.** It is pointwise and excludes the
+  smoothing bias. Measure its coverage away from the ends of the sample next,
+  before the docs call the band anything more than pointwise.
+- **The study scripts are not committed.** They are `mc.jl` and `mc_rest.jl`
+  in the session scratchpad. The table and the design above are the record.

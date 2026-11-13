@@ -39,6 +39,7 @@ include("SpatialNetworks.jl")
 include("SpatialCommonFactors.jl")
 include("SpatioTemporalModels.jl")
 include("SpVAR.jl")
+include("SemiparametricSpatial.jl")
 
 const UtilsMod      = SpatialUtils
 const CrossSection  = SpatialEconometricsPrototype
@@ -58,6 +59,7 @@ const NetworksMod   = SpatialNetworks
 const FactorsMod    = SpatialCommonFactors
 const SpatioTempMod = SpatioTemporalModels
 const SpVARMod     = SpVAR
+const SemiparMod   = SemiparametricSpatial
 const WeightsMod    = SpatialWeights
 const SelectionMod  = SpatialModelSelection
 const PanelDiagMod  = SpatialPanelDiagnostics
@@ -97,6 +99,7 @@ import .SpatialShiftShare: ShiftShareDesign, shift_share_design, ShiftShareFit, 
 import .SpatialNetworks: network_weights, group_weights, PeerIdentification, peer_identification, PeerEffectsFit, fit_peer_effects, MultiplexSAR, fit_multiplex_sar, network_moran
 import .SpatialCommonFactors: CDTestResult, pesaran_cd, AlphaExponentResult, alpha_exponent, DependenceVerdict, dependence_verdict, SpCCEModel, fit_sp_cce
 import .SpatioTemporalModels: STARModel, fit_star, InteractiveFEModel, fit_interactive_fe, factor_projection, IRFResult, space_time_irf, spatial_forecast
+import .SemiparametricSpatial: local_polynomial_smoother, SpectralOverlapResult, spectral_overlap, PartiallyLinearSARModel, fit_partially_linear_sar, ClosedFormRhoResult, closed_form_rho, TVCoefSARModel, fit_tv_coef_sar
 import .SpVAR: SpVARModel, fit_spvar, OrderConditionResult, spvar_order_condition, STIRResult, space_time_stir, spvar_irf, spvar_forecast, NestedPanelVARModel, fit_nested_panel_var, lr_spatial_interaction
 import .SpatialFiltering: SpatialEigen, spatial_eigenvectors, moran_coefficient, ESFModel, fit_esf, selected_eigenvectors, REESFModel, fit_re_esf, STPCAResult, stpca, fourier_basis, component_weight, feature_contributions, component_groups
 
@@ -566,6 +569,11 @@ export
     OrderConditionResult, spvar_order_condition,
     STIRResult, space_time_stir, spvar_irf, spvar_forecast,
     NestedPanelVARModel, fit_nested_panel_var, lr_spatial_interaction,
+    # Semiparametric spatial (Su & Jin 2010; Smirnov 2022; Geniaux 2026)
+    local_polynomial_smoother, SpectralOverlapResult, spectral_overlap,
+    PartiallyLinearSARModel, fit_partially_linear_sar,
+    ClosedFormRhoResult, closed_form_rho,
+    TVCoefSARModel, fit_tv_coef_sar,
     # Extension entry points (methods live in ext/)
     AbstractBayesianSpatialResult,
     bayesian_sar, bayesian_sdm, bayesian_sem,
