@@ -107,5 +107,14 @@ for s in (3, 10, 15, 20, 28)
     @printf("%5.2f  %8.4f  %8.4f   %8.4f\n", tv.tau[s], tv.beta[s, 2],
             1.96 * tv.beta_se[s, 2], 1 + 2τ[s] + 2τ[s]^2)
 end
-println("\nThe band excludes the smoothing bias (order h²β''), so near the ends,")
-println("where the local-linear fit is one-sided, it can miss the true curve.")
+println("\nThe band excludes the smoothing bias (order h²β''). At the cross-validated")
+println("bandwidth it under-covers in the interior, where β curves: measured 0.81–0.87")
+println("for a nominal 95% (validation/mc_tv_coef.jl). Halving the bandwidth helps:")
+
+tvu = fit_tv_coef_sar(vec(Y), hcat(ones(N * Tp), vec(xp)), Wr, N, Tp;
+                      method = ExactLU(), bandwidth = tv.bandwidth / 2)
+println("\n  τ     β̂_x(τ) at h/2   ±1.96 se   true β_x(τ)")
+for s in (3, 10, 15, 20, 28)
+    @printf("%5.2f  %13.4f  %8.4f   %8.4f\n", tvu.tau[s], tvu.beta[s, 2],
+            1.96 * tvu.beta_se[s, 2], 1 + 2τ[s] + 2τ[s]^2)
+end

@@ -862,9 +862,14 @@ A fit of `Y_t = ρWY_t + X_tβ(t/T) + α + e_t` by [`fit_tv_coef_sar`](@ref).
 - `rho`, `rho_se`, `sigma2`, `loglik`.
 - `beta::Matrix` — `T×d`: row `s` is `β̂(s/T)`.
 - `beta_se::Matrix` — pointwise standard errors of `β̂(s/T)`, conditional
-  on `ρ̂` and `α̂`: `σ̂²ΨΨ'` for the linear smoother `Ψ`. They **exclude the
-  smoothing bias**, of order `h²β''(τ)` (LGG Theorem 3), so a band built
-  from them covers `E β̂(τ)`, not `β(τ)`, unless `h` undersmooths.
+  on `h`, `ρ̂` and `α̂`: `σ̂²ΨΨ'` for the linear smoother `Ψ`. They **exclude
+  the smoothing bias**, of order `h²β''(τ)` (LGG Theorem 3). Measured
+  (`validation/mc_tv_coef.jl`): at the cross-validated `h`, a nominal 95%
+  band covers `β(τ)` only 0.81–0.87 of the time in the interior, though
+  0.92–0.96 at the ends. The cause is the bias, plus the variation of the
+  chosen `h` between samples, which a conditional SE cannot see. Refitting
+  at half the CV bandwidth brought interior coverage to 0.92–0.94, but at
+  `T = 25` it failed on up to 9% of samples for a strongly curved `β`.
 - `tau::Vector` — the rescaled times `s/T`.
 - `alpha::Vector` — fixed effects, normalised to sum to zero (LGG §2.1).
 - `bandwidth` (in units of rescaled time), `bandwidth_rule`.

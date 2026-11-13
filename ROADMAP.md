@@ -1010,7 +1010,11 @@ local-polynomial smoother (rule-of-thumb or two-step LSCV bandwidth), the
 closed-form `ρ` on the same first stage, the spectral overlap `π̄` on every
 fit, and LGG's `β(τ)` with a leave-one-unit-out CV bandwidth. Each reduces
 exactly to an existing estimator at a large bandwidth (testsets 41b, 41c,
-41f). The Monte Carlo of coverage and of the trap is in `docs/AUDIT.md`.
+41f). The Monte Carlo studies are in `docs/AUDIT.md`, with their scripts in
+`validation/`: coverage and the trap for the cross-section, and the `β(τ)`
+band. At the CV bandwidth the band under-covers in the interior (0.81–0.87)
+and is close to nominal at the ends. A refit at `h/2` brings the interior to
+0.92–0.94; the docs give that recipe and its failure rate at `T = 25`.
 
 Choices made in the build that the sources do not dictate:
 - **Su & Jin's `Ω` is omitted.** The standard errors are valid under normal
@@ -1025,15 +1029,19 @@ Choices made in the build that the sources do not dictate:
   and testset 41f checks both conventions exactly.
 
 Not built, and why:
-- Geniaux's spectral penalty, plateau rule and spatial cross-fitting: the
-  plateau rule is supported by simulation only, and the remedy is a separate
-  piece of work.
+- Geniaux's spectral penalty, plateau rule and spatial cross-fitting:
+  **scheduled as #13 pass 2.** The remedy penalises a *spline* surface's
+  projection onto `W`'s modes, and a kernel smoother has no penalty to add
+  it to. So pass 2 is a second, penalised-spline first stage, not an option
+  on the first one. Before it is built, read the rest of Geniaux: Appendix C,
+  and the exact form of the penalty and the plateau path. The plateau rule
+  is supported by simulation only.
 - The SEM closed form: whether its first stage projects on `[X : WX]` is
   still open.
 - `ρ_t`: unsourced.
 - Quantile, varying-coefficient, penalised and additive rows: not in pass 1.
 
-**New file:** `src/SemiparametricSpatial.jl` (1,131 lines against the ~500
+**New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
 estimated; the four estimators with their variances, two bandwidth selectors
 and the overlap measure)
 
@@ -1223,7 +1231,7 @@ independent support enumeration.
 |---|---|---|---|
 | 18 | ✅ Spatio-Temporal Models (#12) | ~500 | STAR, forecasting, interactive FE; SpVAR in a second pass |
 | 19 | ✅ Common factors in panels (#1) | ~400 | SP-CCE and the CD / `α` exponent tests |
-| 20 | 🔶 Semiparametric Spatial (#13) | ~500 (pass 1: 1,131) | Pass 1 done 2026-11-13: Su & Jin PLSAR, closed-form `ρ`, the overlap `π̄`, LGG `β(τ)`. Geniaux's remedy, quantile and penalised rows remain |
+| 20 | 🔶 Semiparametric Spatial (#13) | ~500 (pass 1: 1,136) | Pass 1 done 2026-11-13: Su & Jin PLSAR, closed-form `ρ`, the overlap `π̄`, LGG `β(τ)`. Geniaux's remedy, quantile and penalised rows remain |
 | 21 | ⬜ Spatial GARCH (#16) | ~450 | Spatial structure in the variance |
 | 22 | ✅ **SpVAR** (deferred from #12) | ~450 | Di Giacinto (2010): block-triangular `C₀`, separable FIML, outward/inward STIR, the nested panel VAR and the LR test against it; plus `order_weights` |
 | | **Phase 7B total** | **~2,300** | Items 18, 19 and 22 closed 2026-11-04; actual ~3,450 lines across three submodules |
@@ -1314,8 +1322,8 @@ the new module's 1,131 lines, the umbrella's 8 lines that load it, and 98
 net lines of docstring prose in four commits since the †† row (`f7bea6a`,
 `a4a09e1`, `6ff3bbd`, `e1a681e`).
 
-Measured on master: 29 submodules plus the umbrella across 25,558 lines of
-`src/`, 9,708 lines of tests, 4,861 lines of examples across 30 scripts,
+Measured on master: 29 submodules plus the umbrella across 25,563 lines of
+`src/`, 9,708 lines of tests, 4,870 lines of examples across 30 scripts,
 398 lines of package extensions, 58 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 

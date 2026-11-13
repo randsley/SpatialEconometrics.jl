@@ -106,10 +106,38 @@ tv.rho, tv.beta, tv.beta_se, tv.tau
 The data are stacked `N` units within each of `T` periods, as in the
 package's other panels. The default bandwidth is the paper's
 leave-one-unit-out cross-validation. `beta_se` is pointwise and **excludes
-the smoothing bias**, of order `h²β''(τ)`, so a band built from it covers the
-expected estimate rather than `β(τ)` itself, and it can miss near the ends of
-the sample. A time-varying `ρ` is a different model, with no published
-method, and is not offered.
+the smoothing bias**, of order `h²β''(τ)`. A time-varying `ρ` is a different
+model, with no published method, and is not offered.
+
+**The band under-covers in the interior, not at the ends.** That is the
+measured result (`validation/mc_tv_coef.jl`, 500 replications per cell,
+`N ∈ {50, 100}`, `T ∈ {25, 50}`, a gently and a strongly curved `β`):
+
+| bandwidth | interior coverage (τ ∈ [0.2, 0.8]) | at the ends | fits refused |
+|---|---|---|---|
+| cross-validated `h` | 0.81–0.87 (minimum 0.77) | 0.92–0.96 | none |
+| `h/2`, refitted | 0.92–0.94 (minimum 0.90) | 0.93–0.96 | up to 44 of 500 at `T = 25` |
+
+Cross-validation picks the bandwidth that minimises mean squared error, and
+that makes the squared bias comparable to the variance. That under-covers
+wherever `β` curves. At the ends the variance is larger, so the same bias
+costs less coverage. The varying bandwidth adds to it: `beta_se` is
+conditional on the `h` that was chosen, and `h` itself varies from sample
+to sample. With `h` held fixed and `ρ`, `α` known, `beta_se` matched the
+Monte Carlo spread to within 5%. With `h` chosen by CV it fell to 0.87–0.92
+of it.
+
+For a band to read as a confidence band, refit at a smaller bandwidth:
+
+```julia
+tv  = fit_tv_coef_sar(y, X, W, N, T)
+tvu = fit_tv_coef_sar(y, X, W, N, T; bandwidth = tv.bandwidth / 2)
+```
+
+That is undersmoothing. It trades a wider band for one that is centred
+closer to `β(τ)`. With short panels it can fail: at `T = 25` the halved
+window was too thin on up to 9% of samples, and coverage of `ρ` fell to
+0.91–0.93 for the strongly curved `β`.
 
 A very large bandwidth turns the fit into a within regression on `x`, `τ` and
 `τx`, and `ρ̂` then matches `fit_spatial_panel(…; approach = DirectQML(bias_correct = false))`

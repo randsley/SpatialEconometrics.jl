@@ -4289,8 +4289,72 @@ reliable.**
 - **Geniaux's remedy is not built:** no spectral penalty, plateau rule or
   spatial cross-fitting. The trap rows above show what a user gets without
   it, and the docs say so.
-- **The `β(τ)` band was not measured.** It is pointwise and excludes the
-  smoothing bias. Measure its coverage away from the ends of the sample next,
-  before the docs call the band anything more than pointwise.
-- **The study scripts are not committed.** They are `mc.jl` and `mc_rest.jl`
-  in the session scratchpad. The table and the design above are the record.
+- **The `β(τ)` band:** measured the same day. See the next subsection.
+- **The study scripts** are `validation/mc_semiparametric.jl`, with its
+  output beside it. A full rerun from the committed script reproduced all
+  twelve rows above exactly. That includes the five cells first run apart
+  after the memory failure, so the per-cell seeding holds.
+
+### The `β(τ)` band: wrong where the docs did not warn, right where they did
+
+Before this measurement, the docs page and example 30 said the band "can miss
+near the ends" of the sample, where the local-linear fit is one-sided. That
+was a guess dressed as a caveat. Measurement says the opposite.
+
+**Design** (`validation/mc_tv_coef.jl`):
+- 500 replications per cell, seed `20261113`;
+- a ring `W` (two neighbours each side), `ρ = 0.4`, `N ∈ {50, 100}`,
+  `T ∈ {25, 50}`;
+- a time-varying intercept `1 + τ³`, and `β_x(τ)` either
+  `1 + 2τ + 2τ²` (`β'' = 4`) or `1 + sin 2πτ` (`|β''|` up to 39);
+- the CV bandwidth, and a refit at half of it.
+
+**At the CV bandwidth:**
+- interior coverage (τ ∈ [0.2, 0.8]) of the nominal 95% band is
+  **0.81–0.87**, with a minimum of 0.77;
+- coverage at the two endpoints is 0.92–0.96;
+- coverage of `ρ` is 0.93–0.95.
+
+**Why: two causes, separated by an oracle.** The decomposition table in the
+script output compares mean `beta_se` with the Monte Carlo SD:
+- *The formula is right.* With `h` fixed and `ρ`, `α` known, the ratio is
+  0.97–1.05.
+- *The bandwidth's own variation.* With the CV-chosen `h`, the interior ratio
+  falls to 0.87–0.92, even for the oracle. `beta_se` is conditional on `h`,
+  and the selected `h` varies from sample to sample. The bias varies with it,
+  and a conditional SE cannot see that.
+- *σ̂² without a degrees-of-freedom correction.* It averages 0.954 at
+  `N = 50, T = 25` and 0.979 at `N = 100, T = 50`. The cost is a few percent
+  of SE.
+- *The bias.* This is the rest. A band centred on the Monte Carlo mean covers
+  0.91–0.94 in the interior; centred on the truth, 0.81–0.87. CV minimises
+  mean squared error, which makes the squared bias comparable to the
+  variance. That is the textbook reason a CV-bandwidth band under-covers. At
+  the ends the variance is larger, so the same bias costs less coverage.
+
+For the quadratic curve the first-order bias `h²μ₂β''/2`, with `μ₂ = 1/5`,
+is 0.031 at the mean `h = 0.28`. The measured largest interior bias is
+0.039.
+
+**Undersmoothing works, and it has limits.** A refit at `h/2`:
+- raises interior coverage to **0.92–0.94** (minimum 0.90), with the ends at
+  0.93–0.96;
+- at `T = 25`, refuses 5, 6, 23 and 44 of 500 fits, because the halved
+  window is too thin for a local-linear design. The refused fits are
+  excluded from those rows, which favours the undersmoothed figures slightly;
+- with the strongly curved `β`, lowers coverage of `ρ` to 0.908–0.930.
+
+**What changed:**
+- the docs page, example 30 and the `TVCoefSARModel` docstring now say where
+  the band fails, and why;
+- they give the `h/2` refit as a measured remedy with its failure rate;
+- the API is unchanged.
+
+A bias-corrected or robust band (for example, Calonico, Cattaneo & Farrell's
+robust bias correction) would be the principled fix. Nothing in LGG
+provides one, so it is not built.
+
+**The lesson is the one the standing rule already states.** The old caveat
+was plausible, specific and wrong. It was written from the textbook picture
+of boundary bias for a local-*constant* fit, which local-*linear* fitting
+largely removes. It cost nothing to write and an hour to refute.
