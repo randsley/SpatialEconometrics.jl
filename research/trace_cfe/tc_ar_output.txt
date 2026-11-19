@@ -1,0 +1,36 @@
+knn6   n  400 smooth normal K/n 0.125 ‖Cs‖F²   28.2 sd ρ̂ 0.129 | Wald 1.000 | inversion: HC2 1.000 oracle 1.000 | mean length 0.522, not one interval 0.000, both ends 0.000 | quartic check 1.7e-16
+(warm-up above) R = 1000, MC SE 0.007.
+
+weakly identified (normal):
+knn20  n  400 smooth normal K/n 0.125 ‖Cs‖F²    3.2 sd ρ̂ 0.391 | Wald 0.913 | inversion: HC2 0.958 oracle 0.955 | mean length 1.104, not one interval 0.000, both ends 0.001 | quartic check 4.1e-16
+knn20  n  400 smooth normal K/n 0.205 ‖Cs‖F²    2.0 sd ρ̂ 0.514 | Wald 0.882 | inversion: HC2 0.963 oracle 0.964 | mean length 1.288, not one interval 0.000, both ends 0.012 | quartic check 1.4e-16
+knn20  n  400 smooth normal K/n 0.305 ‖Cs‖F²    1.5 sd ρ̂ 0.574 | Wald 0.854 | inversion: HC2 0.972 oracle 0.975 | mean length 1.461, not one interval 0.000, both ends 0.082 | quartic check 7.5e-16
+knn20  n  400 rough  normal K/n 0.205 ‖Cs‖F²    2.0 sd ρ̂ 0.417 | Wald 0.924 | inversion: HC2 0.965 oracle 0.960 | mean length 1.139, not one interval 0.000, both ends 0.000 | quartic check 8.7e-16
+knn20  n  400 rough  normal K/n 0.305 ‖Cs‖F²    1.5 sd ρ̂ 0.513 | Wald 0.876 | inversion: HC2 0.956 oracle 0.953 | mean length 1.310, not one interval 0.000, both ends 0.016 | quartic check 1.4e-16
+knn20  n 1600 rough  normal K/n 0.303 ‖Cs‖F²   14.9 sd ρ̂ 0.405 | Wald 0.942 | inversion: HC2 0.978 oracle 0.942 | mean length 1.045, not one interval 0.000, both ends 0.022 | quartic check 6.8e-16
+band   n  400 smooth normal K/n 0.305 ‖Cs‖F²    8.8 sd ρ̂ 0.523 | Wald 0.852 | inversion: HC2 0.961 oracle 0.941 | mean length 1.201, not one interval 0.000, both ends 0.010 | quartic check 3.4e-16
+controls (normal):
+knn6   n  400 smooth normal K/n 0.125 ‖Cs‖F²   28.2 sd ρ̂ 0.135 | Wald 0.950 | inversion: HC2 0.947 oracle 0.955 | mean length 0.558, not one interval 0.000, both ends 0.000 | quartic check 1.7e-16
+knn6   n  900 smooth normal K/n 0.112 ‖Cs‖F²   69.5 sd ρ̂ 0.083 | Wald 0.953 | inversion: HC2 0.956 oracle 0.951 | mean length 0.335, not one interval 0.000, both ends 0.000 | quartic check 1.6e-16
+knn6   n 1600 smooth normal K/n 0.106 ‖Cs‖F²  127.0 sd ρ̂ 0.060 | Wald 0.953 | inversion: HC2 0.949 oracle 0.947 | mean length 0.238, not one interval 0.000, both ends 0.000 | quartic check 1.5e-16
+rook   n  900 rough  normal K/n 0.189 ‖Cs‖F²  122.2 sd ρ̂ 0.056 | Wald 0.952 | inversion: HC2 0.954 oracle 0.949 | mean length 0.230, not one interval 0.000, both ends 0.000 | quartic check 4.3e-16
+band   n  900 smooth normal K/n 0.112 ‖Cs‖F²   49.8 sd ρ̂ 0.102 | Wald 0.948 | inversion: HC2 0.951 oracle 0.949 | mean length 0.409, not one interval 0.000, both ends 0.000 | quartic check 2.2e-16
+knn20  n  900 smooth normal K/n 0.189 ‖Cs‖F²    5.2 sd ρ̂ 0.350 | Wald 0.936 | inversion: HC2 0.954 oracle 0.950 | mean length 1.046, not one interval 0.000, both ends 0.000 | quartic check 2.2e-16
+
+weakly identified (chisq):
+knn20  n  400 smooth chisq  K/n 0.125 ‖Cs‖F²    3.2 sd ρ̂ 0.393 | Wald 0.908 | inversion: HC2 0.943 oracle 0.947 | mean length 1.101, not one interval 0.000, both ends 0.003 | quartic check 4.1e-16
+knn20  n  400 smooth chisq  K/n 0.205 ‖Cs‖F²    2.0 sd ρ̂ 0.513 | Wald 0.868 | inversion: HC2 0.950 oracle 0.942 | mean length 1.288, not one interval 0.000, both ends 0.018 | quartic check 3.7e-16
+knn20  n  400 smooth chisq  K/n 0.305 ‖Cs‖F²    1.5 sd ρ̂ 0.579 | Wald 0.841 | inversion: HC2 0.938 oracle 0.928 | mean length 1.454, not one interval 0.000, both ends 0.092 | quartic check 1.0e-15
+knn20  n  400 rough  chisq  K/n 0.205 ‖Cs‖F²    2.0 sd ρ̂ 0.425 | Wald 0.914 | inversion: HC2 0.957 oracle 0.948 | mean length 1.144, not one interval 0.000, both ends 0.001 | quartic check 3.0e-16
+knn20  n  400 rough  chisq  K/n 0.305 ‖Cs‖F²    1.5 sd ρ̂ 0.499 | Wald 0.889 | inversion: HC2 0.955 oracle 0.942 | mean length 1.327, not one interval 0.000, both ends 0.015 | quartic check 2.9e-16
+knn20  n 1600 rough  chisq  K/n 0.303 ‖Cs‖F²   14.9 sd ρ̂ 0.356 | Wald 0.963 | inversion: HC2 0.981 oracle 0.962 | mean length 1.036, not one interval 0.000, both ends 0.034 | quartic check 1.1e-15
+band   n  400 smooth chisq  K/n 0.305 ‖Cs‖F²    8.8 sd ρ̂ 0.495 | Wald 0.874 | inversion: HC2 0.970 oracle 0.946 | mean length 1.194, not one interval 0.000, both ends 0.020 | quartic check 5.0e-16
+controls (chisq):
+knn6   n  400 smooth chisq  K/n 0.125 ‖Cs‖F²   28.2 sd ρ̂ 0.135 | Wald 0.950 | inversion: HC2 0.954 oracle 0.951 | mean length 0.556, not one interval 0.000, both ends 0.000 | quartic check 7.4e-16
+knn6   n  900 smooth chisq  K/n 0.112 ‖Cs‖F²   69.5 sd ρ̂ 0.086 | Wald 0.949 | inversion: HC2 0.951 oracle 0.943 | mean length 0.339, not one interval 0.000, both ends 0.000 | quartic check 1.7e-16
+knn6   n 1600 smooth chisq  K/n 0.106 ‖Cs‖F²  127.0 sd ρ̂ 0.060 | Wald 0.947 | inversion: HC2 0.945 oracle 0.940 | mean length 0.240, not one interval 0.000, both ends 0.000 | quartic check 3.2e-16
+rook   n  900 rough  chisq  K/n 0.189 ‖Cs‖F²  122.2 sd ρ̂ 0.056 | Wald 0.962 | inversion: HC2 0.961 oracle 0.944 | mean length 0.240, not one interval 0.000, both ends 0.000 | quartic check 3.5e-16
+band   n  900 smooth chisq  K/n 0.112 ‖Cs‖F²   49.8 sd ρ̂ 0.102 | Wald 0.947 | inversion: HC2 0.956 oracle 0.947 | mean length 0.418, not one interval 0.000, both ends 0.000 | quartic check 1.5e-16
+knn20  n  900 smooth chisq  K/n 0.189 ‖Cs‖F²    5.2 sd ρ̂ 0.353 | Wald 0.937 | inversion: HC2 0.954 oracle 0.951 | mean length 1.049, not one interval 0.000, both ends 0.000 | quartic check 5.9e-16
+
+total 3.7 min

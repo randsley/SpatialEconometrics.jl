@@ -1238,6 +1238,13 @@ scripts, their outputs and the method are in `research/trace_cfe/`.
      points of the oracle everywhere and covers 0.930–0.966 wherever
      `sd(ρ̂)` < 0.39. The seven failing cells are weakly identified (kNN-20
      at n = 400, `‖Cs‖_F²` 1.6–14), and the oracle fails there too.
+     Proposition 6: the test-inversion (Anderson–Rubin) set
+     `{ρ : g(ρ)² ≤ 1.96² V̂(ρ)}` is valid without A9, because Theorem 1
+     never uses `J`. `tc_ar.jl`: it covers 0.938–0.981 in the weak cells
+     (Wald 0.841–0.963) with normal and `χ²₃` errors, and in the controls it
+     is as short as the Wald interval. `V̂(ρ)` is an exact quartic, so the
+     set costs no more than `V̂`. It is the interval a smoothed or
+     projected TC-CFE in `src/` should report.
      Proposition 5 derives A5 from `W`: `‖Cs‖_F²/n ≥ κ/2 −
      2(K/n)(c_W + d̄)²` with `κn ≤ ‖W‖_F²`, so A5 holds for K/n → 0. In
      `tc_a5.jl` the bound is close at small K/n (0.137 against 0.148) and

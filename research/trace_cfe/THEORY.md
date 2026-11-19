@@ -1362,7 +1362,70 @@ That leaves 90 cells.
 So step 2's conclusion holds for these `W` and `n` and up to K/n = 0.30:
 HC2 covers as well as the oracle does, within 2.6 points. What it cannot fix
 is weak identification, which shows as a large `sd(ρ̂)` and a small
-`‖Cs‖_F²`.
+`‖Cs‖_F²`. Proposition 6 fixes that with a different interval.
+
+**Proposition 6 (an interval that does not need identification; proved).**
+Let `V̂(ρ)` be the HC2 `V̂` evaluated at a candidate `ρ` (its `sᵢ`, `â` and
+noise term computed from `y₀(ρ)`). Define the test-inversion set
+
+    CS = {ρ ∈ (−1, 1) : g(ρ)² ≤ 1.96² V̂(ρ)}.
+
+Assume A1 with four moments, A2–A8, A10 and K/n → 0, but **not A9**. Then
+`P(ρ₀ ∈ CS) → 0.95`.
+
+*Proof.* `ρ₀ ∈ CS` if and only if `g(ρ₀)²/V̂(ρ₀) ≤ 1.96²`. Theorem 1 gives
+`g(ρ₀)/√V → N(0, 1)` from A1–A6 alone; its proof never uses `J`. Steps 1
+and 2 of Proposition 2 give `V̂(ρ₀)/V → 1` at `ρ₀` itself. They use A5
+(`V ≥ cn`), A6, A8, A10 and Lemma 2, but neither A9 nor the root; step 3,
+which moves from `ρ₀` to `ρ̂`, is not needed. Slutsky's lemma finishes. ∎
+
+This is the Anderson–Rubin device (Anderson & Rubin, 1949), in the form
+Stock & Wright (2000) give for GMM with weak identification: test each `ρ`
+with the moment itself, and keep the `ρ` that are not rejected. (Both papers
+are cited from their standard use; neither has been read for this note.) The Wald
+interval `ρ̂ ± 1.96√V̂/|g′(ρ̂)|` needs `J/√V → ∞` (A9), through the
+Corollary. `CS` does not, so its coverage holds however small `J` is.
+`CS` is cheap to compute. `g(ρ) = c − bρ + aρ²` is quadratic. `V̂(ρ)` is
+an exact quartic in `ρ`, because `sᵢ(ρ) = (e₀ − ρe₁)ᵢ²/Mᵢᵢ` is quadratic,
+`â(ρ)` is linear and the noise term is linear in `s`. So `CS` is the set
+where a quartic polynomial is non-negative. It can be an interval, a union
+of intervals, or the whole range, and the last means the data say nothing
+about `ρ`.
+
+**Numerical check (`tc_ar.jl`).** The seven weakly identified cells of
+`tc_coverage_robust.jl` and six well-identified controls, with normal and
+`χ²₃` errors, R = 1000. Once per cell, the quartic is checked against `V̂`
+computed directly, at `ρ̂` and `ρ₀`; it agrees to within 1.1 × 10⁻¹⁵ in
+every cell.
+
+| cells | Wald, HC2 | `CS`, HC2 | `CS`, true σ² | mean length of `CS` |
+|---|---|---|---|---|
+| weak, normal (7) | 0.852–0.942 | 0.956–0.978 | 0.941–0.975 | 1.05–1.46 |
+| weak, `χ²₃` (7) | 0.841–0.963 | 0.938–0.981 | 0.928–0.962 | 1.04–1.45 |
+| controls, normal (6) | 0.936–0.953 | 0.947–0.956 | 0.947–0.955 | 0.23–1.05 |
+| controls, `χ²₃` (6) | 0.937–0.962 | 0.945–0.961 | 0.940–0.951 | 0.24–1.05 |
+
+- **`CS` covers where the Wald interval fails.** In the weak cells the
+  Wald interval covers as little as 0.841, and `CS` covers 0.938–0.981.
+  The over-coverage up to 0.98 is HC2's upward bias at `ρ` far from `ρ₀`;
+  with the true `σ²` it is 0.928–0.975.
+- **`CS` costs nothing where identification is strong.** In the controls
+  its mean length equals the Wald interval's: 0.335 against
+  2 · 1.96 · sd(ρ̂) = 0.325 for kNN-6 at n = 900, and 0.230 against 0.220
+  for rook. That is the power check: a set that always covered by being
+  wide would fail it.
+- **`CS` says when `ρ` is not identified.** In the weak cells it is 1.0–1.5
+  long out of 1.98, and it reaches both ends of (−0.99, 0.99) in up to 9% of
+  replications (kNN-20, n = 400, K/n = 0.30). `CS` was one interval in every
+  replication of every cell, although the proposition allows a union.
+- **Non-normal errors.** With `χ²₃` errors, `CS` covers 0.938–0.981 in the
+  weak cells and 0.945–0.961 in the controls. The lowest, 0.938, is
+  kNN-20 at n = 400, K/n = 0.30, where `‖Cs‖_F²` = 1.5.
+
+So `CS` should be reported with, or in place of, the Wald interval. It needs
+no more computation than `V̂` at three vectors, and it is valid without A9.
+The weak-identification diagnostic asked for in item 3 of "Still to do" is
+then not needed for validity: a wide `CS` is the diagnostic.
 
 ## Still to do
 
@@ -1404,9 +1467,12 @@ is weak identification, which shows as a large `sd(ρ̂)` and a small
    cells): HC2 is within −2.6 to +1.8 points of the oracle everywhere, and
    covers 0.930–0.966 wherever `sd(ρ̂)` < 0.39. The 7 failing cells are
    weak identification (a dense `W` at n = 400), where the oracle fails
-   too. Still untested: non-normal errors in these designs, and a
-   diagnostic for weak identification with a threshold derived rather than
-   read off.
+   too. Proposition 6 gives the remedy: the test-inversion set `CS` is
+   valid without A9 and covers 0.938–0.981 in those cells, with normal and
+   `χ²₃` errors (`tc_ar.jl`), at no cost in length where identification is
+   strong. Still untested: non-normal errors in the other cells of
+   `tc_coverage_robust.jl`. `CS` for K/n → c > 0, which needs
+   Proposition 2's open case, is also open.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ` is
@@ -1433,6 +1499,9 @@ from the page images of the copies in `ExtRef/`, Bhansali, Giraitis &
 Kokoszka (2007), all of it; Kelejian & Prucha (2001), §3.1 and the proof of
 Theorem 1; Hall & Heyde (1980), §3.2; and Lee (2004)'s CLT, as restated in
 Lee (2023), ch. 1, §1.8.3 and Appendix 1A. The others have not been read.
+- Anderson, T. W., & Rubin, H. (1949). Estimation of the parameters of a
+  single equation in a complete system of stochastic equations. *Annals of
+  Mathematical Statistics*, 20(1), 46–63. doi:10.1214/aoms/1177730090
 - Bhansali, R. J., Giraitis, L., & Kokoszka, P. S. (2007). Convergence of
   quadratic forms with nonvanishing diagonal. *Statistics & Probability
   Letters*, 77(7), 726–734. doi:10.1016/j.spl.2006.11.007
@@ -1460,6 +1529,8 @@ Lee (2023), ch. 1, §1.8.3 and Appendix 1A. The others have not been read.
 - Rosenthal, H. P. (1970). On the subspaces of Lᵖ (p > 2) spanned by
   sequences of independent random variables. *Israel Journal of
   Mathematics*, 8(3), 273–303. doi:10.1007/BF02771562
+- Stock, J. H., & Wright, J. H. (2000). GMM with weak identification.
+  *Econometrica*, 68(5), 1055–1096. doi:10.1111/1468-0262.00151
 - von Bahr, B., & Esseen, C.-G. (1965). Inequalities for the rth absolute
   moment of a sum of random variables, 1 ≤ r ≤ 2. *The Annals of
   Mathematical Statistics*, 36(1), 299–303. doi:10.1214/aoms/1177700291
