@@ -1308,7 +1308,61 @@ so at the cost of variance, and under-cover where HC2 does not. The exact
 bias formulas for CJN are proved and checked, but they do not give a better
 interval. What these designs do not cover: K/n above 0.25, which a basis
 with bounded leverage cannot reach at n = 900; other `W`; and `n` other than
-900.
+900. The next check covers those.
+
+**Other `W`, other `n`, K/n up to 0.30 (`tc_coverage_robust.jl`).** The
+same estimator and HC2 `V̂`, with the weak signal, normal errors, smooth and
+rough variances, `ρ₀` = 0.4 and R = 1000, over:
+- four `W`: kNN with k = 6 and k = 20, rook contiguity on a regular grid,
+  and a distance band (inverse-distance weights within the radius that
+  gives 10 neighbours on average, so the count varies);
+- n = 400, 900 and 1600;
+- K/n ≈ 0.05, 0.11, 0.19 and 0.30.
+
+The locations are stratified: one per cell of a √n × √n grid, jittered
+within it. With uniform locations the hat basis had units with leverage 1
+at n = 1600, so these draws differ from the n = 900 design above. Six
+designs with `max hᵢᵢ` > 0.99 (K/n = 0.29 at n = 900, for the three
+`W` on random locations and both variances) were skipped as outside A3.
+That leaves 90 cells.
+
+| | cells | HC2 coverage | oracle coverage |
+|---|---|---|---|
+| `sd(ρ̂)` < 0.39 | 83 | 0.930–0.966 | 0.931–0.964 |
+| `sd(ρ̂)` ≥ 0.39 | 7 | 0.852–0.942 | 0.869–0.928 |
+| all | 90 | HC2 − oracle: −0.026 to +0.018 | |
+
+- **HC2 tracks the oracle everywhere**, within −2.6 to +1.8 points. No
+  `V̂` was negative. Where coverage fails, the oracle fails as well, so the
+  failure lies in the first-order approximation, not in `V̂`.
+- **The failures are weak identification.** All seven cells with an oracle
+  coverage below 0.93 have `sd(ρ̂)` ≥ 0.39; the largest `sd(ρ̂)` among the
+  other 83 is 0.35. Six are kNN-20 at n = 400 or the distance band at
+  n = 400, K/n = 0.30, and one is kNN-20 at n = 1600, K/n = 0.30. There
+  `‖Cs‖_F²` is 1.6–14, `ρ̂` is biased down by 0.08–0.26 (probably because
+  the root is confined to (−1, 1); not checked), and the interval is
+  ±0.8 to ±1.1 wide. The 0.39 split is read
+  off these results, not derived. A dense `W` with small `n` is where
+  this happens: kNN-20 at n = 400 has `‖Cs‖_F²/n` = 0.004–0.021, against
+  0.045–0.23 for kNN-6 and rook. An interval as wide as that should be read
+  as "ρ is not identified here", not as a 95% statement.
+- **K/n = 0.30 is fine when the leverage stays bounded.** Rook, whose grid
+  basis has `max hᵢᵢ` 0.89–0.93, covers 0.949–0.963 at K/n = 0.30 for all
+  three `n`. kNN-6 at n = 1600 covers 0.936 and 0.951 there, though `d̄`
+  is large (`‖Cs‖_F²/n` jumps to 0.19, `sd(ρ̂)` to 0.30 under rough
+  variances).
+- **n = 1600 is slightly low with kNN-6 and rough variances** (oracle
+  0.931–0.939, HC2 0.936–0.944), and so is rook with smooth variances at
+  K/n = 0.05 (oracle 0.932, HC2 0.930). The oracle is low by the same
+  amount, so this is the first-order approximation too.
+- **Power check.** The homoskedastic `V̂` covers 0.811–0.986 under smooth
+  variances in the 83 identified cells, and 0.858–0.967 under rough ones.
+  As above, it fails mainly where the variance has a spatial pattern.
+
+So step 2's conclusion holds for these `W` and `n` and up to K/n = 0.30:
+HC2 covers as well as the oracle does, within 2.6 points. What it cannot fix
+is weak identification, which shows as a large `sd(ρ̂)` and a small
+`‖Cs‖_F²`.
 
 ## Still to do
 
@@ -1345,9 +1399,14 @@ with bounded leverage cannot reach at n = 900; other `W`; and `n` other than
    (`tc_cjn_lin.jl`). With both corrected, CJN is within 1.6% of `V` at
    K/n ≤ 0.19, and worse than uncorrected at 0.25. Coverage with the
    corrected `V̂` (`tc_coverage_cjnc.jl`) gains at most 0.5 points and
-   loses up to 3.6 at K/n = 0.25, so HC2 stays the recommended `V̂`. Step 2
-   is closed for these designs; untested are K/n above 0.25, other `W`,
-   and other `n`.
+   loses up to 3.6 at K/n = 0.25, so HC2 stays the recommended `V̂`. Four
+   `W`, n = 400–1600 and K/n up to 0.30 (`tc_coverage_robust.jl`, 90
+   cells): HC2 is within −2.6 to +1.8 points of the oracle everywhere, and
+   covers 0.930–0.966 wherever `sd(ρ̂)` < 0.39. The 7 failing cells are
+   weak identification (a dense `W` at n = 400), where the oracle fails
+   too. Still untested: non-normal errors in these designs, and a
+   diagnostic for weak identification with a threshold derived rather than
+   read off.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ` is

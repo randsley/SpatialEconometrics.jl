@@ -1232,7 +1232,12 @@ scripts, their outputs and the method are in `research/trace_cfe/`.
      0.320), the RMSE-best λ already under-covers (0.908 at a = 4), and a
      plug-in `ĉ` has sd 0.8–2.9, too noisy to choose λ. A smoothed TC-CFE
      in `src/` must not default to GCV; undersmooth and report the
-     sensitivity across λ.
+     sensitivity across λ. Step 2 for other `W` and `n`
+     (`tc_coverage_robust.jl`: kNN-6, kNN-20, rook and a distance band;
+     n = 400–1600; K/n up to 0.30; 90 cells): HC2 is within −2.6 to +1.8
+     points of the oracle everywhere and covers 0.930–0.966 wherever
+     `sd(ρ̂)` < 0.39. The seven failing cells are weakly identified (kNN-20
+     at n = 400, `‖Cs‖_F²` 1.6–14), and the oracle fails there too.
      Proposition 5 derives A5 from `W`: `‖Cs‖_F²/n ≥ κ/2 −
      2(K/n)(c_W + d̄)²` with `κn ≤ ‖W‖_F²`, so A5 holds for K/n → 0. In
      `tc_a5.jl` the bound is close at small K/n (0.137 against 0.148) and
