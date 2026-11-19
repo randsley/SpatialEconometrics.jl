@@ -666,6 +666,57 @@ so neither condition implies the other.
   first: at a = 4, λ = 1, `V̂` is unbiased but coverage is 0.663
   (`tc_smoother.jl`), because `c` = 1.6.
 
+**Choosing λ (measured; no theory).** Propositions 3 and 4 say when an
+interval is valid, not how to pick λ. Two ways were tried in
+`tc_lambda.jl`: GCV, and a plug-in estimate of `c` (same design as
+`tc_smoother.jl`, λ on a half-decade grid from 10⁻³ to 10², R = 500).
+- GCV is `n‖M_λy₀p‖²/(n − tr S_λ)²`, where `y₀p` comes from a pilot fit at
+  λ = 10⁻³.
+- The plug-in is `ĉ(λ) = (f̃′A_λf̃ − ŝ′diag(S_pA_λS_p))/√V̂_λ`, with
+  `f̃ = S_py₀p` from the same pilot.
+
+| a | λ | tr S | c | ĉ: mean | ĉ: sd | sd ρ̂ | RMSE ρ̂ | coverage | GCV picks (of 500) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.001 | 222 | 0.003 | 0.001 | 0.03 | 0.119 | 0.119 | 0.960 | 0 |
+| 1 | 0.1 | 131 | 0.014 | 0.068 | 0.84 | 0.075 | 0.075 | 0.944 | 4 |
+| 1 | 1 | 62 | 0.096 | 0.246 | 1.53 | 0.059 | 0.059 | 0.944 | 46 |
+| 1 | 3.16 | 41 | 0.261 | 0.446 | 1.77 | 0.054 | **0.057** | 0.944 | 82 |
+| 1 | 10 | 27 | 0.659 | 0.864 | 2.02 | 0.049 | 0.062 | 0.900 | 275 |
+| 1 | 31.6 | 18 | 1.331 | 1.597 | 2.35 | 0.044 | 0.080 | 0.720 | 68 |
+| 4 | 0.001 | 222 | 0.031 | 0.003 | 0.03 | 0.109 | 0.110 | 0.970 | 0 |
+| 4 | 0.1 | 131 | 0.232 | 0.243 | 0.87 | 0.068 | 0.071 | 0.946 | 4 |
+| 4 | 0.316 | 93 | 0.598 | 0.645 | 1.34 | 0.056 | **0.068** | 0.908 | 27 |
+| 4 | 1 | 62 | 1.594 | 1.677 | 1.93 | 0.045 | 0.090 | 0.648 | 167 |
+| 4 | 3.16 | 41 | 4.139 | 4.261 | 2.91 | 0.034 | 0.156 | 0.028 | 302 |
+
+With GCV's own choice, coverage is **0.888** (a = 1) and **0.320**
+(a = 4). (All 22 rows are in `tc_lambda_output.txt`.)
+
+- **GCV over-smooths for inference.** It picks λ = 3–10 at a = 1 and
+  λ = 1–3 at a = 4. Those values give a good fit of `f`, but `c` is 0.3–4
+  there. Under-coverage is mild for a weak surface and severe for a strong
+  one. GCV must not be the default λ of a smoothed TC-CFE.
+- **The RMSE-best λ is already too large for an interval.** RMSE is
+  smallest where `c` ≈ 0.26 (a = 1) and 0.6 (a = 4), and coverage there is
+  0.944 and 0.908. This is the usual undersmoothing result: a valid interval
+  needs `c` → 0, so λ must be below the RMSE-optimal one. The price is
+  precision. `sd(ρ̂)` doubles from λ = 1 to λ = 0.001.
+- **`c` cannot be estimated well enough to pick λ.** While `c` ≤ 4, `ĉ`'s
+  bias is at most 0.2, small beside its sd (0.645 against 0.598, 4.26
+  against 4.14). Its sd,
+  however, is 0.8–2.9 in the range that matters, because `f̃′A_λf̃` carries
+  noise of the same order as `√V`. So it can flag a large bias (`c` ≳ 4) but
+  cannot tell `c` = 0.3 from 0. Beyond `c` ≈ 4 it overshoots (30.7 against
+  14.8). The cause is not checked; a likely one is the pilot's own error
+  in `f̃` once `A_λ` is far from `A_p`.
+- **What this leaves.** The largest λ with coverage ≥ 0.94 is about 1/3
+  of GCV's modal choice at a = 1 (3.16 against 10) and 1/30 at a = 4 (0.1
+  against 3.16). So the factor depends on the signal, and two designs do
+  not justify a rule. An honest
+  default is to undersmooth: take λ at the small end of the range where
+  `V̂` is still stable, and report `sd(ρ̂)` across λ as a sensitivity
+  check. The same holds for K with a projection (`tc_approx.jl`).
+
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κn`; a
 row-standardised `W` with at most `m` neighbours per row has `κ = 1/m`.
@@ -1297,8 +1348,12 @@ with bounded leverage cannot reach at n = 900; other `W`; and `n` other than
    loses up to 3.6 at K/n = 0.25, so HC2 stays the recommended `V̂`. Step 2
    is closed for these designs; untested are K/n above 0.25, other `W`,
    and other `n`.
-4. Proposition 4(c) proves the smoother's `V̂` consistent. Still open: how
-   to choose λ so that `β = o(√n)` and `‖Mf‖² = o(n)`.
+4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
+   measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
+   and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ` is
+   too noisy (sd 0.8–2.9) to choose λ. Still open: a data-driven λ (or K)
+   with a coverage guarantee, for example one targeting `c` rather than the
+   fit of `f`.
 5. Reading: de Jong (1987), Bhansali, Giraitis & Kokoszka (2007), Kelejian &
    Prucha (2001) and Hall & Heyde's §3.2 are read. Cattaneo, Jansson & Newey
    (2018) §3 and Kline, Saggio & Sølvsten (2020) §4.2 have been read via

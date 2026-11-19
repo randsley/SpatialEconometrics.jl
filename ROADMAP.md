@@ -1227,7 +1227,12 @@ scripts, their outputs and the method are in `research/trace_cfe/`.
      Proposition 4(c) proves its HC2 `V̂` (with `ûᵢ²/(M²)ᵢᵢ`) consistent
      when `tr S/n → 0` and `‖Mf‖² = o(n)`. `tc_smoother_vhat.jl` matches the
      exact shrinkage terms (|z| ≤ 2.2 in 10 cells); over-smoothing biases
-     `V̂` down, to 0.55 of `V` at the largest λ.
+     `V̂` down, to 0.55 of `V` at the largest λ. Choosing λ
+     (`tc_lambda.jl`): GCV over-smooths for inference (coverage 0.888 and
+     0.320), the RMSE-best λ already under-covers (0.908 at a = 4), and a
+     plug-in `ĉ` has sd 0.8–2.9, too noisy to choose λ. A smoothed TC-CFE
+     in `src/` must not default to GCV; undersmooth and report the
+     sensitivity across λ.
      Proposition 5 derives A5 from `W`: `‖Cs‖_F²/n ≥ κ/2 −
      2(K/n)(c_W + d̄)²` with `κn ≤ ‖W‖_F²`, so A5 holds for K/n → 0. In
      `tc_a5.jl` the bound is close at small K/n (0.137 against 0.148) and

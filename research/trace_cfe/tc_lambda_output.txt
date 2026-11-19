@@ -1,0 +1,36 @@
+amp 1 (pilot λ = 1e-03, R = 3)
+  λ   0.0010 tr S  221.6 | c  +0.003 ĉ mean  +0.005 sd 0.013 | ρ̂ bias -0.0752 sd 0.0932 RMSE 0.1070 | coverage 1.000 | GCV picks   0
+  λ   1.0000 tr S   62.2 | c  +0.096 ĉ mean  +1.152 sd 1.325 | ρ̂ bias -0.0237 sd 0.0264 RMSE 0.0320 | coverage 1.000 | GCV picks   3
+  GCV choice: coverage 1.000, ρ̂ bias -0.0237 sd 0.0264 RMSE 0.0320
+
+(warm-up above)
+
+amp 1 (pilot λ = 1e-03, R = 500)
+  λ   0.0010 tr S  221.6 | c  +0.003 ĉ mean  +0.001 sd 0.027 | ρ̂ bias +0.0069 sd 0.1188 RMSE 0.1189 | coverage 0.960 | GCV picks   0
+  λ   0.0032 tr S  214.0 | c  +0.003 ĉ mean  +0.003 sd 0.076 | ρ̂ bias +0.0066 sd 0.1135 RMSE 0.1136 | coverage 0.964 | GCV picks   0
+  λ   0.0100 tr S  197.3 | c  +0.004 ĉ mean  +0.010 sd 0.201 | ρ̂ bias +0.0062 sd 0.1036 RMSE 0.1037 | coverage 0.962 | GCV picks   0
+  λ   0.0316 tr S  168.8 | c  +0.006 ĉ mean  +0.029 sd 0.461 | ρ̂ bias +0.0060 sd 0.0893 RMSE 0.0894 | coverage 0.956 | GCV picks   0
+  λ   0.1000 tr S  131.3 | c  +0.014 ĉ mean  +0.068 sd 0.843 | ρ̂ bias +0.0063 sd 0.0751 RMSE 0.0753 | coverage 0.944 | GCV picks   4
+  λ   0.3162 tr S   93.1 | c  +0.035 ĉ mean  +0.136 sd 1.227 | ρ̂ bias +0.0075 sd 0.0650 RMSE 0.0653 | coverage 0.944 | GCV picks  22
+  λ   1.0000 tr S   62.2 | c  +0.096 ĉ mean  +0.246 sd 1.533 | ρ̂ bias +0.0107 sd 0.0585 RMSE 0.0594 | coverage 0.944 | GCV picks  46
+  λ   3.1623 tr S   40.5 | c  +0.261 ĉ mean  +0.446 sd 1.773 | ρ̂ bias +0.0188 sd 0.0538 RMSE 0.0569 | coverage 0.944 | GCV picks  82
+  λ  10.0000 tr S   26.5 | c  +0.659 ĉ mean  +0.864 sd 2.019 | ρ̂ bias +0.0370 sd 0.0491 RMSE 0.0615 | coverage 0.900 | GCV picks 275
+  λ  31.6228 tr S   17.6 | c  +1.331 ĉ mean  +1.597 sd 2.352 | ρ̂ bias +0.0660 sd 0.0444 RMSE 0.0795 | coverage 0.720 | GCV picks  68
+  λ 100.0000 tr S   12.0 | c  +1.949 ĉ mean  +2.431 sd 2.758 | ρ̂ bias +0.0925 sd 0.0411 RMSE 0.1012 | coverage 0.418 | GCV picks   3
+  GCV choice: coverage 0.888, ρ̂ bias +0.0292 sd 0.0562 RMSE 0.0633
+
+amp 4 (pilot λ = 1e-03, R = 500)
+  λ   0.0010 tr S  221.6 | c  +0.031 ĉ mean  +0.003 sd 0.030 | ρ̂ bias +0.0099 sd 0.1094 RMSE 0.1097 | coverage 0.970 | GCV picks   0
+  λ   0.0032 tr S  214.0 | c  +0.036 ĉ mean  +0.009 sd 0.082 | ρ̂ bias +0.0099 sd 0.1043 RMSE 0.1047 | coverage 0.970 | GCV picks   0
+  λ   0.0100 tr S  197.3 | c  +0.050 ĉ mean  +0.028 sd 0.210 | ρ̂ bias +0.0106 sd 0.0951 RMSE 0.0956 | coverage 0.960 | GCV picks   0
+  λ   0.0316 tr S  168.8 | c  +0.097 ĉ mean  +0.086 sd 0.469 | ρ̂ bias +0.0134 sd 0.0819 RMSE 0.0829 | coverage 0.950 | GCV picks   0
+  λ   0.1000 tr S  131.3 | c  +0.232 ĉ mean  +0.243 sd 0.867 | ρ̂ bias +0.0208 sd 0.0680 RMSE 0.0711 | coverage 0.946 | GCV picks   4
+  λ   0.3162 tr S   93.1 | c  +0.598 ĉ mean  +0.645 sd 1.337 | ρ̂ bias +0.0385 sd 0.0563 RMSE 0.0681 | coverage 0.908 | GCV picks  27
+  λ   1.0000 tr S   62.2 | c  +1.594 ĉ mean  +1.677 sd 1.926 | ρ̂ bias +0.0780 sd 0.0454 RMSE 0.0902 | coverage 0.648 | GCV picks 167
+  λ   3.1623 tr S   40.5 | c  +4.139 ĉ mean  +4.261 sd 2.911 | ρ̂ bias +0.1522 sd 0.0341 RMSE 0.1560 | coverage 0.028 | GCV picks 302
+  λ  10.0000 tr S   26.5 | c  +8.878 ĉ mean  +9.597 sd 4.546 | ρ̂ bias +0.2514 sd 0.0242 RMSE 0.2525 | coverage 0.000 | GCV picks   0
+  λ  31.6228 tr S   17.6 | c +13.070 ĉ mean +18.086 sd 6.999 | ρ̂ bias +0.3366 sd 0.0180 RMSE 0.3370 | coverage 0.000 | GCV picks   0
+  λ 100.0000 tr S   12.0 | c +14.821 ĉ mean +30.743 sd 11.764 | ρ̂ bias +0.3842 sd 0.0149 RMSE 0.3845 | coverage 0.000 | GCV picks   0
+  GCV choice: coverage 0.320, ρ̂ bias +0.1170 sd 0.0640 RMSE 0.1333
+
+total 1.0 min
