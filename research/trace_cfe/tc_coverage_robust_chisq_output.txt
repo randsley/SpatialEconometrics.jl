@@ -1,0 +1,100 @@
+knn6   n  900 rough  K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.077 | bias -0.0296 sd 0.0311 | oracle 1.000 hc2 1.000 homo 1.000 | CS 1.000 length 0.256
+(warm-up above) Coverage of the 95% interval, R = 1000 (MC SE 0.007). Errors: chisq.
+
+knn6   n  400 smooth K  17 K/n 0.043 maxh 0.203 ‖Cs‖F²/n 0.118 | bias -0.0026 sd 0.0961 | oracle 0.936 hc2 0.947 homo 0.880 | CS 0.948 length 0.387
+knn6   n  400 smooth K  50 K/n 0.125 maxh 0.636 ‖Cs‖F²/n 0.070 | bias -0.0025 sd 0.1353 | oracle 0.944 hc2 0.950 homo 0.882 | CS 0.954 length 0.556
+knn6   n  400 smooth K  82 K/n 0.205 maxh 0.876 ‖Cs‖F²/n 0.047 | bias -0.0007 sd 0.1626 | oracle 0.946 hc2 0.955 homo 0.900 | CS 0.964 length 0.675
+knn6   n  400 smooth K 122 K/n 0.305 maxh 0.971 ‖Cs‖F²/n 0.045 | bias -0.0280 sd 0.2885 | oracle 0.933 hc2 0.934 homo 0.885 | CS 0.959 length 0.893
+knn6   n  400 rough  K  17 K/n 0.043 maxh 0.203 ‖Cs‖F²/n 0.118 | bias -0.0016 sd 0.0710 | oracle 0.945 hc2 0.953 homo 0.960 | CS 0.955 length 0.283
+knn6   n  400 rough  K  50 K/n 0.125 maxh 0.636 ‖Cs‖F²/n 0.070 | bias -0.0000 sd 0.1014 | oracle 0.933 hc2 0.951 homo 0.943 | CS 0.948 length 0.411
+knn6   n  400 rough  K  82 K/n 0.205 maxh 0.876 ‖Cs‖F²/n 0.047 | bias +0.0004 sd 0.1250 | oracle 0.954 hc2 0.952 homo 0.945 | CS 0.957 length 0.517
+knn6   n  400 rough  K 122 K/n 0.305 maxh 0.971 ‖Cs‖F²/n 0.045 | bias -0.0020 sd 0.1968 | oracle 0.953 hc2 0.954 homo 0.951 | CS 0.960 length 0.725
+knn6   n  900 smooth K  50 K/n 0.056 maxh 0.326 ‖Cs‖F²/n 0.109 | bias -0.0010 sd 0.0686 | oracle 0.954 hc2 0.951 homo 0.863 | CS 0.953 length 0.269
+knn6   n  900 smooth K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.077 | bias -0.0004 sd 0.0857 | oracle 0.947 hc2 0.949 homo 0.874 | CS 0.951 length 0.339
+knn6   n  900 smooth K 170 K/n 0.189 maxh 0.863 ‖Cs‖F²/n 0.051 | bias -0.0001 sd 0.1080 | oracle 0.951 hc2 0.948 homo 0.867 | CS 0.948 length 0.444
+knn6   n  900 smooth K 257 K/n 0.286 | skipped: max hᵢᵢ = 0.9903 > 0.99, A3 fails
+knn6   n  900 rough  K  50 K/n 0.056 maxh 0.326 ‖Cs‖F²/n 0.109 | bias -0.0001 sd 0.0510 | oracle 0.945 hc2 0.946 homo 0.938 | CS 0.947 length 0.199
+knn6   n  900 rough  K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.077 | bias -0.0018 sd 0.0629 | oracle 0.947 hc2 0.952 homo 0.948 | CS 0.954 length 0.257
+knn6   n  900 rough  K 170 K/n 0.189 maxh 0.863 ‖Cs‖F²/n 0.051 | bias -0.0012 sd 0.0766 | oracle 0.954 hc2 0.958 homo 0.952 | CS 0.963 length 0.327
+knn6   n  900 rough  K 257 K/n 0.286 | skipped: max hᵢᵢ = 0.9903 > 0.99, A3 fails
+knn6   n 1600 smooth K  82 K/n 0.051 maxh 0.365 ‖Cs‖F²/n 0.112 | bias +0.0005 sd 0.0489 | oracle 0.947 hc2 0.954 homo 0.865 | CS 0.953 length 0.199
+knn6   n 1600 smooth K 170 K/n 0.106 maxh 0.596 ‖Cs‖F²/n 0.079 | bias +0.0015 sd 0.0600 | oracle 0.941 hc2 0.947 homo 0.866 | CS 0.945 length 0.240
+knn6   n 1600 smooth K 290 K/n 0.181 maxh 0.758 ‖Cs‖F²/n 0.051 | bias +0.0048 sd 0.0779 | oracle 0.955 hc2 0.963 homo 0.865 | CS 0.961 length 0.316
+knn6   n 1600 smooth K 485 K/n 0.303 maxh 0.949 ‖Cs‖F²/n 0.188 | bias +0.0034 sd 0.1215 | oracle 0.963 hc2 0.973 homo 0.994 | CS 0.974 length 0.512
+knn6   n 1600 rough  K  82 K/n 0.051 maxh 0.365 ‖Cs‖F²/n 0.112 | bias -0.0006 sd 0.0358 | oracle 0.954 hc2 0.957 homo 0.953 | CS 0.959 length 0.145
+knn6   n 1600 rough  K 170 K/n 0.106 maxh 0.596 ‖Cs‖F²/n 0.079 | bias +0.0008 sd 0.0437 | oracle 0.955 hc2 0.962 homo 0.952 | CS 0.964 length 0.183
+knn6   n 1600 rough  K 290 K/n 0.181 maxh 0.758 ‖Cs‖F²/n 0.051 | bias +0.0005 sd 0.0556 | oracle 0.956 hc2 0.968 homo 0.947 | CS 0.964 length 0.240
+knn6   n 1600 rough  K 485 K/n 0.303 maxh 0.949 ‖Cs‖F²/n 0.188 | bias -0.0264 sd 0.2432 | oracle 0.957 hc2 0.968 homo 0.913 | CS 0.986 length 0.692
+knn20  n  400 smooth K  17 K/n 0.043 maxh 0.203 ‖Cs‖F²/n 0.021 | bias -0.0126 sd 0.1957 | oracle 0.950 hc2 0.952(neg 2) homo 0.938 | CS 0.949 length 0.786
+knn20  n  400 smooth K  50 K/n 0.125 maxh 0.636 ‖Cs‖F²/n 0.008 | bias -0.0841 sd 0.3929 | oracle 0.913 hc2 0.908 homo 0.891 | CS 0.943 length 1.101
+knn20  n  400 smooth K  82 K/n 0.205 maxh 0.876 ‖Cs‖F²/n 0.005 | bias -0.1790 sd 0.5135 | oracle 0.877 hc2 0.868 homo 0.857 | CS 0.950 length 1.288
+knn20  n  400 smooth K 122 K/n 0.305 maxh 0.971 ‖Cs‖F²/n 0.004 | bias -0.2972 sd 0.5788 | oracle 0.845 hc2 0.841 homo 0.811 | CS 0.938 length 1.454
+knn20  n  400 rough  K  17 K/n 0.043 maxh 0.203 ‖Cs‖F²/n 0.021 | bias -0.0194 sd 0.1566 | oracle 0.956 hc2 0.960 homo 0.964 | CS 0.958 length 0.665
+knn20  n  400 rough  K  50 K/n 0.125 maxh 0.636 ‖Cs‖F²/n 0.008 | bias -0.0303 sd 0.2952 | oracle 0.950 hc2 0.951 homo 0.957 | CS 0.957 length 0.996
+knn20  n  400 rough  K  82 K/n 0.205 maxh 0.876 ‖Cs‖F²/n 0.005 | bias -0.1027 sd 0.4254 | oracle 0.918 hc2 0.914 homo 0.919 | CS 0.957 length 1.144
+knn20  n  400 rough  K 122 K/n 0.305 maxh 0.971 ‖Cs‖F²/n 0.004 | bias -0.1764 sd 0.4985 | oracle 0.892 hc2 0.889 homo 0.885 | CS 0.955 length 1.327
+knn20  n  900 smooth K  50 K/n 0.056 maxh 0.326 ‖Cs‖F²/n 0.017 | bias -0.0004 sd 0.1571 | oracle 0.947 hc2 0.943 homo 0.902 | CS 0.944 length 0.627
+knn20  n  900 smooth K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.009 | bias -0.0167 sd 0.2608 | oracle 0.950 hc2 0.948 homo 0.898 | CS 0.952 length 0.877
+knn20  n  900 smooth K 170 K/n 0.189 maxh 0.863 ‖Cs‖F²/n 0.006 | bias -0.0343 sd 0.3529 | oracle 0.946 hc2 0.937 homo 0.906 | CS 0.954 length 1.049
+knn20  n  900 smooth K 257 K/n 0.286 | skipped: max hᵢᵢ = 0.9903 > 0.99, A3 fails
+knn20  n  900 rough  K  50 K/n 0.056 maxh 0.326 ‖Cs‖F²/n 0.017 | bias +0.0000 sd 0.1224 | oracle 0.954 hc2 0.953 homo 0.955 | CS 0.956 length 0.482
+knn20  n  900 rough  K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.009 | bias -0.0028 sd 0.1842 | oracle 0.946 hc2 0.953 homo 0.953 | CS 0.955 length 0.707
+knn20  n  900 rough  K 170 K/n 0.189 maxh 0.863 ‖Cs‖F²/n 0.006 | bias -0.0066 sd 0.2505 | oracle 0.949 hc2 0.956 homo 0.956 | CS 0.954 length 0.865
+knn20  n  900 rough  K 257 K/n 0.286 | skipped: max hᵢᵢ = 0.9903 > 0.99, A3 fails
+knn20  n 1600 smooth K  82 K/n 0.051 maxh 0.365 ‖Cs‖F²/n 0.019 | bias -0.0024 sd 0.1249 | oracle 0.946 hc2 0.940 homo 0.875 | CS 0.945 length 0.493
+knn20  n 1600 smooth K 170 K/n 0.106 maxh 0.596 ‖Cs‖F²/n 0.010 | bias +0.0037 sd 0.1832 | oracle 0.942 hc2 0.952 homo 0.870 | CS 0.951 length 0.687
+knn20  n 1600 smooth K 290 K/n 0.181 maxh 0.758 ‖Cs‖F²/n 0.006 | bias -0.0065 sd 0.2567 | oracle 0.936 hc2 0.940 homo 0.863 | CS 0.942 length 0.837
+knn20  n 1600 smooth K 485 K/n 0.303 maxh 0.949 ‖Cs‖F²/n 0.009 | bias -0.0431 sd 0.3521 | oracle 0.940 hc2 0.938 homo 0.933 | CS 0.950 length 0.995
+knn20  n 1600 rough  K  82 K/n 0.051 maxh 0.365 ‖Cs‖F²/n 0.019 | bias -0.0074 sd 0.0915 | oracle 0.943 hc2 0.951 homo 0.952 | CS 0.952 length 0.366
+knn20  n 1600 rough  K 170 K/n 0.106 maxh 0.596 ‖Cs‖F²/n 0.010 | bias -0.0022 sd 0.1335 | oracle 0.948 hc2 0.948 homo 0.948 | CS 0.951 length 0.520
+knn20  n 1600 rough  K 290 K/n 0.181 maxh 0.758 ‖Cs‖F²/n 0.006 | bias -0.0054 sd 0.1695 | oracle 0.949 hc2 0.957 homo 0.948 | CS 0.955 length 0.663
+knn20  n 1600 rough  K 485 K/n 0.303 maxh 0.949 ‖Cs‖F²/n 0.009 | bias -0.0605 sd 0.3559 | oracle 0.948 hc2 0.963 homo 0.913 | CS 0.981 length 1.036
+rook   n  400 smooth K  17 K/n 0.043 maxh 0.188 ‖Cs‖F²/n 0.228 | bias +0.0015 sd 0.0824 | oracle 0.946 hc2 0.940 homo 0.833 | CS 0.947 length 0.323
+rook   n  400 smooth K  50 K/n 0.125 maxh 0.506 ‖Cs‖F²/n 0.169 | bias +0.0017 sd 0.1012 | oracle 0.943 hc2 0.943 homo 0.846 | CS 0.949 length 0.410
+rook   n  400 smooth K  82 K/n 0.205 maxh 0.684 ‖Cs‖F²/n 0.132 | bias +0.0051 sd 0.1204 | oracle 0.940 hc2 0.949 homo 0.866 | CS 0.960 length 0.489
+rook   n  400 smooth K 122 K/n 0.305 maxh 0.892 ‖Cs‖F²/n 0.103 | bias +0.0095 sd 0.1597 | oracle 0.945 hc2 0.955 homo 0.845 | CS 0.965 length 0.643
+rook   n  400 rough  K  17 K/n 0.043 maxh 0.188 ‖Cs‖F²/n 0.228 | bias -0.0007 sd 0.0569 | oracle 0.953 hc2 0.950 homo 0.953 | CS 0.948 length 0.233
+rook   n  400 rough  K  50 K/n 0.125 maxh 0.506 ‖Cs‖F²/n 0.169 | bias -0.0006 sd 0.0703 | oracle 0.948 hc2 0.961 homo 0.949 | CS 0.960 length 0.313
+rook   n  400 rough  K  82 K/n 0.205 maxh 0.684 ‖Cs‖F²/n 0.132 | bias +0.0007 sd 0.0903 | oracle 0.941 hc2 0.959 homo 0.921 | CS 0.962 length 0.393
+rook   n  400 rough  K 122 K/n 0.305 maxh 0.892 ‖Cs‖F²/n 0.103 | bias +0.0028 sd 0.1183 | oracle 0.937 hc2 0.969 homo 0.924 | CS 0.970 length 0.519
+rook   n  900 smooth K  50 K/n 0.056 maxh 0.294 ‖Cs‖F²/n 0.211 | bias +0.0000 sd 0.0577 | oracle 0.941 hc2 0.952 homo 0.835 | CS 0.957 length 0.227
+rook   n  900 smooth K 101 K/n 0.112 maxh 0.507 ‖Cs‖F²/n 0.173 | bias -0.0004 sd 0.0647 | oracle 0.958 hc2 0.968 homo 0.860 | CS 0.971 length 0.270
+rook   n  900 smooth K 170 K/n 0.189 maxh 0.684 ‖Cs‖F²/n 0.136 | bias -0.0024 sd 0.0779 | oracle 0.947 hc2 0.955 homo 0.854 | CS 0.962 length 0.319
+rook   n  900 smooth K 257 K/n 0.286 maxh 0.892 ‖Cs‖F²/n 0.104 | bias -0.0059 sd 0.0963 | oracle 0.946 hc2 0.957 homo 0.851 | CS 0.965 length 0.415
+rook   n  900 rough  K  50 K/n 0.056 maxh 0.294 ‖Cs‖F²/n 0.211 | bias -0.0008 sd 0.0390 | oracle 0.948 hc2 0.956 homo 0.952 | CS 0.955 length 0.159
+rook   n  900 rough  K 101 K/n 0.112 maxh 0.507 ‖Cs‖F²/n 0.173 | bias -0.0008 sd 0.0459 | oracle 0.952 hc2 0.961 homo 0.957 | CS 0.963 length 0.193
+rook   n  900 rough  K 170 K/n 0.189 maxh 0.684 ‖Cs‖F²/n 0.136 | bias -0.0009 sd 0.0564 | oracle 0.944 hc2 0.962 homo 0.950 | CS 0.961 length 0.240
+rook   n  900 rough  K 257 K/n 0.286 maxh 0.892 ‖Cs‖F²/n 0.104 | bias -0.0026 sd 0.0689 | oracle 0.949 hc2 0.971 homo 0.947 | CS 0.974 length 0.308
+rook   n 1600 smooth K  82 K/n 0.051 maxh 0.297 ‖Cs‖F²/n 0.212 | bias +0.0014 sd 0.0432 | oracle 0.951 hc2 0.951 homo 0.838 | CS 0.954 length 0.174
+rook   n 1600 smooth K 170 K/n 0.106 maxh 0.508 ‖Cs‖F²/n 0.174 | bias +0.0007 sd 0.0508 | oracle 0.951 hc2 0.950 homo 0.844 | CS 0.954 length 0.207
+rook   n 1600 smooth K 290 K/n 0.181 maxh 0.685 ‖Cs‖F²/n 0.138 | bias +0.0006 sd 0.0608 | oracle 0.944 hc2 0.948 homo 0.848 | CS 0.953 length 0.246
+rook   n 1600 smooth K 485 K/n 0.303 maxh 0.932 ‖Cs‖F²/n 0.101 | bias +0.0003 sd 0.0820 | oracle 0.958 hc2 0.957 homo 0.808 | CS 0.962 length 0.324
+rook   n 1600 rough  K  82 K/n 0.051 maxh 0.297 ‖Cs‖F²/n 0.212 | bias +0.0001 sd 0.0292 | oracle 0.957 hc2 0.957 homo 0.957 | CS 0.960 length 0.120
+rook   n 1600 rough  K 170 K/n 0.106 maxh 0.508 ‖Cs‖F²/n 0.174 | bias -0.0002 sd 0.0342 | oracle 0.959 hc2 0.972 homo 0.963 | CS 0.970 length 0.148
+rook   n 1600 rough  K 290 K/n 0.181 maxh 0.685 ‖Cs‖F²/n 0.138 | bias -0.0000 sd 0.0424 | oracle 0.943 hc2 0.964 homo 0.942 | CS 0.962 length 0.182
+rook   n 1600 rough  K 485 K/n 0.303 maxh 0.932 ‖Cs‖F²/n 0.101 | bias +0.0015 sd 0.0533 | oracle 0.954 hc2 0.970 homo 0.940 | CS 0.968 length 0.239
+band   n  400 smooth K  17 K/n 0.043 maxh 0.203 ‖Cs‖F²/n 0.092 | bias -0.0066 sd 0.1134 | oracle 0.952 hc2 0.942 homo 0.845 | CS 0.950 length 0.461
+band   n  400 smooth K  50 K/n 0.125 maxh 0.636 ‖Cs‖F²/n 0.047 | bias -0.0108 sd 0.1691 | oracle 0.952 hc2 0.961 homo 0.858 | CS 0.967 length 0.701
+band   n  400 smooth K  82 K/n 0.205 maxh 0.876 ‖Cs‖F²/n 0.026 | bias -0.0165 sd 0.2228 | oracle 0.946 hc2 0.948 homo 0.858 | CS 0.953 length 0.851
+band   n  400 smooth K 122 K/n 0.305 maxh 0.971 ‖Cs‖F²/n 0.022 | bias -0.1636 sd 0.4950 | oracle 0.897 hc2 0.874 homo 0.743 | CS 0.970 length 1.194
+band   n  400 rough  K  17 K/n 0.043 maxh 0.203 ‖Cs‖F²/n 0.092 | bias -0.0054 sd 0.0786 | oracle 0.945 hc2 0.955 homo 0.958 | CS 0.951 length 0.316
+band   n  400 rough  K  50 K/n 0.125 maxh 0.636 ‖Cs‖F²/n 0.047 | bias -0.0079 sd 0.1264 | oracle 0.949 hc2 0.954 homo 0.960 | CS 0.955 length 0.512
+band   n  400 rough  K  82 K/n 0.205 maxh 0.876 ‖Cs‖F²/n 0.026 | bias -0.0118 sd 0.1649 | oracle 0.948 hc2 0.950 homo 0.949 | CS 0.965 length 0.674
+band   n  400 rough  K 122 K/n 0.305 maxh 0.971 ‖Cs‖F²/n 0.022 | bias -0.0527 sd 0.3167 | oracle 0.937 hc2 0.940 homo 0.934 | CS 0.960 length 0.950
+band   n  900 smooth K  50 K/n 0.056 maxh 0.326 ‖Cs‖F²/n 0.085 | bias -0.0035 sd 0.0791 | oracle 0.947 hc2 0.952 homo 0.839 | CS 0.956 length 0.310
+band   n  900 smooth K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.055 | bias -0.0040 sd 0.1016 | oracle 0.951 hc2 0.947 homo 0.860 | CS 0.956 length 0.418
+band   n  900 smooth K 170 K/n 0.189 maxh 0.863 ‖Cs‖F²/n 0.032 | bias -0.0077 sd 0.1440 | oracle 0.947 hc2 0.949 homo 0.851 | CS 0.953 length 0.579
+band   n  900 smooth K 257 K/n 0.286 | skipped: max hᵢᵢ = 0.9903 > 0.99, A3 fails
+band   n  900 rough  K  50 K/n 0.056 maxh 0.326 ‖Cs‖F²/n 0.085 | bias +0.0001 sd 0.0558 | oracle 0.953 hc2 0.957 homo 0.953 | CS 0.958 length 0.225
+band   n  900 rough  K 101 K/n 0.112 maxh 0.597 ‖Cs‖F²/n 0.055 | bias -0.0019 sd 0.0741 | oracle 0.962 hc2 0.963 homo 0.955 | CS 0.968 length 0.313
+band   n  900 rough  K 170 K/n 0.189 maxh 0.863 ‖Cs‖F²/n 0.032 | bias -0.0018 sd 0.0989 | oracle 0.946 hc2 0.956 homo 0.943 | CS 0.954 length 0.424
+band   n  900 rough  K 257 K/n 0.286 | skipped: max hᵢᵢ = 0.9903 > 0.99, A3 fails
+band   n 1600 smooth K  82 K/n 0.051 maxh 0.365 ‖Cs‖F²/n 0.088 | bias -0.0023 sd 0.0582 | oracle 0.961 hc2 0.961 homo 0.826 | CS 0.962 length 0.235
+band   n 1600 smooth K 170 K/n 0.106 maxh 0.596 ‖Cs‖F²/n 0.058 | bias -0.0027 sd 0.0749 | oracle 0.937 hc2 0.946 homo 0.829 | CS 0.954 length 0.297
+band   n 1600 smooth K 290 K/n 0.181 maxh 0.758 ‖Cs‖F²/n 0.034 | bias -0.0004 sd 0.1010 | oracle 0.941 hc2 0.950 homo 0.839 | CS 0.956 length 0.405
+band   n 1600 smooth K 485 K/n 0.303 maxh 0.949 ‖Cs‖F²/n 0.073 | bias -0.0010 sd 0.1685 | oracle 0.963 hc2 0.961 homo 0.975 | CS 0.965 length 0.679
+band   n 1600 rough  K  82 K/n 0.051 maxh 0.365 ‖Cs‖F²/n 0.088 | bias -0.0004 sd 0.0408 | oracle 0.949 hc2 0.950 homo 0.951 | CS 0.950 length 0.164
+band   n 1600 rough  K 170 K/n 0.106 maxh 0.596 ‖Cs‖F²/n 0.058 | bias +0.0015 sd 0.0523 | oracle 0.955 hc2 0.961 homo 0.958 | CS 0.965 length 0.218
+band   n 1600 rough  K 290 K/n 0.181 maxh 0.758 ‖Cs‖F²/n 0.034 | bias +0.0013 sd 0.0675 | oracle 0.961 hc2 0.973 homo 0.962 | CS 0.970 length 0.306
+band   n 1600 rough  K 485 K/n 0.303 maxh 0.949 ‖Cs‖F²/n 0.073 | bias -0.0444 sd 0.3026 | oracle 0.950 hc2 0.951 homo 0.909 | CS 0.991 length 0.778
+total 27.4 min

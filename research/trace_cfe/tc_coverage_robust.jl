@@ -10,8 +10,9 @@
 #        so the neighbour count varies);
 #   n:   400, 900, 1600;
 #   K/n: about 0.05, 0.11, 0.19, 0.30;
-#   σ²:  smooth and rough; normal errors; the weak signal of tc_vhat.jl; ρ₀ = 0.4; R = 1000.
-# Reported: oracle and HC2 coverage, negative V̂ counts. Power check: the homoskedastic V̂ (pooled σ̂²) under
+#   σ²:  smooth and rough; normal errors, or standardised χ²₃ with the argument `chisq`; the weak signal of tc_vhat.jl; ρ₀ = 0.4; R = 1000.
+# Reported: oracle and HC2 coverage of the Wald interval, negative V̂ counts, and the coverage and mean
+# length (within (−0.99, 0.99)) of Proposition 6's test-inversion set CS. Power check: the homoskedastic V̂ (pooled σ̂²) under
 # rough variances. A design whose M∘M is singular, or whose max hᵢᵢ exceeds 0.99 (A3 fails), is skipped with
 # a line saying so.
 include(joinpath(@__DIR__, "tc_lib.jl"))
@@ -52,7 +53,7 @@ function vparts(D, W, y, ρ, s)
     2 * dot(s, D.As2 * s) + sum((a .^ 2 .- noise) .* s)
 end
 
-function cell(; n = 900, wtype = :knn6, kh = 10, R = 1000, var = :rough, ρ0 = 0.4, seed = 5)
+function cell(; n = 900, wtype = :knn6, kh = 10, R = 1000, var = :rough, law = :normal, ρ0 = 0.4, seed = 5)
     rng = MersenneTwister(seed)
     if wtype == :rook
         g = round(Int, sqrt(n)); n = g^2
@@ -73,17 +74,18 @@ function cell(; n = 900, wtype = :knn6, kh = 10, R = 1000, var = :rough, ρ0 = 0
         return
     end
     if maximum(1 .- D.Mii) > 0.99
-        @printf("%-6s n %4d %-6s K %3d K/n %.3f | skipped: max hᵢᵢ = %.4f > 0.99, A3 fails
-", wtype, n, var, D.K, D.K / n, maximum(1 .- D.Mii))
+        @printf("%-6s n %4d %-6s K %3d K/n %.3f | skipped: max hᵢᵢ = %.4f > 0.99, A3 fails\n", wtype, n, var, D.K, D.K / n, maximum(1 .- D.Mii))
         return
     end
     f = D.Q * (D.Q' * (sin.(2π .* u) .* cos.(π .* v))) .+ x
     σ2 = var == :smooth ? exp.(3 .* (u .+ v .- 1)) : exp.(randn(rng, n)); σ2 ./= mean(σ2)
     Fac = lu(sparse(I - ρ0 * W))
+    draw() = law == :normal ? randn(rng, n) : (z = randn(rng, n, 3); (vec(sum(z .^ 2, dims = 2)) .- 3) ./ sqrt(6))
     ks = (:oracle, :hc2, :homo)
     cov = Dict(k => 0 for k in ks); neg = Dict(k => 0 for k in ks); ρs = zeros(R)
+    covCS = 0; lenCS = 0.0
     for r in 1:R
-        y = Fac \ (f .+ sqrt.(σ2) .* randn(rng, n))
+        y = Fac \ (f .+ sqrt.(σ2) .* draw())
         Wy = W * y; W2y = W * Wy
         e0, e1, e2 = Mproj(D, y), Mproj(D, Wy), Mproj(D, W2y)
         ρ, a, b = cfe_root(e0, e1 .+ D.d .* e0, e1, e2 .+ D.d .* e1)
@@ -98,13 +100,27 @@ function cell(; n = 900, wtype = :knn6, kh = 10, R = 1000, var = :rough, ρ0 = 0
                 cov[k] += 1
             end
         end
+        # Proposition 6: the test-inversion set, with V̂(ρ) as an exact quartic (tc_ar.jl)
+        f1 = e1 .+ D.d .* e0; c = dot(e0, f1)
+        S = (e0 .^ 2 ./ D.Mii, -2 .* e0 .* e1 ./ D.Mii, e1 .^ 2 ./ D.Mii)
+        α0 = Mproj(D, W * (y .- e0)); α1 = -Mproj(D, W * (Wy .- e1))
+        N = map(s -> vec(sum((D.G * (D.Q' * (s .* D.Q))) .* D.G, dims = 2)), S); ΩS = map(s -> D.As2 * s, S)
+        Ac = (α0 .^ 2 .- N[1], 2 .* α0 .* α1 .- N[2], α1 .^ 2 .- N[3])
+        p = zeros(5)
+        for k in 0:2, l in 0:2
+            p[k+l+1] += 2 * dot(S[k+1], ΩS[l+1]) + dot(Ac[k+1], S[l+1])
+        end
+        Vq(t) = p[1] + t * (p[2] + t * (p[3] + t * (p[4] + t * p[5])))
+        gq(t) = c - b * t + a * t^2
+        covCS += gq(ρ0)^2 <= 1.96^2 * Vq(ρ0)
+        lenCS += 0.002 * count(t -> gq(t)^2 <= 1.96^2 * Vq(t), -0.99:0.002:0.99)
     end
     @printf("%-6s n %4d %-6s K %3d K/n %.3f maxh %.3f ‖Cs‖F²/n %.3f | bias %+.4f sd %.4f |", wtype, n, var, D.K,
             D.K / n, maximum(1 .- D.Mii), sum(D.As2) / n, mean(ρs) - ρ0, std(ρs))
     for k in ks
         @printf(" %s %.3f%s", k, cov[k] / R, neg[k] > 0 ? "(neg $(neg[k]))" : "")
     end
-    println()
+    @printf(" | CS %.3f length %.3f\n", covCS / R, lenCS / R)
 end
 
 khs = Dict(400 => (4, 7, 9, 11), 900 => (7, 10, 13, 16), 1600 => (9, 13, 17, 22))
@@ -114,11 +130,12 @@ if get(ARGS, 1, "") == "time"
         println("n $n, largest K, 20 replications: $(round(t, digits = 1)) s")
     end
 else
-    cell(; R = 5); println("(warm-up above) Coverage of the 95% interval, R = 1000 (MC SE 0.007).\n")
+    law = get(ARGS, 1, "normal") == "chisq" ? :chisq : :normal
+    cell(; R = 5); println("(warm-up above) Coverage of the 95% interval, R = 1000 (MC SE 0.007). Errors: $law.\n")
     t0 = time()
     for wtype in (:knn6, :knn20, :rook, :band), n in (400, 900, 1600), var in (:smooth, :rough)
         for kh in khs[n]
-            cell(; n, wtype, kh, var)
+            cell(; n, wtype, kh, var, law)
         end
     end
     println("total $(round((time() - t0) / 60, digits = 1)) min")

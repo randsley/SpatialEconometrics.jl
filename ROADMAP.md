@@ -1244,7 +1244,9 @@ scripts, their outputs and the method are in `research/trace_cfe/`.
      (Wald 0.841–0.963) with normal and `χ²₃` errors, and in the controls it
      is as short as the Wald interval. `V̂(ρ)` is an exact quartic, so the
      set costs no more than `V̂`. It is the interval a smoothed or
-     projected TC-CFE in `src/` should report.
+     projected TC-CFE in `src/` should report. Over the whole grid
+     with normal and `χ²₃` errors (180 cells) `CS` covers 0.932–0.992; it
+     over-covers only where the leverage is near 0.95.
      Proposition 5 derives A5 from `W`: `‖Cs‖_F²/n ≥ κ/2 −
      2(K/n)(c_W + d̄)²` with `κn ≤ ‖W‖_F²`, so A5 holds for K/n → 0. In
      `tc_a5.jl` the bound is close at small K/n (0.137 against 0.148) and

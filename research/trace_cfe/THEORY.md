@@ -1427,6 +1427,41 @@ no more computation than `V̂` at three vectors, and it is valid without A9.
 The weak-identification diagnostic asked for in item 3 of "Still to do" is
 then not needed for validity: a wide `CS` is the diagnostic.
 
+**`CS` over the whole grid, with normal and `χ²₃` errors
+(`tc_coverage_robust.jl`, argument `chisq`).** The robustness grid was rerun
+with `CS` added, under both laws. With normal errors the Wald columns
+reproduce the earlier run exactly, since the seeds are the same.
+
+| errors | cells | Wald, HC2 | Wald, oracle | `CS`, HC2 |
+|---|---|---|---|---|
+| normal | 83 with `sd(ρ̂)` < 0.39 | 0.930–0.966 | 0.931–0.964 | 0.932–0.992 |
+| normal | 7 with `sd(ρ̂)` ≥ 0.39 | 0.852–0.942 | 0.869–0.928 | 0.956–0.978 |
+| `χ²₃` | 84 with `sd(ρ̂)` < 0.39 | 0.934–0.973 | 0.933–0.963 | 0.942–0.991 |
+| `χ²₃` | 6 with `sd(ρ̂)` ≥ 0.39 | 0.841–0.914 | 0.845–0.918 | 0.938–0.970 |
+
+- **Non-normal errors change nothing.** With `χ²₃` errors the Wald interval
+  fails in the same six weakly identified cells, and `CS` covers 0.938 or
+  more in all 90. HC2 stays within −2.3 to +3.2 points of the oracle. One
+  cell had a negative `V̂` (2 of 1000; kNN-20, n = 400, K/n = 0.04).
+- **`CS` never under-covers by more than 1.8 points.** Its lowest values,
+  0.932 and 0.934 with normal errors, are at n = 1600 (rook, smooth
+  variances, K/n = 0.05; kNN-6, rough, K/n = 0.11), where the Wald interval
+  and the oracle are low by the same amount.
+- **`CS` over-covers where the leverage is near 0.95.** At n = 1600, K/n =
+  0.30, rough variances, the three `W` on random locations (`max hᵢᵢ` =
+  0.949) give `CS` 0.978–0.992 under both laws; rook at the same K/n
+  (`max hᵢᵢ` = 0.93) gives 0.959. The likely cause, not measured here, is
+  HC2's upward bias, applied at every candidate `ρ`. It is conservative,
+  not invalid.
+- **Length.** In the identified cells the mean length of `CS` is 0.63–1.16
+  times `2 · 1.96 · sd(ρ̂)`. Below 1 means `CS` is shorter than a Wald
+  interval with the true sd. A likely reason, not checked, is heavy tails
+  in `ρ̂`, which inflate its sd but not `CS`.
+
+So `CS` covers at least as well as the Wald interval in every one of the
+180 cells, within Monte Carlo error (it is at most 0.5 points lower, against
+an SE of 0.7), and much better where `ρ` is weakly identified.
+
 ## Still to do
 
 1. Theorem 1 and the Corollary are proved (2026-11-19), the Corollary
@@ -1470,9 +1505,10 @@ then not needed for validity: a wide `CS` is the diagnostic.
    too. Proposition 6 gives the remedy: the test-inversion set `CS` is
    valid without A9 and covers 0.938–0.981 in those cells, with normal and
    `χ²₃` errors (`tc_ar.jl`), at no cost in length where identification is
-   strong. Still untested: non-normal errors in the other cells of
-   `tc_coverage_robust.jl`. `CS` for K/n → c > 0, which needs
-   Proposition 2's open case, is also open.
+   strong. Over the whole grid with normal and `χ²₃` errors (180 cells),
+   `CS` covers 0.932–0.992, and over-covers (to 0.99) only where the
+   leverage is near 0.95. Open: `CS` for K/n → c > 0, which needs
+   Proposition 2's open case.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ` is
