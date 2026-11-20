@@ -3,7 +3,7 @@
 `runtests.jl` holds the shared setup and a single outer testset,
 "SpatialEconometrics.jl Full Suite Verification", which includes the 62
 top-level testsets in order from `testsets/`, one file each (`01_…` to
-`45_…`). The list `_TESTSET_FILES` in `runtests.jl` sets the order.
+`48_…`). The list `_TESTSET_FILES` in `runtests.jl` sets the order.
 
 Until 2026-11-19 the testsets sat inline in that outer block, about 11,000
 lines. Julia lowers and compiles a top-level expression as a whole before it
