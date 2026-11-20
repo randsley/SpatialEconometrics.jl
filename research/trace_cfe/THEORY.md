@@ -22,7 +22,9 @@ sign of `J` is measured (`tc_sign.jl`), with a check in `root_rho`. Later
 the same day: Lemma 4 bounds the smoother's bias over a roughness class, and
 Proposition 7 proves the coverage of a bias-aware interval and of a λ chosen
 by its length (`tc_rbc.jl`, `tc_honest.jl`); "Choosing ℛ" says how to set
-its bound and why the data cannot (`tc_rchoice.jl`).
+its bound and why the data cannot (`tc_rchoice.jl`). Then Lemma 5 and
+Proposition 7′ extend both to `f ∉ span(B)`, with the class on a finer
+reference basis (`tc_refbasis.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -78,6 +80,8 @@ line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, 
 | `r = Mf`, `r_W`, `β`, `c_β` | the approximation (or shrinkage) remainder; its lagged part; the bias `f′Cf`; its size `β/√V` |
 | `Π`, `ψ`, `ℛ`, `F(ℛ)` | Lemma 4 and Proposition 7: a smoother's penalty; the coefficients of `f = Bψ`; a roughness bound; the class `{Bψ : ψ′Πψ ≤ ℛ²}` |
 | `v`, `T_λ`, `χ̄_λ`, `b̄`, `t̄`, `cv(t)`, `Υ_λ`, `𝒢` | `B′M_λWf`; `B′M_λW`; the quadratic part's bound; the bias bound; `b̄/√V`; the `1 − α` quantile of `\|N(t, 1)\|`; `Π^{+1/2}T_λP_B`; the grid of λ |
+| `B̃`, `Π̃`, `ψ̃`, `ℛ̃`, `F̃(ℛ̃)`, `f_B` | Lemma 5: a finer reference basis and its penalty; the coefficients of `f = B̃ψ̃`; its roughness bound; the class; `P_Bf` |
+| `ṽ`, `Q̃`, `χ̃`, `b̃`, `T̃`, `Υ̃`, `E` | Lemma 5: the linear coefficient; the quadratic matrix; its bound; the bias bound; `ṽ = T̃f_B`; `Π̃^{+1/2}T̃P_B`; `G(ϱ)′ − Δ(ϱ)` |
 | `θ` | the limit of `K/n` |
 | `κ_W`, `n_W`, `X`, `ωⱼ`, `φⱼ`, `πⱼ` | Proposition 5: `‖W‖_F² ≥ κ_W n`; neighbours per row; `Ws + D`; its eigenvalues and eigenvectors; their overlaps with `B` |
 | `Y` | a generic matrix (Lemmas 2 and 3, and the bound after Lemma 3) |
@@ -1108,7 +1112,8 @@ Then:
 only if `c_β → 0`. Here `c_β` may stay away from zero. The price is
 `cv(t̄) > z_{1−α/2}` and the assumption `ℛ`. At λ = 0, `b̄ = 0` and `I_0`
 is the projection's Wald interval, so the rule never does worse than
-choosing the projection, up to the noise in the choice.
+choosing the projection, up to the noise in the choice. That holds only
+under A4: when `f ∉ span(B)`, the projection is biased too (Lemma 5).
 
 **The raw plug-in needs fewer conditions** than the debiased one: (a) and
 (c) hold with it under (iv)'s first two conditions alone, because its
@@ -1127,9 +1132,8 @@ Yet the debiased plug-in averages 0.96–0.98 of the oracle at λ = 100. So
 
 **What is not covered.**
 - **`f ∉ span(B)`.** A remainder `f − P_Bf` adds to `β` a part that `b̄`
-  does not bound, and it moves `v̂`. Proposition 3's condition, that this
-  part of `β` is `o(√n)`, is what should be needed, but that is not proved
-  here. In `tc_honest.jl`, `c` at λ ≤ 0.001 (where `b̄ ≈ 0`) is 0.003–0.031.
+  does not bound, and it moves `v̂`. Lemma 5 and Proposition 7′ (below)
+  cover it, by putting the class on a finer reference basis. In `tc_honest.jl`, `c` at λ ≤ 0.001 (where `b̄ ≈ 0`) is 0.003–0.031.
 - **The separation in (b)** fails near ties. In `tc_honest.jl`, λ̂ spreads
   over 4–5 grid values, most of them on two or three (198, 258 and 39 of
   500 draws at λ = 1, 3.16 and 10, a = 1). So (b) does not literally apply at n = 900,
@@ -1234,6 +1238,132 @@ changes any coverage probability by at most `δ/2`.
 4. **Do not estimate `ℛ` from the data.** The remark shows that a valid
    data bound must be loose. The table above shows that plug-in rules,
    including doubled ones, under-cover.
+
+**Lemma 5 (the bias over a class on a finer reference basis; proved).**
+Lemma 4 needs `f ∈ span(B)`. Let `B̃` (n × K̃) be a second, finer basis
+with a penalty `Π̃`, used only to state the class
+`F̃(ℛ̃) = {B̃ψ̃ : ψ̃′Π̃ψ̃ ≤ ℛ̃²}`. The estimator still uses `B`. Assume
+
+- (R) `B̃ · null(Π̃) ⊂ B · null(Π)`.
+
+For tensor hat bases on the same box with second-difference penalties,
+both sides are the bilinear surfaces (and `x`, if it is a column of both),
+so (R) holds. Split `ψ̃ = ψ̃₀ + ψ̃₁` as in Lemma 4, and write `fₖ = B̃ψ̃ₖ`,
+`f_B = P_Bf` and `M = I − P_B`. Let `C = EM` be Jin & Lee's matrix at any
+`ϱ`, with `E = G(ϱ)′ − Δ(ϱ)` (Proposition 1). Then, for `f = B̃ψ̃`:
+
+(a) `M_λf₀ = 0` for every `λ ≥ 0` (with `M₀ = M`), so `Mf = MB̃ψ̃₁`.
+
+(b) The smoother: `β(λ) = f′A_λf = ψ̃₁′ṽ_λ + ψ̃₁′Q̃_λψ̃₁`, with
+`ṽ_λ = (M_λB̃)′Wf_B` and `Q̃_λ = (M_λB̃)′W(MB̃) + (M_λB̃)′D_λ(M_λB̃)`.
+
+(c) REsd: `β_R = f′Cf = ψ̃₁′ṽ_R + ψ̃₁′Q̃_Rψ̃₁`, with `ṽ_R = (MB̃)′E′f_B`
+and `Q̃_R = (MB̃)′E(MB̃)`.
+
+(d) In both cases `ṽ ∈ range(Π̃)`, and `Q̃ψ̃₀ = 0 = ψ̃₀′Q̃`. So
+`|β| ≤ b̃ = ℛ̃√(ṽ′Π̃⁺ṽ) + ℛ̃²χ̃` for `f ∈ F̃(ℛ̃)`, with `χ̃` the largest
+`|eigenvalue|` of `Π̃^{+1/2} sym(Q̃) Π̃^{+1/2}`, and `sym(Y) = (Y + Y′)/2`.
+
+(e) With `B̃ = B` and `Π̃ = Π`, (b) is Lemma 4 and (c) gives `b̃ = 0`. At
+`λ = 0`, (b) is Proposition 3's split.
+
+*Proof.* (a) By (R), `f₀ = Bφ₀` with `Πφ₀ = 0`, so Lemma 4(a) gives
+`M_λf₀ = 0`; at `λ = 0` this is `Mf₀ = 0`.
+(b) Lemma 4(a)'s argument uses only `M_λf₀ = 0`, so
+`β = f₁′M_λWf + f₁′M_λD_λM_λf₁`. Write `Wf = Wf_B + WMf`, and use (a)
+for `Mf = MB̃ψ̃₁`.
+(c) `Cf_B = 0`, since `Mf_B = 0`. So `f′Cf = (f_B + Mf)′EMf`, and (a)
+gives `Mf = MB̃ψ̃₁`.
+(d) For `ψ̃₀ ∈ null(Π̃)`: `ψ̃₀′ṽ_λ = (M_λf₀)′Wf_B = 0`, and
+`ψ̃₀′ṽ_R = (Mf₀)′E′f_B = 0`. Each `Q̃` has `M_λB̃` or `MB̃` as its left
+and its right factor, and these vanish on `ψ̃₀` by (a). The rest is
+Lemma 4(b) and (c), with `ψ′Qψ = ψ′sym(Q)ψ`.
+(e) `MB = 0`, so the `W` term of `Q̃_λ` vanishes, `f_B = f` and
+`ṽ_λ = v`; `ṽ_R` and `Q̃_R` vanish. At `λ = 0`,
+`β = r′Wf_B + r′(W + D)r` with `r = Mf`, and `r′Wf_B = r′MWP_Bf = r′r_W`. ∎
+
+`b̃` depends on `f` only through `f_B`, which `P_By₀(ρ₀)` estimates
+without bias, because `P_Br = 0`. The plug-in and its debiasing are those
+of Proposition 7, with `T̃_λ = (M_λB̃)′W` or `T̃_R = (MB̃)′E′`, and
+`Υ̃ = Π̃^{+1/2}T̃P_B`. **The class does not depend on the reference grid in
+the limit.** With the penalty scaled by the knot spacing,
+`ψ̃′Π̃ψ̃ ≈ h̃²∫(f_uu² + f_vv²)` (as in "Choosing ℛ"), so as `B̃` is refined,
+`F̃` tends to a bound on the curvature integral. For the same reason `ℛ̃`
+is stated by interpolating a reference surface at the knots of `B̃`, not
+by least squares, which is not defined once `K̃ > n`.
+
+**Proposition 7′ (the bias-aware interval when `f ∉ span(B)`; proved for
+the smoother candidates, given Proposition 7's inputs).** Proposition 7(a)–(d)
+hold for `f ∈ F̃(ℛ̃)` in place of `F(ℛ)`, with `b̃` in place of `b̄`, at every
+`λ ∈ 𝒢`, including `λ = 0`, which now has `b̃ > 0`. The changes to its
+assumptions are:
+- (i) A4 is replaced by Proposition 3, for the projection with
+  `c_β = O(1)`;
+- (iv) is read with `Υ̃`;
+- (v) is new: `ℛ̃‖Υ̃‖_op‖Mf‖/√V → 0`.
+
+The REsd candidate is not covered, because Proposition 1 has not been
+proved without A4 (its step 2 uses `Mf = 0`).
+
+*Proof.* Proposition 7's proof uses `f ∈ span(B)` only in step 2, for
+`Π^{+1/2}v = Υf`, and through A4 for `t₀ = O_p(n^{−1/2})`.
+- Since `P_Bf = f_B`, `Π̃^{+1/2}ṽ = Υ̃f` for every `f`, and step 2's
+  expansion is unchanged.
+- Under Proposition 3 with `c_β = O(1)`,
+  `J(ρ̂₀ − ρ₀)/√V → N(c_β, 1)`, so `t₀ = O_p(n^{−1/2})` still.
+- The one new term is in the debiasing. At `ρ₀`, `û₀ = r + Mε`, so `ŝ₀ᵢ`
+  gains `(rᵢ² + 2rᵢ(Mε)ᵢ)/Mᵢᵢ`. Its weighted sum is at most
+  `c maxᵢcᵢ(‖r‖² + O_p(‖r‖))`, which is `O_p(‖Υ̃‖_op²‖r‖²)`. Scaled by
+  `ℛ̃²/V`, this vanishes by (v). The term matters because it inflates
+  `ŝ₀`, which deflates `q̂`.
+- Step 3 uses Lemma 5 in place of Lemma 4, and Proposition 3 with
+  `r = M_λf`. Steps 1 and 4 are unchanged. ∎
+
+**Measured** (`tc_refbasis.jl`). The design is tc_honest's, with the
+estimation basis coarsened to `k` = 4, 5, 7 or 15 knots a side. The
+reference has `k̃ = 30` (`K̃ = 901 > n`). The candidates are REsd and 12
+smoother λ, with R = 300. "Old" is the released rule: Lemma 4 on `B`, with
+`ℛ` from the least-squares fit of `f` on `B`, and `b̄ = 0` for REsd. "New"
+is Lemma 5, with `ℛ̃` from the interpolant (`ℛ̃*`, true for `f̃`, and
+`‖f − f̃‖/‖f‖ ≤ 0.005`).
+- **The split is exact.** (b) and (c) hold to a relative 1e-12 or better,
+  at every λ, in all 8 cells. This also checks (a), which the split uses.
+  `B̃·null(Π̃)` lies in `span(B)` to 1e-14.
+- **The new bound holds** in all 104 cases: every candidate of every cell.
+  The old bound is exceeded for REsd in all 8 cells, and at small λ when
+  `k ≤ 7`.
+- **It converges in `k̃`.** At `k = 5`, `a = 4`, `λ = 1`, `b̃/√V` is 15.26,
+  15.55, 15.71 and 15.77 for `k̃` = 15, 20, 30 and 40, and 10.98–11.12 for
+  REsd. `ℛ̃*(k̃ − 1)` is 85.0–83.0.
+- **Coverage at λ̂, with mean half-lengths in brackets.** The old rule
+  under-covers where the remainder matters, and the new one covers
+  everywhere:
+
+  | a | k | old, `ℛ*` | new, `ℛ̃*` | new, `4ℛ̃*` |
+  |---|---|---|---|---|
+  | 1 | 4 | 0.933 (0.102) | 1.000 (0.185) | 1.000 (1.181) |
+  | 1 | 5 | 0.950 (0.105) | 0.990 (0.148) | 1.000 (0.630) |
+  | 1 | 7 | 0.967 (0.113) | 0.983 (0.125) | 1.000 (0.305) |
+  | 1 | 15 | 0.960 (0.118) | 0.960 (0.118) | 0.997 (0.174) |
+  | 4 | 4 | 0.050 (0.079) | 1.000 (0.798) | 1.000 (7.206) |
+  | 4 | 5 | 0.717 (0.091) | 1.000 (0.516) | 1.000 (4.545) |
+  | 4 | 7 | 0.923 (0.107) | 1.000 (0.277) | 1.000 (1.960) |
+  | 4 | 15 | 0.973 (0.151) | 0.980 (0.164) | 1.000 (0.432) |
+
+- **The price is small only for a fine `B`.** At `k = 15` and `ℛ̃*`, the
+  new rule is 0% and 8% longer than the old one. At `4ℛ̃*` it is 7% and
+  115% longer. At `k ≤ 7` it is 1.1–10 times longer.
+- **The bound is loose against this `f`.** For the smoother at small λ, `b̃`
+  is 7–10 times `|β|` when `k ≤ 5`. For REsd at `k = 15` it is 0.137 and
+  0.705 against `|c|` = 0.001 and 0.012. The worst case in `F̃` may spend
+  the whole curvature budget on the part of `f` that `B` misses. Such
+  functions are in the class: inside each cell the remainder has the
+  curvature of `f` itself. So much of the gap is probably the class and
+  not the bound, but that is not shown. The joint (trust-region) bound of
+  the two terms would show how much is the bound.
+- **A rule for K.** The new half-length can be compared across bases, and
+  its minimum over `k` is at the finest `k` tried (15) in all four
+  settings. This is a measured version of "undersmooth".
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -2048,9 +2178,14 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    covers 0.954 and 0.964 at its chosen λ with `ℛ` true, and is 33–53%
    shorter than the projection's. Proposition 7 proves its coverage at each
    λ, at a chosen λ (under a separation condition, or with Bonferroni), and
-   uniformly over `F(ℛ)`. Still open: the joint bound of the linear and
-   quadratic terms (a trust-region problem) in place of their sum; the
-   part of `f` outside span(B); a sharper form of (iv)'s third condition;
+   uniformly over `F(ℛ)`. Lemma 5 and Proposition 7′ cover `f ∉ span(B)`,
+   with the class on a finer reference basis (`tc_refbasis.jl`): the
+   released rule covers 0.050–0.973 at a coarse `B`, the new one
+   0.960–1.000, at a price that is small only for a fine `B`. Still open:
+   the joint bound of the linear and quadratic terms (a trust-region
+   problem) in place of their sum, which would show how much of Lemma 5's
+   looseness is the bound; REsd under Proposition 7′ (Proposition 1
+   without A4); a sharper form of (iv)'s third condition;
    and reading the bias-aware-interval literature (Armstrong & Kolesár) to
    compare. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
    it through a reference surface or a curvature bound, err large, and
