@@ -59,6 +59,18 @@ The second step has a smaller variance. Each root is the one at which
 `g′(ρ) < 0`; the two roots of a quadratic have slopes of opposite sign, so
 that rule picks exactly one.
 
+**The rule assumes `J = −E g′(ρ₀) > 0`** (THEORY.md, A9). If `J < 0`, the
+other root is the consistent one, and the rule's root stays about `|J/g₂|`
+from `ρ₀` however large `n` is. `root_rho` checks the sign at a 2SLS
+estimate (instruments `[X, B, W[X, B]]`) and warns if `g′` is positive
+there, for the moment that gave `ρ̂`. `J < 0` is rare: 0.7% of 3,000
+hub-and-spoke designs had it, and in 1,000 fits on kNN designs the check
+never fired. In the hub design of testset 47g, the smoother's root is
+biased by 0.06 (about 2 SD) and its Wald interval covers 56 of 257 draws;
+`CS`, which does not use the rule, still contains `ρ₀`. REsd's second
+step, with `A = G(ρ̃)′`, had `J > 0` even where the first step's was
+negative, so on the projection path the warning is rarer still.
+
 ## Two intervals
 
 **The Wald interval** is `ρ̂ ± z·se`, with `se = √V̂(ρ̂)/|g′(ρ̂)|`. `V̂` is

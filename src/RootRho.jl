@@ -206,6 +206,38 @@ function _sign_rule_root(a::T, b::T, c::T, bounds) where {T}
     return bounds[1] < ρ < bounds[2] ? ρ : nothing
 end
 
+# A preliminary 2SLS estimate of ρ, with instruments [Z, WZ], used only to read
+# the sign of J = −E g′(ρ₀), which the sign rule assumes positive (THEORY.md,
+# A9). `nothing` when WZ adds nothing to span Z, or when the instruments span
+# every direction (2SLS would then be OLS, which is not consistent).
+function _prelim_2sls(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T},
+                      Ws::SparseMatrixCSC{T}) where {T}
+    n, K = size(Z)
+    F = qr(hcat(Z, Ws * Z), ColumnNorm())
+    d = abs.(diag(F.R))
+    r = count(>(1e-10 * d[1]), d)
+    K < r < n || return nothing
+    Qh = Matrix(F.Q)[:, 1:r]
+    Xh = hcat(Wy, Z)
+    ρ = ((Qh * (Qh' * Xh)) \ y)[1]
+    return isfinite(ρ) ? ρ : nothing
+end
+
+# Warn when g′ = −b + 2aρ, for the moment that gave ρ̂, is positive at the
+# preliminary estimate: the sign rule then picks the wrong root if J < 0. As g′
+# is linear, this is the same as the preliminary estimate lying nearer the
+# other root. Only the final moment matters: REsd's first step only chooses
+# C(ρ̃), and the moment at ρ₀ is valid for any choice.
+function _check_slope_sign(ρp, a, b)
+    ρp === nothing && return false
+    bad = -b + 2a * ρp > 0
+    bad && @warn "root_rho: the moment's slope g′ is positive at a preliminary 2SLS " *
+        "estimate (ρ = $(round(ρp; digits = 3))). The root rule takes the root where " *
+        "g′ < 0, which assumes J = −E g′(ρ₀) > 0, so ρ̂ and its Wald interval may be the " *
+        "wrong root. The test-inversion set does not use the root rule and stays valid."
+    return bad
+end
+
 # V̂(ρ) for the moment with C, as the coefficients of a quartic in ρ. The HC2
 # plug-in sᵢ(ρ) = ûᵢ(ρ)²/Mᵢᵢ is quadratic in ρ, â(ρ) = (C + C′)P y₀(ρ) is
 # linear, and the noise term diag(H(Q′diag(s)Q)H′), H = (C + C′)Q, is linear
@@ -426,6 +458,23 @@ intervals was measured for `K/n` up to 0.30; a larger `K` gives a warning.
 Units with leverage above 0.99 make the correction ill-posed and are
 refused.
 
+# The root rule
+
+`g` is a quadratic in `ρ`, and `ρ̂` is the root at which `g′ < 0`. This
+assumes `J = −E g′(ρ₀) > 0` (THEORY.md, A9). If `J < 0`, the other root is
+the consistent one, and the rule picks a root at a distance of about
+`|J/g₂|` from `ρ₀` (`g₂` the quadratic coefficient), which does not shrink
+with `n`. A 2SLS estimate (instruments `[X, basis, W·[X, basis]]`) is used
+to check the sign: if `g′` is positive there, a warning is given. The
+test-inversion set does not use the rule and stays valid.
+
+`J < 0` is rare. In a search over 3,000 hub-and-spoke designs, 0.7% had it;
+the one in testset 47g gives a sign-rule root biased by 0.06 (2 SD) with the
+smoother. In 1,000 fits on kNN designs (`n` 400–900, both paths) the check
+never fired. REsd's second step has `J > 0` in the designs measured, even
+when the first step's `J` is negative, so on the projection path the
+warning is rarer still.
+
 # Cost
 
 Everything is dense: about four `n × n` matrices, so `n` is capped at
@@ -524,6 +573,7 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
         C, a, b, c = C2, a2, b2, c2
         ρ = ρ2
     end
+    ρ === nothing || _check_slope_sign(_prelim_2sls(yv, Wy, Z, Ws), a, b)
     vp = _vhat_poly(C, Q, Mii, yv, Wy)
     cs = _inversion_set(a, b, c, vp, z, bnds)
     touches = !isempty(cs) && (cs[1][1] == bnds[1] || cs[end][2] == bnds[2])
@@ -571,6 +621,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     z = T(_norminv(1 - (1 - level) / 2))
     a, b, c = _quadratic(A, y, Wy)
     ρ = _sign_rule_root(a, b, c, bnds)
+    ρ === nothing || _check_slope_sign(_prelim_2sls(y, Wy, Z, Ws), a, b)
     vp = _vhat_poly_general(A, H, M, m, y, Wy)
     cs = _inversion_set(a, b, c, vp, z, bnds)
     touches = !isempty(cs) && (cs[1][1] == bnds[1] || cs[end][2] == bnds[2])

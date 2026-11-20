@@ -164,4 +164,36 @@
         @test occursin("penalised smoother", sprint(show, r)) && occursin("df = tr S", sprint(show, r))
         @test !occursin("first step", sprint(show, r))
     end
+
+    @testset "47g. the sign rule's check: J < 0 warns (power: J > 0 does not)" begin
+        # A hub design with J = −E g′(ρ₀) < 0. Found by a search over 3,000
+        # hub designs (0.7% had J < 0); built from formulas, so the design and
+        # J are the same on every Julia version. Six hubs point to fixed units,
+        # every other unit to hub mod1(4i, 6); f lies in the span of Z, and the
+        # smoother is the projection (penalty 0), so Mf = 0.
+        n = 100; Wh = zeros(n, n)
+        for (h, t) in enumerate((35, 4, 37, 96, 15, 9)); Wh[h, t] = 1; end
+        for i in 7:n; Wh[i, mod1(4i, 6)] = 1; end
+        Wh = sparse(Wh); xh = sin.(1.28 .* (1:n)); Zh = hcat(ones(n), xh, xh .^ 2)
+        fh = Zh * [-4.2, -3.9, 4.2]; ρh = -0.9
+        Qh = Matrix(qr(Zh).Q)[:, 1:3]; Mh = I - Qh * Qh'
+        Ah = RR._exact_diag_moment(Matrix(Mh), Wh); Ahs = (Ah + Ah') / 2
+        Gh = Matrix(Wh) / (I - ρh * Matrix(Wh))
+        Jh = 2 * (dot(fh, Gh' * Ahs * fh) + tr(Gh' * Ahs)) / n
+        @test Jh < -20                                   # −24.33, exact
+        yh = (I - ρh * Matrix(Wh)) \ (fh .+ randn(MersenneTwister(1), n))
+        fit_h = @test_logs (:warn, r"slope g′ is positive") match_mode = :any root_rho(
+            yh, Zh[:, 2:3], Wh; basis = Zh[:, 1:1], penalty = zeros(1, 1), lambda = 1.0)
+        # Why it matters: the sign rule took the inconsistent root; the other
+        # root is the one near ρ₀ (0.009 against 0.063 on 1.13, 0.001 against
+        # 0.055 on 1.10). ρ₀ is still in the test-inversion set.
+        other = (fit_h.b + sqrt(fit_h.b^2 - 4fit_h.a * fit_h.c)) / (2fit_h.a)
+        @test abs(other - ρh) < abs(fit_h.rho - ρh) / 3
+        @test any(lo <= ρh <= hi for (lo, hi) in fit_h.cs)
+        # No preliminary estimate when WZ adds nothing to span Z (W1 = 1).
+        @test RR._prelim_2sls(yh, Wh * yh, ones(n, 1), Wh) === nothing
+        # Power: on this testset's design (J > 0) neither path logs anything.
+        @test_logs root_rho(y, X1, d.W; d.ps..., lambda = λ)
+        @test_logs root_rho(y, X1, d.W; basis = d.ps.basis)
+    end
 end

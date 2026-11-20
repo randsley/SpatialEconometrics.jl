@@ -7,8 +7,8 @@
 > the default GS2SLS's panel inference (AUDIT 34–36); the Claude Code skill
 > (#14); and the notebooks on Google Colab. No tag is registered.
 >
-> 33 submodules, 4,241 test assertions in 64 top-level testsets with both
-> package extensions installed and 4,206 (plus 2 broken markers) without
+> 33 submodules, 4,248 test assertions in 64 top-level testsets with both
+> package extensions installed and 4,213 (plus 2 broken markers) without
 > them, measured on 2026-11-20 on Julia 1.13.4, and without them on 1.10.13.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
 > 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
@@ -1734,6 +1734,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **v0.6.0** (tagged 2026-11-19, = the row above) | 32 | 4,139 ¶⁷ | 29,005 |
 | **master** (+ `root_rho`, the research item on a growing basis built) | 33 | 4,182 ¶⁸ | 29,391 |
 | **master** (+ `root_rho` with a penalised smoother, and `tensor_pspline`) | 33 | 4,241 ¶⁹ | 29,643 |
+| **master** (+ the sign rule's check in `root_rho`, after a review of THEORY.md) | 33 | 4,248 ¶¹⁰ | 29,694 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1871,8 +1872,15 @@ Top-level testsets rose from 63 to 64. The `src/` count rose by 252: 210 in
 docstring) and 42 in 13 other files, where titleless references got full
 entries.
 
-Measured on master: 33 submodules plus the umbrella across 29,643 lines of
-`src/`, 11,660 lines of tests, 5,332 lines of examples across 34 scripts,
+¶¹⁰ Measured locally on 2026-11-20: 4,248 passed on Julia 1.13.4 with both
+extensions, and 4,213 plus 2 broken on 1.10.13 without them, both 7 above
+¶⁹: testset 47g (the sign rule's check, on a hub design with `J < 0`; see
+AUDIT, "the sign rule's assumption"). Testset 47 now has 66 assertions. The
+`src/` count rose by 51, all in `RootRho.jl` (the 2SLS check and the
+docstring's "The root rule").
+
+Measured on master: 33 submodules plus the umbrella across 29,694 lines of
+`src/`, 11,694 lines of tests, 5,332 lines of examples across 34 scripts,
 398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 

@@ -15,6 +15,10 @@ proved, and the leave-out alternatives are measured. Then Proposition 3
 (approximation error) replaces the sketched Remark 1, which had missed a
 first-order term, and Proposition 4 (a penalised smoother) replaces
 Remark 3, and Proposition 5 gives a primitive condition for A5.
+Revised on 2026-11-20 after a review (`research/review.md`): a gap in
+Proposition 2, step 3, is closed (the `ζ` part of `b̂`), the steps it
+asked to be explicit are written out, the meaning of `H` is fixed, and the
+sign of `J` is measured (`tc_sign.jl`), with a check in `root_rho`.
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -63,7 +67,7 @@ line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, 
 | `G`, `G(ϱ)`, `C(ϱ)` | `W(I − ρ₀W)⁻¹`; the same, and the moment matrix, at a plug-in value `ϱ` (Proposition 1) |
 | `t = ρ − ρ₀`, `g₀`, `g₁`, `g₂`, `Γ` | the deviation from `ρ₀`; the coefficients of `g(ρ₀ + t)`; the discriminant `g₁² − 4g₂g₀` |
 | `η` | `f + ε = y₀(ρ₀)` |
-| `b`, `b̂`, `ζ`, `H` | the linear part's coefficient; its estimate; that estimate's noise `ζ = Hε`, with `H = (C + C′)` times the first stage's hat matrix |
+| `b`, `b̂`, `ζ`, `H` | the linear part's coefficient; its estimate; that estimate's noise `ζ = Hε`, with `H = (C + C′)P_B` for a projection and `H = (A + A′)S` for a smoother (Proposition 4). For the exact-diagonal `A = MW + MDM` with a projection, `MP_B = 0` makes `H = MWP_B` |
 | `V`, `V̂`, `J` | the moment's variance; its estimate; `−E g′(ρ₀)` |
 | `sᵢ`, `Σ̂`, `νᵢ`, `ϑᵢ` | the plug-in variance; `Diag(s)`; its remainder `sᵢ − εᵢ²`; the leverage noise in `ûᵢ` |
 | `û`, `û₀`, `û₁` | `My₀(ρ̂)`; `My`; `MWy` |
@@ -347,14 +351,22 @@ is not needed here, so the errors may form a triangular array.
    τ^{−δ} Σᵢ E|ξᵢ|^q / V^{q/2}`, so if the right side tends to 0 the
    conditional sum tends to 0 in `L¹`, hence in probability.
 
-   By independence of `εᵢ` and `wᵢ`,
+   `wᵢ = Σ_{j<i} γᵢⱼεⱼ` is `Fᵢ₋₁`-measurable, and under A1 `εᵢ` is
+   independent of `Fᵢ₋₁`. So `E[|ξᵢ|^q | Fᵢ₋₁] = |bᵢ + 2wᵢ|^q E|εᵢ|^q` a.s.,
+   and taking expectations,
    `E|ξᵢ|^q = E|εᵢ|^q · E|bᵢ + 2wᵢ|^q ≤ μ̄ 2^{q−1}(|bᵢ|^q + 2^q E|wᵢ|^q)`.
    By Rosenthal's (1970) inequality for the independent, mean-zero terms of
    `wᵢ = Σ_{j<i} γᵢⱼεⱼ`, with `ℓᵢ² = Σ_{j<i} γᵢⱼ²`,
 
        E|wᵢ|^q ≤ Θ_q [Σⱼ |γᵢⱼ|^q E|εⱼ|^q + (Σⱼ γᵢⱼ²σⱼ²)^{q/2}] ≤ Θ_q (μ̄ + σ̄^q) ℓᵢ^q,
 
-   because `Σⱼ|γᵢⱼ|^q ≤ (Σⱼγᵢⱼ²)^{q/2}` for `q ≥ 2`. Then:
+   because `Σⱼ|γᵢⱼ|^q = Σⱼ(γᵢⱼ²)^{q/2} ≤ (Σⱼγᵢⱼ²)^{q/2}` (the ℓ_{q/2} norm of
+   the non-negative `γᵢⱼ²` is at most their ℓ₁ norm, as `q/2 > 1`), and
+   `σⱼ^q = (σⱼ²)^{q/2} ≤ σ̄^q`. Rosenthal's inequality is used here for
+   independent, mean-zero, not identically distributed summands. That is
+   the form usually quoted, but the paper has not been read, so its exact
+   conditions and constant are unchecked ("Still to do", item 5).
+   Then:
    - `Σᵢ|bᵢ|^q ≤ (maxᵢbᵢ²)^{δ/2}‖b‖² ≤ (maxᵢbᵢ²)^{δ/2} V/σ̲²`, so this part
      of the ratio is at most `c (maxᵢbᵢ²/V)^{δ/2}`;
    - `Σᵢ ℓᵢ^q ≤ (maxᵢ ℓᵢ²)^{δ/2} Σᵢ ℓᵢ² ≤ ‖Cs‖_op^δ ‖Cs‖_F²/2`, because a
@@ -505,11 +517,29 @@ estimator of `ρ₀`, so the proof does not cover it. `tc_roots.jl` measures
 the difference in the coverage design (`ρ₀ = 0.4`, normal and `t₃` errors,
 n = 400 to 2500, R = 1000 each): the discriminant was positive in all 8000
 replications, the two rules disagreed once (`t₃`, n = 400), and the other
-root was at least 1.37 from `ρ₀` (median about 2). The sign rule needs the
-sign of `J`, which A9 assumes. It cannot be read off `g′` at either root,
-since those are `±√Γ` by construction; it needs a consistent preliminary
-estimate, such as a 2SLS fit, at which to evaluate `−g′`. A package
-implementation should do that, or report both roots.
+root was at least 1.37 from `ρ₀` (median about 2). (`tc_roots.jl` is a
+research script; the package's `root_rho` uses the sign rule.)
+
+**The sign of `J`.** A9 assumes `J > 0`, and under that assumption the sign
+rule is feasible: of the two roots, take the one where `g′ < 0`. The data
+do not show the sign of `J` at the roots, since `g′ = ±√Γ` there by
+construction. To check it, `g′` must be evaluated at a consistent
+preliminary estimate `ρ̌`, for example 2SLS. As `g′` is linear,
+`g′(ρ̌) > 0` is the same as `ρ̌` lying nearer the other root. `root_rho`
+does this check, with 2SLS on the instruments `[Z, WZ]`, and warns if it
+fails.
+
+`J < 0` can happen. `tc_sign.jl` builds 3,000 hub-and-spoke designs
+(`n = 100`) from formulas; 22 (0.7%) have `J < 0` for the first-step
+moment, all with hubs. In the strongest (`J/n = −24.3`), with the one-step
+exact-diagonal moment (the smoother's, here with penalty 0), the sign-rule
+root is biased by +0.066 (sd 0.030), and the Wald interval covers 56 of 257
+draws. The other root has bias −0.003 (sd 0.016). The check warns in 256 of
+300 draws, and `CS` covers 286 of 300. REsd's second step, with
+`C(ρ̃) ≈ G(ρ̃)′M`, has `J > 0` there (bias +0.002, Wald 237 of 246, 2
+warnings in 300), as its signal part is close to `‖MGf‖² ≥ 0`. On kNN
+designs with `J > 0` (`n` 400–900, both moments, 1,000 fits) the check never
+warned. Testset 47g fixes the hub design and checks the warning.
 
 **The rate for K.** Nothing in Theorem 1 needs `K/n → 0`. A3 and A5 allow
 `K/n → θ ∈ [0, 1)`. This is weaker than the published rate conditions for
@@ -678,11 +708,19 @@ which checks step 2's identities.
   −0.010 to −0.002), as any fixed `ϱ` gives a valid moment.
 - REsd's sd is 3–10% below the first step's (0.1301 against 0.1444 at
   n = 400; 0.0497 against 0.0513 at n = 2500), and its coverage with the
-  robust variance and the code's root rule is 0.946–0.952.
+  robust variance and the code's root rule is 0.946–0.952. That rule is
+  `cfe_root`'s (the root nearest the OLS ratio), not the sign rule the
+  Corollary covers; `tc_roots.jl` found the two rules disagree in 1 of 8000
+  replications of this kind of design. The package's `root_rho` uses the
+  sign rule, and validation/mc_root_rho.jl measures its coverage
+  (0.931–0.975 for the Wald interval).
 
 **Proposition 4 (a penalised smoother; proved; replaces Remark 3).** Let `M = I − S` with
 `S` symmetric, its eigenvalues in `[0, 1]` (a ridge- or difference-penalised
-spline), `maxᵢ Sᵢᵢ ≤ s̄ < 1` in place of A3, and `M∘M` invertible. Use the
+spline), `maxᵢ Sᵢᵢ ≤ s̄ < 1` in place of A3, and `M∘M` invertible. `S` has
+eigenvalue 1 on the directions the penalty leaves alone (`X` and the
+penalty's null space), so `M` is singular; nothing below needs `M`
+invertible, only `M∘M`, for `d`. Use the
 moment `g(ρ) = y₀′Ay₀` with `A = MW + MDM` and `(M∘M)d = −diag(MW)`, so
 `diag A = 0` exactly; the identity `diag(MDM) = (M∘M)d` needs only `M`
 symmetric. Then:
@@ -699,7 +737,8 @@ symmetric. Then:
 - **The variance estimate needs two changes.** Under homoskedasticity
   `E ûᵢ² = σ²(M²)ᵢᵢ`, not `σ²Mᵢᵢ`, so the plug-in is `sᵢ = ûᵢ²/(M²)ᵢᵢ`.
   With `f̂ = Sy₀`, `b̂ = (A + A′)Sy₀` and the noise term is `diag(HΣ̂H′)`
-  with `H = (A + A′)S`, the general form of the projection's `H = (C + C′)P_B`.
+  with `H = (A + A′)S`. This is the notation table's `H` with the
+  smoother's `A` and `S` in place of the projection's `C` and `P_B`.
   This `V̂` is consistent (part (c) below).
 
 **The idempotent shortcut is wrong here.** The code forms the moment from
@@ -759,7 +798,7 @@ Assume A1 with four moments, A2, A4–A9, Proposition 4's conditions on `S`,
 `V̂/V → 1` in probability.
 
 *Proof.* Proposition 2's three steps, with these changes.
-- **`mᵢ` is bounded below**: `mᵢ = Mᵢᵢ² + Σ_{j≠i} Sᵢⱼ² ≥ (1 − s̄)²`.
+- **`mᵢ` is bounded below**: `mᵢ = Σₖ Mᵢₖ² ≥ Mᵢᵢ² = (1 − Sᵢᵢ)² ≥ (1 − s̄)²`.
 - **The remainder in `sᵢ`.** At `ρ₀`, `ûᵢ = (Mε)ᵢ + rᵢ`, and
   `(Mε)ᵢ = Mᵢᵢεᵢ − ϑᵢ` with `ϑᵢ = Σ_{j≠i} Sᵢⱼεⱼ`. Since `(S²)ᵢᵢ ≤ Sᵢᵢ`,
   `Σ_{j≠i} Sᵢⱼ² ≤ Sᵢᵢ(1 − Sᵢᵢ)`, so `E ϑᵢ² ≤ σ̄²Sᵢᵢ` and
@@ -884,7 +923,9 @@ So A5 holds whenever `limsup K/n < κ_W/(4(c_W + d̄)²)`, and in particular
 when `K/n → 0` with `d̄` bounded, with `liminf ‖Cs‖_F²/n ≥ κ_W/2`. A
 sufficient condition for bounded `d̄` is `maxᵢ hᵢᵢ ≤ h̄ < 1/2`, which gives
 
-    d̄ ≤ maxᵢ‖Weᵢ‖ √h̄ / ((1 − h̄)(1 − 2h̄)).
+    d̄ ≤ c_W √h̄ / ((1 − h̄)(1 − 2h̄)),
+
+using `maxᵢ‖Weᵢ‖ ≤ c_W` (A2).
 
 For Jin & Lee's `C = (W′ − Δ)M` the same holds with `max|Δᵢᵢ|` in place of
 `d̄`, which Lemma 2(b) bounds under A3 alone.
@@ -1314,8 +1355,17 @@ carry the argument:
    quadratic part moves by at most `‖Ω‖_op(2‖s‖‖s_t‖ + ‖s_t‖²) =
    O_p(n^{3/4})`. The linear part moves by terms such as
    `|t| Σ b̂ᵢ²|ûᵢ(û₁)ᵢ|/Mᵢᵢ ≤ c|t|(Σ b̂ᵢ²ûᵢ²)^{1/2}(Σ b̂ᵢ²(û₁)ᵢ²)^{1/2}`, which is
-   `O_p(n^{−1/2})·O_p(√n)·o_p(n)`, since `Σ bᵢ²(û₁)ᵢ² ≤ maxᵢ bᵢ² ‖û₁‖² = o_p(n²)`
-   by A6; and `Σ (2b̂ᵢ(b̂_t)ᵢ + (b̂_t)ᵢ²)sᵢ`, which is
+   `O_p(n^{−1/2})·O_p(√n)·o_p(n)`, because `Σ b̂ᵢ²(û₁)ᵢ² = o_p(n²)`. To see
+   this, write `b̂ = b + ζ`, so `b̂ᵢ² ≤ 2bᵢ² + 2ζᵢ²`:
+   - A6 with `‖b‖² = O(n)` (A8, Lemma 2) gives
+     `maxᵢ bᵢ² = (maxᵢ bᵢ²/‖b‖²)‖b‖² = o(n)`, so
+     `Σ bᵢ²(û₁)ᵢ² ≤ maxᵢ bᵢ² ‖û₁‖² = o(n)·O_p(n) = o_p(n²)`;
+   - `ζ = Hε` has `Var ζᵢ ≤ σ̄²‖H‖_op² ≤ c` (Lemma 2) and
+     `E ζᵢ⁴ ≤ c(Var ζᵢ)²` (step 2), so `Σᵢ ζᵢ⁴ = O_p(n)` and
+     `maxᵢ ζᵢ² ≤ (Σᵢ ζᵢ⁴)^{1/2} = O_p(√n)`. Hence
+     `Σ ζᵢ²(û₁)ᵢ² ≤ maxᵢ ζᵢ² ‖û₁‖² = O_p(n^{3/2}) = o_p(n²)`.
+
+   The other term is `Σ (2b̂ᵢ(b̂_t)ᵢ + (b̂_t)ᵢ²)sᵢ`, which is
    `O_p(√n)·O_p(maxᵢ sᵢ)^{1/2} + O_p(maxᵢ sᵢ) = O_p(n^{3/4})`, since
    `maxᵢ sᵢ = O_p(√n)` when `E sᵢ² ≤ c`. All of these are `o_p(n)`. ∎
 
@@ -1398,7 +1448,8 @@ the hat-basis design (R = 1000):
   part.
 
 **The exact bias of CJN's linear part (proved; `tc_cjn_lin.jl`).** At `ρ₀`,
-`b̂ = b + ζ` with `ζ = Hε`, `H = MWP_B`, and the noise term is
+`b̂ = b + ζ` with `ζ = Hε`, `H = MWP_B` (the notation table's `H` for this
+check's moment `A = MW + MDM`), and the noise term is
 `noiseᵢ = Σₖ Hᵢₖ²sₖ`. Write `𝒳 = (MΣM)∘(MΣM)`. Then
 
     E Σᵢ(b̂ᵢ² − noiseᵢ)sᵢ − Σᵢ bᵢ²σᵢ²
@@ -1678,10 +1729,15 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    `p > 2` (Gohberg & Krein 1961, Theorem 2) were read on 2026-11-20; the
    proof for `1 < p < 2` is outlined in the note, not given in full. Von Bahr & Esseen's inequality (1965) and
    Rosenthal's inequality (1970) are used as they are usually stated, and
-   have not been read.
+   have not been read. Theorem 1 needs Rosenthal's inequality for
+   independent, mean-zero, not identically distributed terms (the `εⱼ` of
+   a triangular array); that is the form to confirm.
 6. Theorem 1 now needs `2 + δ` moments (done 2026-11-19). Consistency of
    `V̂` needs four (Proposition 2); eighth moments would be needed only for
    a rate or for the variance of `V̂`.
+7. A9's sign is assumed, not derived. `J < 0` occurs in 0.7% of the hub
+   designs of `tc_sign.jl` and in none of the kNN designs measured. A
+   condition on `W` and `f` that rules it out is open.
 
 ## References
 

@@ -1,0 +1,29 @@
+┌ Warning: Assignment to `rng` in soft scope is ambiguous because a global variable by the same name exists: `rng` will be treated as a new local. Disambiguate by using `local rng` to suppress this warning or `global rng` to assign to the existing global variable.
+└ @ D:\Nigel\GitHub\SpatialEconometrics.jl\research\trace_cfe\tc_sign.jl:88
+┌ Warning: Assignment to `n` in soft scope is ambiguous because a global variable by the same name exists: `n` will be treated as a new local. Disambiguate by using `local n` to suppress this warning or `global n` to assign to the existing global variable.
+└ @ D:\Nigel\GitHub\SpatialEconometrics.jl\research\trace_cfe\tc_sign.jl:88
+┌ Warning: Assignment to `W` in soft scope is ambiguous because a global variable by the same name exists: `W` will be treated as a new local. Disambiguate by using `local W` to suppress this warning or `global W` to assign to the existing global variable.
+└ @ D:\Nigel\GitHub\SpatialEconometrics.jl\research\trace_cfe\tc_sign.jl:90
+┌ Warning: Assignment to `f` in soft scope is ambiguous because a global variable by the same name exists: `f` will be treated as a new local. Disambiguate by using `local f` to suppress this warning or `global f` to assign to the existing global variable.
+└ @ D:\Nigel\GitHub\SpatialEconometrics.jl\research\trace_cfe\tc_sign.jl:91
+Julia 1.13.4
+
+(1) 3000 hub designs, n = 100, unit error variance: share with J < 0 = 0.0073 (22 designs)
+Most negative J/n (signal + trace):
+  J/n =  -24.35  (nh = 6, tg = [35, 4, 37, 96, 15, 9], mult = 4, ω = 1.28, coef = [-4.2, -3.9, 4.2], ρ0 = -0.9, s = -26.16149901798708, t = 1.8068937338712054)
+  J/n =   -4.97  (nh = 7, tg = [11, 85, 57, 39, 11, 28, 40], mult = 3, ω = 2.16, coef = [-0.8, 6.2, -2.7], ρ0 = 0.9, s = -6.606998624758813, t = 1.6387031591276122)
+  J/n =   -4.24  (nh = 5, tg = [48, 98, 95, 88, 100], mult = 4, ω = 1.92, coef = [1.6, 7.2, -2.4], ρ0 = 0.9, s = -6.03794014283138, t = 1.7984838844274993)
+
+(2) The strongest design. Exact J/n for the penalised moment A: -24.33
+R = 300 draws.
+  penalised: sign-rule root found 257; bias +0.0663, sd 0.0299; Wald covers 56/257
+             other root: bias -0.0030, sd 0.0164
+             warned 256/300; CS covers 286/300
+  REsd:      root found 246; bias +0.0016, sd 0.0070; Wald covers 237/246; warned 2/300; CS covers 288/300
+
+(3) False warnings on kNN designs (testset 47's jittered grid, ρ₀ = 0.4, heteroskedastic), R = 100:
+  kNN-6, n = 400, k = 10, λ = 0.01, a = 1.0: projection 0/100, smoother 0/100
+  kNN-20, n = 400, k = 10, λ = 0.01, a = 1.0: projection 0/100, smoother 0/100
+  kNN-20, n = 400, k = 10, λ = 0.01, a = 4.0: projection 0/100, smoother 0/100
+  kNN-6, n = 900, k = 15, λ = 0.1, a = 4.0: projection 0/100, smoother 0/100
+  kNN-20, n = 400, k = 10, λ = 1.0, a = 4.0: projection 0/100, smoother 0/100

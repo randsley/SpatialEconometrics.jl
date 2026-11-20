@@ -109,6 +109,23 @@ intervals was measured for `K/n` up to 0.30; a larger `K` gives a warning.
 Units with leverage above 0.99 make the correction ill-posed and are
 refused.
 
+### The root rule
+
+`g` is a quadratic in `ρ`, and `ρ̂` is the root at which `g′ < 0`. This
+assumes `J = −E g′(ρ₀) > 0` (THEORY.md, A9). If `J < 0`, the other root is
+the consistent one, and the rule picks a root at a distance of about
+`|J/g₂|` from `ρ₀` (`g₂` the quadratic coefficient), which does not shrink
+with `n`. A 2SLS estimate (instruments `[X, basis, W·[X, basis]]`) is used
+to check the sign: if `g′` is positive there, a warning is given. The
+test-inversion set does not use the rule and stays valid.
+
+`J < 0` is rare. In a search over 3,000 hub-and-spoke designs, 0.7% had it;
+the one in testset 47g gives a sign-rule root biased by 0.06 (2 SD) with the
+smoother. In 1,000 fits on kNN designs (`n` 400–900, both paths) the check
+never fired. REsd's second step has `J > 0` in the designs measured, even
+when the first step's `J` is negative, so on the projection path the
+warning is rarer still.
+
 ### Cost
 
 Everything is dense: about four `n × n` matrices, so `n` is capped at

@@ -5583,3 +5583,43 @@ header; it is not data, and the script now runs the warm-up silently.
 - **Weak identification:** kNN-20 at `n = 400`, `λ = 0.01`: up to 62 draws
   without a root, `CS` touching a bound in up to 694; `CS` covers 0.929–0.964
   there (the 0.929 cell has `c = 0.33`, predicted 0.938).
+
+## `root_rho`: the sign rule's assumption `J > 0`, and a check for it
+
+Added on 2026-11-20 after a review of the theory note (`research/review.md`).
+`root_rho` takes the root of the quadratic moment at which `g′ < 0`. That
+picks the consistent root only if `J = −E g′(ρ₀) > 0` (THEORY.md, A9),
+which was assumed and not stated in the docstring. If `J < 0`, the rule's
+root stays about `|J/g₂|` from `ρ₀` whatever `n` is.
+
+**The check.** `root_rho` computes 2SLS with the instruments `[Z, WZ]`
+(none when `WZ` adds nothing to `span Z`), evaluates `g′` there for the
+moment that gave `ρ̂`, and warns if it is positive. The test-inversion set
+does not use the rule and is unaffected. Only the final moment is checked:
+REsd's first step only chooses `C(ρ̃)`, and the moment at `ρ₀` is valid for
+any choice.
+
+**Measured** (`research/trace_cfe/tc_sign.jl`, output committed):
+- `J < 0` in 22 of 3,000 hub-and-spoke designs (0.7%), `n = 100`, all with
+  hubs; none of the kNN designs measured.
+- The strongest (`J/n = −24.3`), with the one-step exact-diagonal moment
+  (the smoother path, penalty 0), R = 300: the rule's root is biased by
+  +0.066 (sd 0.030), and the Wald interval covers 56 of 257. The other root
+  has bias −0.003 (sd 0.016). The check warns in 256 of 300; `CS` covers
+  286 of 300.
+- REsd on the same draws: bias +0.002, Wald 237 of 246, 2 warnings in 300.
+  Its second-step moment has `J > 0` here.
+- **False warnings:** none in 1,000 fits on kNN designs with `J > 0` (kNN-6
+  and kNN-20, `n` 400–900, `λ` 0.01–1, both paths, including the weakly
+  identified kNN-20 at `n = 400`).
+
+**Testset 47g** fixes the hub design (built from formulas, so the design and
+the exact `J/n = −24.33` are the same on every Julia version) and checks
+that the warning fires, that the other root is nearer `ρ₀` (by 0.009
+against 0.063 on 1.13, 0.001 against 0.055 on 1.10, bound a factor of 3),
+that `ρ₀` is in `CS`, and, as the power check, that neither path logs a
+warning on the testset's kNN design.
+
+**Also from the review:** Proposition 2, step 3 used `Σ bᵢ²(û₁)ᵢ²` where
+`Σ b̂ᵢ²(û₁)ᵢ²` was needed. The noise part `ζ` of `b̂` is now bounded
+(`maxᵢ ζᵢ² = O_p(√n)`), and the result stands with no new condition.
