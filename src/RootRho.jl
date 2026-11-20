@@ -30,19 +30,33 @@ Two intervals are reported for `ρ`:
   data say little about `ρ`, it is wide, and it may reach the bounds, while
   the Wald interval under-covers. Report it.
 
+# With a penalised smoother
+
+Given a `penalty` and `lambda`, the first stage is the penalised smoother
+`S = Z(Z′Z + λΩ)⁻¹Z′` (only the basis is penalised), and `M = I − S` is no
+longer idempotent. Then the moment is the one-step exact-diagonal moment
+`y₀′Ay₀` with `A = MW + MDM`, `(M∘M)d = −diag(MW)`, so `diag A = 0`, and the
+HC2 plug-in is `ûᵢ²/(M²)ᵢᵢ` (THEORY.md, Proposition 4). Jin & Lee's two-step
+is not used there: its plug-in result needs `Mf = 0`, which a smoother
+breaks by shrinking `f`. The smoother's shrinkage biases `ρ̂` and both
+intervals, so smooth **less** than a good fit of `f` would.
+[`tensor_pspline`](@ref) builds a tensor P-spline basis and penalty.
+
 The growing-basis results (a CLT for the moment with a dense `M`, the
-consistency of the HC2 `V̂`, the validity of `CS`) are proved in
-`research/trace_cfe/THEORY.md` (Theorem 1 and Propositions 1, 2 and 6). They
-have not been checked by anyone else. They are measured in that directory
-and in `validation/mc_root_rho.jl`.
+consistency of the HC2 `V̂`, the validity of `CS`, and the penalised
+smoother) are proved in `research/trace_cfe/THEORY.md` (Theorem 1 and
+Propositions 1, 2, 4 and 6). They have not been checked by anyone else.
+They are measured in that directory and in `validation/mc_root_rho.jl` and
+`validation/mc_root_rho_smoother.jl`.
 
 # References
 
 - Jin, F., & Lee, L.-F. (2012). Approximated likelihood and root estimators
   for spatial interaction in spatial autoregressive models. *Regional
   Science and Urban Economics*, 42(3), 446–458.
-- Smirnov, O. A. (2022). Closed-form estimator for spatial autoregressive
-  models. *Geographical Analysis*, 54(1), 3–31.
+- Smirnov, O. A. (2022). A closed-form consistent estimator for linear
+  models with spatial dependence. *Geographical Analysis*, 54(1), 3–31.
+  https://doi.org/10.1111/gean.12268
 - Anderson, T. W., & Rubin, H. (1949). Estimation of the parameters of a
   single equation in a complete system of stochastic equations. *Annals of
   Mathematical Statistics*, 20(1), 46–63.
@@ -56,7 +70,7 @@ using Printf
 import ..SpatialUtils: check_design_rank, _check_spatial_bounds, ExactLU
 import ..SpatialDiscreteChoice: _norminv
 
-export RootRhoResult, root_rho
+export RootRhoResult, root_rho, tensor_pspline
 
 """
     RootRhoResult
@@ -65,9 +79,11 @@ The result of [`root_rho`](@ref).
 
 # Fields
 
-- `rho` — the REsd root `ρ̂` (`NaN` when no admissible root exists; see
-  `root_found`).
-- `rho_first` — Jin & Lee's first-step root `ρ̃` (`NaN` if none).
+- `rho` — the root `ρ̂`: REsd's with a projection, the exact-diagonal
+  moment's with a penalised smoother (`NaN` when no admissible root exists;
+  see `root_found`).
+- `rho_first` — Jin & Lee's first-step root `ρ̃` (`NaN` if none, and always
+  `NaN` with a penalised smoother, which takes one step).
 - `se` — `√V̂(ρ̂)/|g′(ρ̂)|`, with the HC2 `V̂`.
 - `ci_wald` — `ρ̂ ± z·se`.
 - `cs` — the test-inversion set, as a vector of closed intervals within
@@ -80,7 +96,11 @@ The result of [`root_rho`](@ref).
   `[X, B]`. **No standard errors**: the theory covers `ρ` only.
 - `varnames` — the names of `beta`.
 - `n`, `K` — the sample size and the number of columns of `[X, B]`.
-- `max_leverage` — `maxᵢ hᵢᵢ` of the projection on `[X, B]`.
+- `smoother` — `:projection` or `:penalised`.
+- `lambda` — the penalty's `λ` (`0` for a projection).
+- `df` — the effective degrees of freedom `tr S` of the first stage (`K`
+  for a projection).
+- `max_leverage` — `maxᵢ Sᵢᵢ` of the first stage (`hᵢᵢ` for a projection).
 - `a`, `b`, `c` — the final moment `g(ρ) = c − bρ + aρ²`.
 - `vpoly` — `V̂(ρ) = Σₖ vpoly[k+1] ρᵏ`, a quartic.
 - `vhat` — `V̂(ρ̂)`.
@@ -101,6 +121,9 @@ struct RootRhoResult{T<:AbstractFloat}
     varnames::Vector{String}
     n::Int
     K::Int
+    smoother::Symbol
+    lambda::T
+    df::T
     max_leverage::T
     a::T
     b::T
@@ -112,12 +135,22 @@ struct RootRhoResult{T<:AbstractFloat}
 end
 
 function Base.show(io::IO, r::RootRhoResult)
-    println(io, "Root estimator of ρ (Jin & Lee 2012, REsd), projection on [X, B]")
-    println(io, "────────────────────────────────────────────────────────────────")
-    @printf(io, "n = %d, K = %d (K/n = %.3f), max leverage %.3f\n", r.n, r.K, r.K / r.n,
-            r.max_leverage)
+    if r.smoother === :penalised
+        println(io, "Root estimator of ρ (exact-diagonal moment), penalised smoother on [X, B]")
+        println(io, "──────────────────────────────────────────────────────────────────────────")
+        @printf(io, "n = %d, K = %d, λ = %.4g, df = tr S = %.1f (df/n = %.3f), max Sᵢᵢ %.3f\n",
+                r.n, r.K, r.lambda, r.df, r.df / r.n, r.max_leverage)
+    else
+        println(io, "Root estimator of ρ (Jin & Lee 2012, REsd), projection on [X, B]")
+        println(io, "────────────────────────────────────────────────────────────────")
+        @printf(io, "n = %d, K = %d (K/n = %.3f), max leverage %.3f\n", r.n, r.K, r.K / r.n,
+                r.max_leverage)
+    end
     pct = round(100 * r.level; digits = 1)
-    if r.root_found
+    if r.root_found && r.smoother === :penalised
+        @printf(io, "ρ̂ = %.4f   SE %.4f\n", r.rho, r.se)
+        @printf(io, "Wald %g%% interval:            [%.4f, %.4f]\n", pct, r.ci_wald...)
+    elseif r.root_found
         @printf(io, "ρ̂ = %.4f   SE %.4f   (first step ρ̃ = %.4f)\n", r.rho, r.se, r.rho_first)
         @printf(io, "Wald %g%% interval:            [%.4f, %.4f]\n", pct, r.ci_wald...)
     else
@@ -196,6 +229,86 @@ function _vhat_poly(C::Matrix{T}, Q::Matrix{T}, Mii::Vector{T}, y::Vector{T},
     return (p[1], p[2], p[3], p[4], p[5])
 end
 
+# The same quartic for a general symmetric first stage S, M = I − S (not
+# idempotent): sᵢ(ρ) = ûᵢ(ρ)²/mᵢ with û = My₀ and mᵢ = (M²)ᵢᵢ; â(ρ) = Hy₀(ρ)
+# with H = (A + A′)S; the noise term diag(H diag(s) H′) = (H∘H)s
+# (THEORY.md, Proposition 4).
+function _vhat_poly_general(A::Matrix{T}, H::Matrix{T}, M::Matrix{T}, m::Vector{T},
+                            y::Vector{T}, Wy::Vector{T}) where {T}
+    Ω = ((A .+ A') ./ 2) .^ 2
+    H2 = H .^ 2
+    e0 = M * y; e1 = M * Wy
+    S = (e0 .^ 2 ./ m, -2 .* e0 .* e1 ./ m, e1 .^ 2 ./ m)
+    α0 = H * y; α1 = -(H * Wy)
+    N = map(s -> H2 * s, S)
+    ΩS = map(s -> Ω * s, S)
+    Acoef = (α0 .^ 2 .- N[1], 2 .* α0 .* α1 .- N[2], α1 .^ 2 .- N[3])
+    p = zeros(T, 5)
+    for k in 0:2, l in 0:2
+        p[k + l + 1] += 2 * dot(S[k + 1], ΩS[l + 1]) + dot(Acoef[k + 1], S[l + 1])
+    end
+    return (p[1], p[2], p[3], p[4], p[5])
+end
+
+# The exact-diagonal moment matrix A = MW + MDM, (M∘M)d = −diag(MW), for a
+# symmetric M. diag A = 0 exactly: diag(MDM) = (M∘M)d needs only that M is
+# symmetric. The moment must be formed from A itself: the residual-vector
+# shortcut (My₀)′(MWy₀ + DMy₀) is y₀′(M²W + MDM)y₀, which differs when M² ≠ M.
+function _exact_diag_moment(M::Matrix{T}, W::AbstractMatrix{T}) where {T}
+    MW = M * W
+    d = (M .* M) \ (-diag(MW))
+    MW .+= M * (d .* M)
+    return MW
+end
+
+# Piecewise-linear "hat" functions on k equally spaced knots over the range of x.
+function _hat_basis(x::Vector{T}, k::Int) where {T}
+    lo, hi = extrema(x)
+    hi > lo || throw(ArgumentError("tensor_pspline: a coordinate is constant"))
+    t = range(lo, hi; length = k); w = (hi - lo) / (k - 1)
+    return hcat([max.(zero(T), one(T) .- abs.(x .- t[j]) ./ w) for j in 1:k]...)
+end
+
+"""
+    tensor_pspline(u, v; k, order = 2) -> (; basis, penalty)
+
+A tensor-product P-spline on two coordinates, for the `basis` and `penalty`
+arguments of [`root_rho`](@ref):
+
+```julia
+r = root_rho(y, X, W; tensor_pspline(u, v; k = 15)..., lambda = 1.0)
+```
+
+- `basis` — `n × k²`: the products of piecewise-linear "hat" functions on
+  `k` equally spaced knots over the range of `u` and of `v`. Column
+  `(i − 1)k + j` is `hᵢ(u)·hⱼ(v)`. The rows sum to one, so do not also put
+  an intercept in `X`.
+- `penalty` — `k² × k²`: `P ⊗ I + I ⊗ P` with `P = D′D` and `D` the
+  `order`-th difference matrix: a difference penalty along each coordinate.
+  It is symmetric and positive semi-definite. With `order = 2` it leaves
+  four functions unpenalised: those that are linear in each coordinate's
+  knot index, `1, i, j, ij`.
+
+`k` must be at least `order + 2`. Used without `penalty`, `basis` is the
+projection basis of the default `root_rho`.
+"""
+function tensor_pspline(u::AbstractVector{<:Real}, v::AbstractVector{<:Real};
+                        k::Integer, order::Integer = 2)
+    length(u) == length(v) || throw(DimensionMismatch(
+        "tensor_pspline: u has $(length(u)) entries, v has $(length(v))"))
+    order >= 1 || throw(ArgumentError("tensor_pspline: order must be at least 1, got $order"))
+    k >= order + 2 || throw(ArgumentError(
+        "tensor_pspline: k = $k knots is too few for order $order; need k ≥ $(order + 2)"))
+    Hu = _hat_basis(Vector{Float64}(u), Int(k)); Hv = _hat_basis(Vector{Float64}(v), Int(k))
+    B = hcat([Hu[:, i] .* Hv[:, j] for i in 1:k for j in 1:k]...)
+    D = Matrix{Float64}(I, k, k)
+    for _ in 1:order
+        D = D[2:end, :] .- D[1:(end - 1), :]
+    end
+    P = D' * D; Ik = Matrix{Float64}(I, k, k)
+    return (; basis = B, penalty = kron(P, Ik) .+ kron(Ik, P))
+end
+
 _polyval(p, t) = foldr((ck, acc) -> ck + t * acc, p; init = zero(t))
 
 # Real roots of the polynomial Σₖ p[k+1]tᵏ, from the eigenvalues of its
@@ -245,8 +358,9 @@ function _inversion_set(a::T, b::T, c::T, vp::NTuple{5, T}, z::T, bounds) where 
 end
 
 """
-    root_rho(y, X, W; basis = nothing, varnames = nothing, level = 0.95,
-             rho_bounds = (-0.99, 0.99), max_dense_n = 4000)
+    root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
+             varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
+             max_dense_n = 4000)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -275,6 +389,31 @@ so the set's endpoints are exact.
 - `W` — a spatial weights matrix with a zero diagonal, row-standardised so
   that `rho_bounds` lies inside `(−1, 1)`.
 - `basis` — the `n × K_B` basis for `f`.
+- `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
+  penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
+  or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
+
+# With a penalised smoother
+
+The first stage is `S = Z(Z′Z + λΩ̃)⁻¹Z′`, where `Ω̃` applies `Ω` to the
+basis and leaves `X` unpenalised. `M = I − S` is not idempotent, so a
+different moment is used, in one step:
+
+```math
+g(ρ) = y_0(ρ)'\\,A\\,y_0(ρ),\\quad A = MW + MDM,\\quad (M∘M)\\,d = −\\mathrm{diag}(MW),
+```
+
+so `diag A = 0` and `E g(ρ₀) = f′Af`, the bias from the smoother's
+shrinkage of `f` (THEORY.md, Proposition 4). The HC2 plug-in is
+`ûᵢ²/(M²)ᵢᵢ`, and the noise term uses `H = (A + A′)S`. Jin & Lee's
+two-step is not used here: its plug-in result needs `Mf = 0`.
+
+**Choose a small `λ`.** The shrinkage bias grows with `λ`, and it makes
+both intervals under-cover. GCV and the RMSE-optimal `λ` were too large for
+valid inference in `research/trace_cfe/tc_lambda.jl`, so `lambda` has no
+default. Report `ρ̂` across a few values of `λ`, with `r.df = tr S`. A
+`df/n` above 0.30 gives a warning, and units with `Sᵢᵢ` above 0.99 are
+refused.
 
 # Choosing the basis
 
@@ -290,7 +429,8 @@ refused.
 # Cost
 
 Everything is dense: about four `n × n` matrices, so `n` is capped at
-`max_dense_n` (4000 by default, about 0.5 GB).
+`max_dense_n` (4000 by default, about 0.5 GB). The penalised smoother holds
+about six and solves one dense `n × n` system for `d`.
 
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
@@ -300,6 +440,8 @@ Everything is dense: about four `n × n` matrices, so `n` is capped at
 """
 function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::AbstractMatrix{<:Real};
                   basis::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
+                  penalty::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
+                  lambda::Union{Nothing, Real} = nothing,
                   varnames = nothing, level::Real = 0.95,
                   rho_bounds = (-0.99, 0.99), max_dense_n::Integer = 4000)
     T = Float64
@@ -309,6 +451,25 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     basis === nothing || size(basis, 1) == n || throw(DimensionMismatch(
         "root_rho: y has $n rows, basis has $(size(basis, 1))"))
     0 < level < 1 || throw(ArgumentError("root_rho: level must be in (0, 1), got $level"))
+    (penalty === nothing) == (lambda === nothing) || throw(ArgumentError(
+        "root_rho: give both `penalty` and `lambda`, or neither. There is no default λ: " *
+        "GCV and the RMSE-optimal λ smooth too much for valid inference"))
+    penalised = penalty !== nothing
+    if penalised
+        basis === nothing && throw(ArgumentError("root_rho: a penalty needs a basis"))
+        isfinite(lambda) && lambda > 0 || throw(ArgumentError(
+            "root_rho: lambda must be positive and finite, got $lambda; for λ = 0 omit " *
+            "penalty and lambda (the projection)"))
+        kb = size(basis, 2)
+        size(penalty) == (kb, kb) || throw(DimensionMismatch(
+            "root_rho: penalty is $(size(penalty)), expected ($kb, $kb) for the basis"))
+        Pm = Matrix{Float64}(penalty)
+        sc = max(maximum(abs, Pm), floatmin(Float64))
+        maximum(abs, Pm .- Pm') <= 1e-10 * sc || throw(ArgumentError(
+            "root_rho: penalty must be symmetric"))
+        eigmin(Symmetric(Pm)) >= -1e-10 * sc || throw(ArgumentError(
+            "root_rho: penalty must be positive semi-definite"))
+    end
     n <= max_dense_n || throw(ArgumentError(
         "root_rho: n = $n exceeds max_dense_n = $max_dense_n. The estimator holds about " *
         "four dense n × n matrices ($(round(4 * 8 * n^2 / 2^30; digits = 1)) GiB here); " *
@@ -331,6 +492,8 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     check_design_rank(Z, vcat(vnames, ["basis$j" for j in 1:size(Bm, 2)]), "root_rho";
         context = "A hat or B-spline basis sums to one, so it is collinear with an " *
                   "intercept in X: drop one of them.")
+    penalised && return _root_rho_penalised(Vector{T}(y), Z, Ws, kx, Pm, T(lambda), vnames,
+                                            T(level), bnds)
     Q = Matrix(qr(Z).Q)[:, 1:K]
     Mii = 1 .- vec(sum(abs2, Q; dims = 2))
     h = 1 .- Mii
@@ -368,14 +531,61 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     if ρ === nothing
         nanT = T(NaN)
         return RootRhoResult{T}(nanT, ρ1 === nothing ? nanT : ρ1, nanT, (nanT, nanT), cs,
-            touches, length(cs) > 1, T(level), fill(nanT, kx), vnames, n, K, maximum(h),
-            a, b, c, vp, nanT, false, bnds)
+            touches, length(cs) > 1, T(level), fill(nanT, kx), vnames, n, K, :projection,
+            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds)
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : T(NaN)
     β = kx > 0 ? (Z \ (yv .- ρ .* Wy))[1:kx] : T[]
     return RootRhoResult{T}(ρ, ρ1, se, (ρ - z * se, ρ + z * se), cs, touches,
-        length(cs) > 1, T(level), β, vnames, n, K, maximum(h), a, b, c, vp, V, true, bnds)
+        length(cs) > 1, T(level), β, vnames, n, K, :projection, zero(T), T(K), maximum(h),
+        a, b, c, vp, V, true, bnds)
+end
+
+# The penalised smoother: S = Z(Z′Z + λΩ̃)⁻¹Z′, the exact-diagonal moment in
+# one step, and the general HC2 V̂ (THEORY.md, Proposition 4).
+function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T}, kx::Int,
+                             Ω::Matrix{T}, λ::T, vnames::Vector{String}, level::T,
+                             bnds::Tuple{T, T}) where {T}
+    n, K = size(Z)
+    Ωt = zeros(T, K, K)
+    Ωt[(kx + 1):K, (kx + 1):K] .= Ω
+    F = cholesky(Symmetric(Z' * Z .+ λ .* Ωt))
+    S = Z * (F \ Z')
+    S .= (S .+ S') ./ 2
+    Sii = diag(S)
+    nbad = count(>(0.99), Sii)
+    nbad > 0 && throw(ArgumentError(
+        "root_rho: $nbad unit(s) have Sᵢᵢ above 0.99 in the penalised smoother " *
+        "(max $(round(maximum(Sii); digits = 4))). The correction divides by (M∘M) and " *
+        "is ill-posed there; use a larger lambda or fewer basis functions where the " *
+        "data are sparse"))
+    df = sum(Sii)
+    df / n > 0.30 && @warn "root_rho: df/n = tr S/n = $(round(df / n; digits = 3)) is " *
+        "above 0.30, beyond the range where the intervals' coverage was measured"
+    M = Matrix{T}(I, n, n) .- S
+    m = vec(sum(abs2, M; dims = 1))                  # (M²)ᵢᵢ, M symmetric
+    A = _exact_diag_moment(M, Ws)
+    H = (A .+ A') * S
+    Wy = Ws * y
+    z = T(_norminv(1 - (1 - level) / 2))
+    a, b, c = _quadratic(A, y, Wy)
+    ρ = _sign_rule_root(a, b, c, bnds)
+    vp = _vhat_poly_general(A, H, M, m, y, Wy)
+    cs = _inversion_set(a, b, c, vp, z, bnds)
+    touches = !isempty(cs) && (cs[1][1] == bnds[1] || cs[end][2] == bnds[2])
+    nanT = T(NaN)
+    if ρ === nothing
+        return RootRhoResult{T}(nanT, nanT, nanT, (nanT, nanT), cs, touches, length(cs) > 1,
+            level, fill(nanT, kx), vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
+            vp, nanT, false, bnds)
+    end
+    V = _polyval(vp, ρ)
+    se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : nanT
+    β = kx > 0 ? (F \ (Z' * (y .- ρ .* Wy)))[1:kx] : T[]
+    return RootRhoResult{T}(ρ, nanT, se, (ρ - z * se, ρ + z * se), cs, touches,
+        length(cs) > 1, level, β, vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
+        vp, V, true, bnds)
 end
 
 end # module

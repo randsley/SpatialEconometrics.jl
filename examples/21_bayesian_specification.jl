@@ -104,7 +104,7 @@ println("4. The roadmap, for the local-spillover case")
 println("═"^70)
 println()
 
-# Sutton & Sutton (2023): hold the reach local, search {SDE, SLX, SE} x W.
+# Sutton & Sutton (2024): hold the reach local, search {SDE, SLX, SE} x W.
 rm = sdem_roadmap(y_sdem, X, Ws; w_names = wn)
 println(rm)
 println()

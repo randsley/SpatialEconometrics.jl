@@ -9,6 +9,8 @@
 # uses Jin & Lee's (2012) moment, whose mean is exactly zero for any K, and
 # reports two intervals: the Wald interval and the test-inversion set.
 #
+# Section 4 fits a penalised smoother (tensor_pspline) in place of the projection.
+#
 # Run: julia --project=. examples/34_root_rho.jl
 # ---------------------------------------------------------------------------
 
@@ -55,4 +57,21 @@ for k in (6, 8, 11, 14)
     cf = closed_form_rho(y, hcat(X, B), W)
     cs = join((@sprintf("[%.3f, %.3f]", a, b) for (a, b) in rk.cs), " ∪ ")
     @printf("%4d  %.3f   %.3f (%.3f)    %-22s %.3f\n", rk.K, rk.K / n, rk.rho, rk.se, cs, cf.rho)
+end
+
+# ── 4. A penalised smoother in place of the projection ─────────────────────
+#
+# tensor_pspline gives a 15 × 15 tensor hat basis (225 columns) with a
+# second-difference penalty. λ sets how much the surface is smoothed; tr S
+# (r.df) is its effective number of columns. A smoother shrinks f, and the
+# shrinkage biases ρ̂ and both intervals, so take λ small. There is no default:
+# GCV smooths too much for inference. Report ρ̂ across a few λ. In this
+# sample the three test-inversion sets overlap, and each contains ρ = 0.4.
+
+ps = tensor_pspline(u, v; k = 15)
+println("\n    λ      df    df/n    root_rho (SE)      test-inversion set")
+for λ in (0.01, 0.1, 1.0)
+    rλ = root_rho(y, X, W; ps..., lambda = λ)
+    cs = join((@sprintf("[%.3f, %.3f]", a, b) for (a, b) in rλ.cs), " ∪ ")
+    @printf("%6.2f  %6.1f  %.3f   %.3f (%.3f)    %s\n", λ, rλ.df, rλ.df / n, rλ.rho, rλ.se, cs)
 end

@@ -73,7 +73,9 @@ correction does.
 preferred unless you want this estimator specifically.
 
 # References
-Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).
+Lee, L.-F., & Yu, J. (2010). Estimation of spatial autoregressive panel data
+models with fixed effects. *Journal of Econometrics*, 154(2), 165–185.
+https://doi.org/10.1016/j.jeconom.2009.08.001
 """
 struct DirectQML <: PanelEstimationApproach
     bias_correct::Bool
@@ -220,7 +222,9 @@ See also `fit_dynamic_spatial_panel`, `panel_lm_tests`,
     combination of the others.
 
 # References
-Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).
+Lee, L.-F., & Yu, J. (2010). Estimation of spatial autoregressive panel data
+models with fixed effects. *Journal of Econometrics*, 154(2), 165–185.
+https://doi.org/10.1016/j.jeconom.2009.08.001
 """
 function fit_spatial_panel(
     variant::V,

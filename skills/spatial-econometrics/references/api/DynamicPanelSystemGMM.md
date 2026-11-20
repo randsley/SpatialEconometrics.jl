@@ -16,7 +16,9 @@ differences. [`SystemGMM`](@ref) adds moment conditions to address exactly
 that.
 
 ### References
-Arellano, M. & Bond, S. (1991). *Review of Economic Studies*, 58(2).
+Arellano, M., & Bond, S. (1991). Some tests of specification for panel data:
+Monte Carlo evidence and an application to employment equations. *Review of
+Economic Studies*, 58(2), 277–297. https://doi.org/10.2307/2297968
 
 ## `GMMVariant`
 
@@ -39,7 +41,9 @@ uncorrelated with the unit effects — a real assumption, and the thing to
 examine if the Sargan test rejects.
 
 ### References
-Blundell, R. & Bond, S. (1998). *Journal of Econometrics*, 87(1).
+Blundell, R., & Bond, S. (1998). Initial conditions and moment restrictions
+in dynamic panel data models. *Journal of Econometrics*, 87(1), 115–143.
+https://doi.org/10.1016/S0304-4076(98)00009-8
 
 ## `SystemGMMModel`
 
@@ -89,7 +93,9 @@ interface.
     `n_instruments` caveat on [`fit_dynamic_gmm`](@ref).
 
 ### References
-Windmeijer, F. (2005). *Journal of Econometrics*, 126(1).
+Windmeijer, F. (2005). A finite sample correction for the variance of linear
+efficient two-step GMM estimators. *Journal of Econometrics*, 126(1), 25–51.
+https://doi.org/10.1016/j.jeconom.2004.02.005
 
 ## `fit_dynamic_gmm`
 

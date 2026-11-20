@@ -107,15 +107,16 @@ errors through `(I − ρW)⁻¹`, so the unit scores are not independent, and t
 plain outer product misses cross-unit terms. Bai & Chen rearrange each pair
 term onto the later unit of the pair, which makes the contributions
 `g_i` a martingale-difference array (Appendix D). The covariance of the score
-is then estimated by eq. (54):
+is then estimated by their eq. (54), quoted in their notation:
 
 ```math
-\hat Ω_M = \sum_i g^†_i g^{†\prime}_i + \sum_i \sum_{j<i} v_{ij} v_{ij}',
+\widehat Ω_M(α) := \frac{1}{N}\sum_{i=1}^{N} g^†_i(α)\,g^†_i(α)' + \frac{1}{N}\sum_{i=1}^{N}\sum_{j<i} v_{ij}(α)\,v_{ij}(α)'.
 ```
 
-the one-unit parts' outer products plus the outer products of every pair
-term. The pair terms are symmetric in `i` and `j`, so `Ω̂_M` does not depend
-on the order of the units, although each `g_i` does.
+Their `α` is the full parameter vector. The estimator is the one-unit
+parts' outer products plus the outer products of every pair term. The pair
+terms are symmetric in `i` and `j`, so `Ω̂_M` does not depend on the order
+of the units, although each `g_i` does.
 
 The reported `vcov` is the `θ = (ρ, φ, β)` block of the sandwich
 `Ĥ⁻¹Ω̂Ĥ⁻¹`, with the pair part scaled by `N/(N − p)` (eq. 23, the

@@ -70,7 +70,7 @@ t = sdm_tests(y, X_with_intercept, W)
 Each is a [`ScoreTestResult`](@ref), which unlike `LMTestResult` carries its
 `df`.
 
-**Decision rule (Koley & Bera 2023):**
+**Decision rule (Koley & Bera 2024):**
 
 1. If `joint` does not reject → OLS is adequate, and nothing below is worth
    reading

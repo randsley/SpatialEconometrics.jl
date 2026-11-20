@@ -12,9 +12,9 @@ semiparametric spatial models, short-panel dynamic models with correlated
 random effects or common shocks, spatial log-GARCH for the variance, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.6.0** — 4,182 test assertions across 63 top-level testsets
+> **Version 0.6.0** — 4,241 test assertions across 64 top-level testsets
 > with both package extensions installed, measured on Julia 1.13.4. Without
-> them, 4,147 pass and two broken markers stand in for the extension testsets,
+> them, 4,206 pass and two broken markers stand in for the extension testsets,
 > measured on Julia 1.10.13. See [Validation Status](#validation-status) for
 > Monte Carlo results.
 
@@ -124,7 +124,7 @@ exported name.
 | [Common Factors & Spatio-Temporal](https://randsley.github.io/SpatialEconometrics.jl/dev/models/common_factors/) | CD and `α` tests, SP-CCE, STAR, interactive fixed effects |
 | [Spatial VAR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spvar/) | Multivariate space-time systems, STIR, the nested panel VAR |
 | [Semiparametric Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/semiparametric/) | Partially linear SAR, closed-form `ρ`, `β(τ)` |
-| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis; a test-inversion set valid under weak identification |
+| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis, or with a penalised smoother; a test-inversion set valid under weak identification |
 | [Spatial log-GARCH](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spatial_garch/) | Spatial dependence in the conditional variance; covariate-distance `W` for unknown locations |
 | [GWR & MGWR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gwr/) | Coefficient surfaces, multiscale backfitting |
 | [Gravity Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gravity/) | PPML and negative binomial with high-dimensional FE |
@@ -184,7 +184,7 @@ want an internal helper:
 | `CREDynamicSpatialPanel` | Short-`T` dynamic spatial panel with correlated random effects | Li & Yang (2021) |
 | `CommonShockDynamicPanel` | Short-`T` dynamic spatial panel with common shocks | Bai & Chen (2026) |
 | `SpatialGARCH` | Spatial log-GARCH: two-step QML with a derived sandwich | Sato & Matsuda (2021) |
-| `RootRho` | Root estimator of `ρ` with a growing basis: REsd, HC2 variance, test-inversion set | Jin & Lee (2012) |
+| `RootRho` | Root estimator of `ρ` with a growing basis (REsd) or a penalised smoother (`tensor_pspline`): HC2 variance, test-inversion set | Jin & Lee (2012) |
 | `SpatialGS2SLSPanel` | SARAR panels with endogenous regressors | Kelejian & Prucha (1998, 2010) |
 | `DynamicPanelSystemGMM` | Arellano-Bond & Blundell-Bond GMM | Roodman (2009) |
 | `StructuralMacroCalibration` | GRAS & cross-entropy SAM/MRIO balancing | Junius & Oosterhaven (2003) |
@@ -248,7 +248,7 @@ our own because:
 SpatialEconometrics/
 ├── src/            # 34 modules: the umbrella plus 33 submodules
 ├── ext/            # Makie and Turing package extensions (see ext/README.md)
-├── test/           # runtests.jl + testsets/: 63 top-level testsets, one file each (see test/README.md)
+├── test/           # runtests.jl + testsets/: 64 top-level testsets, one file each (see test/README.md)
 ├── skills/         # a Claude Code skill for the package (see skills/README.md)
 ├── examples/       # 34 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
@@ -291,7 +291,7 @@ SpatialEconometrics/
 | Short-T CRE Dynamic Panel | ✓ | **Yes** (Li & Yang's Table 1 replicated, 4,500/4,500 fits; sandwich coverage 0.92–0.97 for `β`, `ρ`, `λ`) |
 | Short-T Common-Shock Panel | ✓ | **Yes** (`validation/mc_serl_sdpd_output.txt`: at `L = 1` coverage of `ρ` 0.93–0.96 to `N = 4000`, at `L = 0` it falls to 0.40; the default `Q` biases `β` at large `N` when regressors are serially correlated with the loadings, and every period of `X` as `Q` removes it) |
 | Spatial log-GARCH | ✓ | **Yes** (`validation/mc_spatial_log_garch_output.txt`: Sato & Matsuda's Table 1 reproduced at `n = 400`, where the derived sandwich covers 0.93–0.96 except near `λ = 1`; the quasi-likelihood is unbounded as `λ → 1`, so 36–39% of `n = 100` samples at `λ = 0.9` have no interior maximum and the fit throws; a proxy `W` biases `ρ̂` more as `n` grows) |
-| Root Estimator of ρ | ✓ | **Yes** (`validation/mc_root_rho_output.txt`: 108 cells, 3 `W`, `n` 400–1600, `K/n` up to 0.19; the test-inversion set covers 0.935–0.975 and the Wald interval 0.931–0.975, with `|bias|` at most 0.06, while the plain closed form is biased by −0.05 to −1.76 on the same draws; the growing-basis theory has not been checked by anyone else) |
+| Root Estimator of ρ | ✓ | **Yes** (`validation/mc_root_rho_output.txt`: 108 cells, 3 `W`, `n` 400–1600, `K/n` up to 0.19; the test-inversion set covers 0.935–0.975 and the Wald interval 0.931–0.975, with `|bias|` at most 0.06, while the plain closed form is biased by −0.05 to −1.76 on the same draws; and with the penalised smoother, `validation/mc_root_rho_smoother_output.txt`: 108 cells, both intervals cover 0.934–0.982 wherever the exact shrinkage bias `c` is at most 0.25, and as predicted by `c` elsewhere; the growing-basis theory has not been checked by anyone else) |
 
 **Cross-sectional SDM Monte Carlo results** (`validation/mc_sdm_output.txt`):
 ρ̂ mean = 0.595 (true 0.600); mean SE = 0.0324, empirical SD = 0.0328; 95%
@@ -325,19 +325,19 @@ studies reported in [Validation Status](#validation-status).
 ## References
 
 - Anselin, L. (1988). *Spatial Econometrics: Methods and Models*. Kluwer.
-- Arellano, M. & Bond, S. (1991). *Review of Economic Studies*, 58(2).
-- Blundell, R. & Bond, S. (1998). *Journal of Econometrics*, 87(1).
-- Conley, T. (1999). *Journal of Econometrics*, 92(1).
-- Driscoll, J. & Kraay, A. (1998). *Review of Economics and Statistics*, 80(4).
+- Arellano, M., & Bond, S. (1991). Some tests of specification for panel data: Monte Carlo evidence and an application to employment equations. *Review of Economic Studies*, 58(2), 277–297. https://doi.org/10.2307/2297968
+- Blundell, R., & Bond, S. (1998). Initial conditions and moment restrictions in dynamic panel data models. *Journal of Econometrics*, 87(1), 115–143. https://doi.org/10.1016/S0304-4076(98)00009-8
+- Conley, T. G. (1999). GMM estimation with cross sectional dependence. *Journal of Econometrics*, 92(1), 1–45. https://doi.org/10.1016/S0304-4076(98)00084-0
+- Driscoll, J. C., & Kraay, A. C. (1998). Consistent covariance matrix estimation with spatially dependent panel data. *Review of Economics and Statistics*, 80(4), 549–560. https://doi.org/10.1162/003465398557825
 - Fotheringham, A. S., Brunsdon, C., & Charlton, M. (2002). *Geographically Weighted Regression*. Wiley.
-- Junius, T. & Oosterhaven, J. (2003). *Economic Systems Research*, 15(1).
-- Kelejian, H. & Prucha, I. (1998). *Journal of Real Estate Finance and Economics*, 17(1).
-- Lee, L.-F. & Yu, J. (2010). *Journal of Econometrics*, 154(2).
+- Junius, T., & Oosterhaven, J. (2003). The solution of updating or regionalizing a matrix with both positive and negative entries. *Economic Systems Research*, 15(1), 87–96. https://doi.org/10.1080/0953531032000056954
+- Kelejian, H. H., & Prucha, I. R. (1998). A generalized spatial two-stage least squares procedure for estimating a spatial autoregressive model with autoregressive disturbances. *Journal of Real Estate Finance and Economics*, 17(1), 99–121. https://doi.org/10.1023/A:1007707430416
+- Lee, L.-F., & Yu, J. (2010). Estimation of spatial autoregressive panel data models with fixed effects. *Journal of Econometrics*, 154(2), 165–185. https://doi.org/10.1016/j.jeconom.2009.08.001
 - LeSage, J. & Pace, R. K. (2009). *Introduction to Spatial Econometrics*. CRC Press.
-- Roodman, D. (2009). *Stata Journal*, 9(1).
-- Santos Silva, J. M. C. & Tenreyro, S. (2006). *Review of Economics and Statistics*, 88(4).
-- Windmeijer, F. (2005). *Journal of Econometrics*, 126(1).
-- Yu, J., de Jong, R. & Lee, L.-F. (2008). *Journal of Econometrics*, 146(1).
+- Roodman, D. (2009). How to do xtabond2: An introduction to difference and system GMM in Stata. *Stata Journal*, 9(1), 86–136. https://doi.org/10.1177/1536867X0900900106
+- Santos Silva, J. M. C., & Tenreyro, S. (2006). The log of gravity. *Review of Economics and Statistics*, 88(4), 641–658. https://doi.org/10.1162/rest.88.4.641
+- Windmeijer, F. (2005). A finite sample correction for the variance of linear efficient two-step GMM estimators. *Journal of Econometrics*, 126(1), 25–51. https://doi.org/10.1016/j.jeconom.2004.02.005
+- Yu, J., de Jong, R., & Lee, L.-F. (2008). Quasi-maximum likelihood estimators for spatial dynamic panel data with fixed effects when both n and T are large. *Journal of Econometrics*, 146(1), 118–134. https://doi.org/10.1016/j.jeconom.2008.08.002
 
 ## License
 

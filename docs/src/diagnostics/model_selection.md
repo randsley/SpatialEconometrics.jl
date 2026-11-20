@@ -177,7 +177,7 @@ is down to 1.5%.
 
 ## The SDEM roadmap
 
-`sdem_roadmap` is the local-spillover search of Sutton & Sutton (2023): for
+`sdem_roadmap` is the local-spillover search of Sutton & Sutton (2024): for
 each candidate `W`, decide which of `:sdem`, `:slx` and `:sem` fits best,
 then read the winner across the candidates.
 

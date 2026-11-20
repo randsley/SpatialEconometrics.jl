@@ -183,8 +183,9 @@ robust_coeftable(m, DriscollKraayVCOV(max_lag = 5, kernel = ParzenKernel()))
 ```
 
 # References
-Driscoll, J. & Kraay, A. (1998). *Review of Economics and Statistics*,
-80(4).
+Driscoll, J. C., & Kraay, A. C. (1998). Consistent covariance matrix
+estimation with spatially dependent panel data. *Review of Economics and
+Statistics*, 80(4), 549–560. https://doi.org/10.1162/003465398557825
 """
 struct DriscollKraayVCOV{K<:KernelType} <: AbstractRobustVCOV
     max_lag::Union{Nothing, Int}

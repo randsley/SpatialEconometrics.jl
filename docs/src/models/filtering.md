@@ -152,7 +152,7 @@ Function signatures are listed in the [API Reference](@ref).
 ## Spatio-temporal principal components
 
 ESF and the eigenvector basis above describe one map. `stpca` describes a
-*sequence* of maps: `n` units, each carrying `p` features observed at `T`
+*sequence* of maps: `N` units, each carrying `p` features observed at `T`
 moments, reduced to components that are simultaneously high-variance and
 spatially structured.
 
@@ -166,8 +166,8 @@ feature_contributions(m, 1)     # which of the p features the component reads
 
 The construction has two stages. First each unit-feature time series is
 replaced by a continuous function, expanded in `n_basis` orthonormal Fourier
-functions by least squares, which turns `n × p × T` discrete observations
-into an `n × B` coefficient matrix `A` with `B = p · n_basis`. Time enters
+functions by least squares, which turns `N × p × T` discrete observations
+into an `N × B` coefficient matrix `A` with `B = p · n_basis`. Time enters
 only through that expansion. Second, components are found in the coefficient
 space, where space enters through `W`.
 

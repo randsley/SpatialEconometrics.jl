@@ -39,8 +39,9 @@ makes `ρ̂`, or the impacts computed from it, causal.
 - Su, L., & Jin, S. (2010). Profile quasi-maximum likelihood estimation of
   partially linear spatial autoregressive models. *Journal of
   Econometrics*, 157(1), 18–33.
-- Smirnov, O. A. (2022). Closed-form estimator for spatial autoregressive
-  models. *Geographical Analysis*, 54(1), 3–31.
+- Smirnov, O. A. (2022). A closed-form consistent estimator for linear
+  models with spatial dependence. *Geographical Analysis*, 54(1), 3–31.
+  https://doi.org/10.1111/gean.12268
 - Geniaux, G. (2026). Flexible nonlinear spatial autoregressive models
   under spatial confounding. arXiv:2611.16592 (preprint).
 - Lee, L.-F. (2004). Asymptotic distributions of quasi-maximum likelihood

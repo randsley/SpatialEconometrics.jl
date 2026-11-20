@@ -1,6 +1,6 @@
 # Theorem 1 without the log factor: is the triangular part bounded in the Schatten-4 norm?
 #
-# Bhansali, Giraitis & Kokoszka (2007, Lemma 2.1, via Macaev 1961) use that triangular truncation is
+# Bhansali, Giraitis & Kokoszka (2007, Lemma 2.1, via Matsaev 1961; the bound is Theorem 1 of Dokl. 139(4), 810-813) use that triangular truncation is
 # bounded on the Schatten-p class for 1 < p < ∞, with a constant free of n: ‖L‖₄ ≤ C₄‖A‖₄ for the strictly
 # lower-triangular part L of a symmetric A. In the operator norm the same truncation can grow like log n
 # (THEORY.md, Lemma 3), and that is where Theorem 1's (log n)² came from.

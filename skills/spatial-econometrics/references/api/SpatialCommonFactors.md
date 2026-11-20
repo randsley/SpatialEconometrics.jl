@@ -380,8 +380,11 @@ abs(m.rho - mc.rho) > 2 * stderror(mc)[1] &&
 
 ### References
 
-- Pesaran, M. H. (2006). *Econometrica*, 74(4), 967–1012.
-- Yang, C. F. (2021). *Econometric Reviews*, 40(1), 14–50.
+- Pesaran, M. H. (2006). Estimation and inference in large heterogeneous
+  panels with a multifactor error structure. *Econometrica*, 74(4),
+  967–1012.
+- Yang, C. F. (2021). Common factors and spatial dependence: An application
+  to US house prices. *Econometric Reviews*, 40(1), 14–50.
 
 ## `pesaran_cd`
 

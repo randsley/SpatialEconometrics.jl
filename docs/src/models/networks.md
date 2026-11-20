@@ -15,29 +15,36 @@ So the first function here is not an estimator.
 
 ## The reflection problem, mechanically
 
-The linear-in-means model, their eq. (1):
+The linear-in-means model, their eq. (1) (quoted from the published
+article, read from its page images; their bold vectors and matrices are
+written plain here):
 
 ```
-y = αι + βGy + γx + δGx + ε
+y = αι + βGy + γx + δGx + ε,    𝔼[ε | x] = 0
 ```
 
-`β` is the **endogenous** effect — the response to what peers do — and `δ`
-the **contextual** effect — the response to who peers are. Separating them
-is the whole point, and it is the thing that fails.
+"where β captures the endogenous effect and δ the exogenous effect". `β` is
+the response to what peers do, and `δ` the response to who peers are (also
+called the *contextual* effect). Separating them is the whole point, and it
+is the thing that fails.
 
-Their **Proposition 1**: social effects are identified if `I`, `G` and `G²`
-are linearly independent; if those are linearly dependent and no individual
-is isolated, social effects are not identified. Their footnote 17 gives the
-check, which is what [`peer_identification`](@ref) runs: vectorize each
-matrix, stack the columns, and take the rank of the result.
+Their **Proposition 1**: "Suppose that γβ + δ ≠ 0. If the matrices I, G,
+and G² are linearly independent social effects are identified. If the
+matrices I, G, and G² are linearly dependent and no individual is isolated,
+social effects are not identified." Their footnote 17 gives the check, which
+is what [`peer_identification`](@ref) runs: "First, vectorize each matrix,
+that is, stack its columns on top of each other. Second, verify whether the
+matrix formed by concatening these stacked vectors has rank three."
 
 With network fixed effects — an unobservable correlated with `x` at the
-network level, swept out by the within-local transformation `(I - G)` —
-their **Proposition 4** requires `I, G, G², G³` to be independent instead.
-Strictly more demanding, because, in their words, information has been lost
-to take into account the presence of correlated effects.
+network level, swept out by their "within local transformation" `(I − G)` —
+their **Proposition 4** reads: "Consider model (10). Suppose that
+γβ + δ ≠ 0. Social effects are identified if and only if the matrices I, G,
+G², and G³ are linearly independent." In their words: "This condition is
+more demanding than the condition of Proposition 1. Some information has
+been lost to take into account the presence of correlated effects."
 
-### What fails, and what does not
+## What fails, and what does not
 
 Every verdict here is pinned as a test, and the algebraic identities behind
 them hold to machine precision because they are identities in the paper.
@@ -215,7 +222,7 @@ skipping the check costs, the density degradation, and the multiplex fit.
 
 - Bramoullé, Y., Djebbari, H. & Fortin, B. (2009). Identification of peer
   effects through social networks. *Journal of Econometrics*, 150(1),
-  41–55.
+  41–55. https://doi.org/10.1016/j.jeconom.2008.12.021
 - Manski, C. F. (1993). Identification of endogenous social effects: the
   reflection problem. *Review of Economic Studies*, 60(3), 531–542.
 - Leenders, R. T. A. J. (2002). Modeling social influence through network

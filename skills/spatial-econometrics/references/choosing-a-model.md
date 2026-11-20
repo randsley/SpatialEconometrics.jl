@@ -180,7 +180,10 @@ Zero flows are kept, as PPML allows.
   `closed_form_rho` is. Report its test-inversion set `cs`: it stays valid
   when `ρ` is weakly identified, where the Wald interval does not. `β` has
   no standard errors. Do not choose the basis size by GCV; report `ρ̂`
-  across a few sizes.
+  across a few sizes. For a penalised basis, pass
+  `tensor_pspline(u, v; k)...` and a small `lambda`: there is no default,
+  because the shrinkage of `f` biases `ρ̂` and both intervals as `λ` grows.
+  Report `ρ̂` across a few values of `λ`, with `r.df`.
 - **Coefficients that drift over time in a panel:** `fit_tv_coef_sar`
   (Liang, Gao & Gong 2022). `ρ` stays constant; only `β` varies.
 

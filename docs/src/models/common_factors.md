@@ -51,8 +51,9 @@ about finding out what it is.
 ## Diagnosing it: and why one statistic is not enough
 
 [`pesaran_cd`](@ref) implements the CD statistic of Pesaran (2015). Its
-implicit null is **weak dependence, not independence** — his eq. (12),
-`H₀w : α < (2−ε)/4` with `T = O(Nᵋ)`. The implementation reproduces his own
+implicit null is **weak dependence, not independence**. In his words
+(abstract): "When T = O(N^ε), for some 0 < ε ≤ 1, then the implicit null of
+the CD test is given by 0 ≤ α < (2 − ε)/4". The implementation reproduces his own
 headline result exactly (`N = 100`, `T = 50`, 3,000 reps, 5% level):
 
 | true `α` | 0.00 | 0.10 | 0.25 | 0.40 | 0.50 | 0.75 |

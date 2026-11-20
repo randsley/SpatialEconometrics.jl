@@ -30,6 +30,7 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Getting Started" => "getting_started.md",
+        "Notation" => "notation.md",
         "Models" => [
             "Cross-Sectional" => "models/cross_sectional.md",
             "Panel" => "models/panel.md",
@@ -67,6 +68,7 @@ makedocs(
         "Formula Interface" => "formula.md",
         "Output & Tables" => "tables.md",
         "Package Extensions" => "extensions.md",
+        "Bibliography" => "bibliography.md",
         # Grouped rather than listed flat: 24 entries in one column is a
         # wall, and the groups match how the manual is organised.
         "API Reference" => [

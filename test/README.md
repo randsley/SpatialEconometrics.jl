@@ -65,6 +65,7 @@ The numbers follow the order in which the features were added.
 | 41–44 | Semiparametric SAR; Li & Yang; Bai & Chen; the spatial log-GARCH |
 | 45 | The Claude skill's function reference against the docstrings |
 | 46 | `root_rho`: Jin & Lee's REsd with a growing basis, its HC2 variance and test-inversion set |
+| 47 | `root_rho` with a penalised smoother: `tensor_pspline`, the exact-diagonal moment and its general HC2 variance, the mean `f′Af` |
 
 A lettered testset (`4b`, `11c`, …) was added later to its area, usually by
 an audit finding that `docs/AUDIT.md` records.

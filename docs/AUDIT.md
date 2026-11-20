@@ -5495,3 +5495,91 @@ interval or in `CS`.
   research grid; beyond that `root_rho` warns.
 - `β` has no standard errors.
 - The penalised smoother is not built.
+
+## `root_rho` with a penalised smoother: the exact-diagonal moment when `M` is not idempotent
+
+Built on 2026-11-20, in `src/RootRho.jl` (the same submodule). The keywords
+`penalty` and `lambda` turn the first stage from a projection into a
+penalised smoother, `S = Z(Z′Z + λΩ̃)⁻¹Z′`, with `Z = [X, B]` and only the
+basis penalised. `tensor_pspline(u, v; k)` supplies a tensor hat basis and a
+difference penalty. Four things are this package's own, so the standing rule
+applies:
+
+- **the moment.** `y₀′Ay₀` with `A = MW + MDM`, `M = I − S` and
+  `(M∘M)d = −diag(MW)`, so `diag A = 0`. It is formed as a matrix: the
+  shortcut through residual vectors, `(My₀)′(MWy₀ + DMy₀)`, equals
+  `y₀′(M²W + MDM)y₀`, which is a different moment when `M² ≠ M`, and it is
+  biased. Jin & Lee's two-step is not used, because its plug-in result
+  (THEORY.md, Proposition 1) needs `Mf = 0`, and a smoother shrinks `f`;
+- **the variance.** HC2 with `ûᵢ²/(M²)ᵢᵢ` and a noise term through
+  `H = (A + A′)S` (Proposition 4(c)). `V̂(ρ)` is still an exact quartic, so
+  the test-inversion set carries over;
+- **the shrinkage bias.** At the true `ρ` the moment's mean is `f′Af`, not
+  zero. Its size `c = f′Af/√V` predicts the coverage of `CS` at
+  `P(|Z + c| ≤ 1.96)` to first order. `lambda` has no default, and the docs
+  say to choose it small;
+- **`tensor_pspline`,** a hat-function tensor basis whose second-order
+  penalty leaves `1`, `i`, `j` and `ij` unpenalised.
+
+**No one else has checked Proposition 4.**
+
+### What was verified exactly first
+
+Testset 47 (59 assertions) checks each part against an independent
+computation:
+
+- **`tensor_pspline`.** The rows of the basis sum to one and the column
+  ordering is `(i−1)k + j`. The penalty is symmetric PSD with null space
+  `{1, i, j, ij}` and rank `k² − 4` (`k² − 1` at order 1). Its guards throw.
+- **The estimator** against a dense reimplementation (`n = 144`, `k = 6`,
+  `λ = 0.3`): the quadratic's coefficients, `ρ̂`, the SE, `β̂`, `tr S` and
+  `max Sᵢᵢ` agree to `1e-10`. The quartic `V̂(ρ)` equals the direct `V̂` at
+  three values of `ρ`. When `M² = M`, the general `V̂` equals the
+  projection's.
+- **The set.** At each endpoint of `CS` that is not a bound, `q = 0`, with
+  `q ≤ 0` inside and `q > 0` just outside.
+- **The exact mean** (`n = 100`, `k = 5`, `λ = 0.1`, fixed design,
+  heteroskedastic, R = 4000). The bounds are 4 SE: 0.0632 for a mean, 0.0894
+  for a variance.
+  - With `f₀` in the unpenalised span (`Mf₀ = 0`), `g(ρ₀)/√V` has mean
+    0.0161 (3.93×) and variance within 0.0086 of 1 (10.4×) on 1.13.
+  - With `f₁` shrunk by the smoother, the centred `(g − f₁′Af₁)/√V` has
+    mean 0.0214 (2.95×, the smallest on 1.13) and variance
+    within 0.0149 of 1 (6.0×) on 1.13.
+  - **Power:** the shortcut moment fails the mean test with 0.379 (5.99×
+    the bound), and the uncentred `g/√V` under `f₁` with 1.525 (24×). The
+    shortcut's exact standardised mean is 0.395, which the test requires to
+    be above 0.2.
+  - On 1.10 the design draw differs: `g(ρ₀)/√V` under `f₀` has mean 0.0066
+    (9.6×) and variance within 0.0319 of 1 (2.80×, the smallest margin in
+    testset 47 on either version); the centred moment under `f₁` has mean
+    0.0006 and variance within 0.0294 of 1 (3.05×). Power: the shortcut
+    fails with 0.321 (5.08×) and the uncentred `g/√V` with 1.295 (20×); the
+    shortcut's exact standardised mean is 0.326, above 0.2.
+- **Recovery** at `n = 900`, `k = 12` (`K = 145`), `λ = 0.01`: `ρ̂` is
+  0.053 SE from the truth on 1.13 (bound 4), with SE 0.093 and
+  `|β̂ − 0.5|` = 0.057.
+- **The guards** each throw with their own message: `penalty` without
+  `lambda` or the reverse, a penalty without a basis, a `lambda` that is not
+  positive and finite, a penalty of the wrong size, not symmetric or not
+  PSD, and a unit with `Sᵢᵢ` above 0.99. `df/n` above 0.30 warns.
+
+### The Monte Carlo
+
+`validation/mc_root_rho_smoother.jl`, 108 cells (3 `W` × `n` 400, 900,
+1600 × `λ` 0.01, 0.1, 1 × `a` 1, 4 × two error designs), R = 1000, 310
+minutes; output in `validation/mc_root_rho_smoother_output.txt`. The first
+line of that file is the script's `R = 3` warm-up row, printed before the
+header; it is not data, and the script now runs the warm-up silently.
+- **Pass criterion (set before the run):** both intervals within 0.93–0.99
+  in every cell with `c ≤ 0.25`. **Met:** 75 cells, Wald 0.935–0.982, `CS`
+  0.934–0.982, `|bias|` ≤ 0.045.
+- **The other 33 cells:** `CS` within 0.027 of the predicted
+  `P(|Z + c| ≤ 1.96)`, Wald within −0.007 to +0.077. The prediction from the
+  exact `c` explains the undercoverage.
+- **Power:** the shortcut moment is biased by −0.015 to −0.244 in the
+  `c ≤ 0.25` cells, and covers below 0.93 in 48 of the 75 (minimum 0.512).
+- **Package against the reference:** `|Δρ̂|` ≤ 1.6e-14, `|Δse|` ≤ 6.4e-16.
+- **Weak identification:** kNN-20 at `n = 400`, `λ = 0.01`: up to 62 draws
+  without a root, `CS` touching a bound in up to 694; `CS` covers 0.929–0.964
+  there (the 0.929 cell has `c = 0.33`, predicted 0.938).

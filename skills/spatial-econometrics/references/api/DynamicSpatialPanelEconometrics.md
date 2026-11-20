@@ -137,5 +137,8 @@ dynamic_spatial_effects(m)
     beside the covariates.
 
 ### References
-Yu, J., de Jong, R. & Lee, L.-F. (2008). *Journal of Econometrics*, 146(1).
+Yu, J., de Jong, R., & Lee, L.-F. (2008). Quasi-maximum likelihood
+estimators for spatial dynamic panel data with fixed effects when both n and
+T are large. *Journal of Econometrics*, 146(1), 118–134.
+https://doi.org/10.1016/j.jeconom.2008.08.002
 

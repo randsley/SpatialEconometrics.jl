@@ -159,8 +159,9 @@ multilateral_resistance(m)
     practice PPML exists to replace.
 
 ### References
-Santos Silva, J. M. C. & Tenreyro, S. (2006). *Review of Economics and
-Statistics*, 88(4).
+Santos Silva, J. M. C., & Tenreyro, S. (2006). The log of gravity. *Review
+of Economics and Statistics*, 88(4), 641–658.
+https://doi.org/10.1162/rest.88.4.641
 
     fit_gravity(NegBinGravity(), flows, X, origin_id, dest_id; fe = BilateralFE(),
                 varnames = nothing, maxiter = 100, tol = 1e-8, alpha_iter = 50)

@@ -10,9 +10,11 @@ The result of [`root_rho`](@ref).
 
 ### Fields
 
-- `rho` — the REsd root `ρ̂` (`NaN` when no admissible root exists; see
-  `root_found`).
-- `rho_first` — Jin & Lee's first-step root `ρ̃` (`NaN` if none).
+- `rho` — the root `ρ̂`: REsd's with a projection, the exact-diagonal
+  moment's with a penalised smoother (`NaN` when no admissible root exists;
+  see `root_found`).
+- `rho_first` — Jin & Lee's first-step root `ρ̃` (`NaN` if none, and always
+  `NaN` with a penalised smoother, which takes one step).
 - `se` — `√V̂(ρ̂)/|g′(ρ̂)|`, with the HC2 `V̂`.
 - `ci_wald` — `ρ̂ ± z·se`.
 - `cs` — the test-inversion set, as a vector of closed intervals within
@@ -25,7 +27,11 @@ The result of [`root_rho`](@ref).
   `[X, B]`. **No standard errors**: the theory covers `ρ` only.
 - `varnames` — the names of `beta`.
 - `n`, `K` — the sample size and the number of columns of `[X, B]`.
-- `max_leverage` — `maxᵢ hᵢᵢ` of the projection on `[X, B]`.
+- `smoother` — `:projection` or `:penalised`.
+- `lambda` — the penalty's `λ` (`0` for a projection).
+- `df` — the effective degrees of freedom `tr S` of the first stage (`K`
+  for a projection).
+- `max_leverage` — `maxᵢ Sᵢᵢ` of the first stage (`hᵢᵢ` for a projection).
 - `a`, `b`, `c` — the final moment `g(ρ) = c − bρ + aρ²`.
 - `vpoly` — `V̂(ρ) = Σₖ vpoly[k+1] ρᵏ`, a quartic.
 - `vhat` — `V̂(ρ̂)`.
@@ -35,8 +41,9 @@ The result of [`root_rho`](@ref).
 
 ## `root_rho`
 
-    root_rho(y, X, W; basis = nothing, varnames = nothing, level = 0.95,
-             rho_bounds = (-0.99, 0.99), max_dense_n = 4000)
+    root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
+             varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
+             max_dense_n = 4000)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -65,6 +72,31 @@ so the set's endpoints are exact.
 - `W` — a spatial weights matrix with a zero diagonal, row-standardised so
   that `rho_bounds` lies inside `(−1, 1)`.
 - `basis` — the `n × K_B` basis for `f`.
+- `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
+  penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
+  or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
+
+### With a penalised smoother
+
+The first stage is `S = Z(Z′Z + λΩ̃)⁻¹Z′`, where `Ω̃` applies `Ω` to the
+basis and leaves `X` unpenalised. `M = I − S` is not idempotent, so a
+different moment is used, in one step:
+
+```math
+g(ρ) = y_0(ρ)'\,A\,y_0(ρ),\quad A = MW + MDM,\quad (M∘M)\,d = −\mathrm{diag}(MW),
+```
+
+so `diag A = 0` and `E g(ρ₀) = f′Af`, the bias from the smoother's
+shrinkage of `f` (THEORY.md, Proposition 4). The HC2 plug-in is
+`ûᵢ²/(M²)ᵢᵢ`, and the noise term uses `H = (A + A′)S`. Jin & Lee's
+two-step is not used here: its plug-in result needs `Mf = 0`.
+
+**Choose a small `λ`.** The shrinkage bias grows with `λ`, and it makes
+both intervals under-cover. GCV and the RMSE-optimal `λ` were too large for
+valid inference in `research/trace_cfe/tc_lambda.jl`, so `lambda` has no
+default. Report `ρ̂` across a few values of `λ`, with `r.df = tr S`. A
+`df/n` above 0.30 gives a warning, and units with `Sᵢᵢ` above 0.99 are
+refused.
 
 ### Choosing the basis
 
@@ -80,11 +112,36 @@ refused.
 ### Cost
 
 Everything is dense: about four `n × n` matrices, so `n` is capped at
-`max_dense_n` (4000 by default, about 0.5 GB).
+`max_dense_n` (4000 by default, about 0.5 GB). The penalised smoother holds
+about six and solves one dense `n × n` system for `d`.
 
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
     consistency of `V̂`, the validity of the test-inversion set) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
+
+## `tensor_pspline`
+
+    tensor_pspline(u, v; k, order = 2) -> (; basis, penalty)
+
+A tensor-product P-spline on two coordinates, for the `basis` and `penalty`
+arguments of [`root_rho`](@ref):
+
+```julia
+r = root_rho(y, X, W; tensor_pspline(u, v; k = 15)..., lambda = 1.0)
+```
+
+- `basis` — `n × k²`: the products of piecewise-linear "hat" functions on
+  `k` equally spaced knots over the range of `u` and of `v`. Column
+  `(i − 1)k + j` is `hᵢ(u)·hⱼ(v)`. The rows sum to one, so do not also put
+  an intercept in `X`.
+- `penalty` — `k² × k²`: `P ⊗ I + I ⊗ P` with `P = D′D` and `D` the
+  `order`-th difference matrix: a difference penalty along each coordinate.
+  It is symmetric and positive semi-definite. With `order = 2` it leaves
+  four functions unpenalised: those that are linear in each coordinate's
+  knot index, `1, i, j, ij`.
+
+`k` must be at least `order + 2`. Used without `penalty`, `basis` is the
+projection basis of the default `root_rho`.
 

@@ -5,6 +5,9 @@ of a dynamic spatial panel with the Yu, de Jong & Lee device, which needs a
 long `T`. Many panels are short: a handful of years across many regions or
 firms. For those, [`fit_cre_dynamic_spatial_panel`](@ref) implements Li &
 Yang's (2021) M-estimator, which is consistent with `T` fixed and `n → ∞`.
+This page keeps Li & Yang's symbols, since the coefficient names follow
+them: `n` is the number of units and `ρ` the time lag (see
+[Notation](@ref)).
 
 ## The model
 
@@ -49,9 +52,9 @@ fit = fit_cre_dynamic_spatial_panel(y, X, Z, W1, N, T + 1; m = 10,
 
 ## Data layout
 
-As in [`fit_dynamic_spatial_panel`](@ref): `y` and `X` stack `N` units within
+As in [`fit_dynamic_spatial_panel`](@ref): `y` and `X` stack `n` units (the argument `N`) within
 each of `T_total = T + 1` periods, **period 0 first**. Period 0 supplies `y_0`
-and enters `X̄`; estimation uses periods `1..T`. `Z` is an `N × q` matrix of
+and enters `X̄`; estimation uses periods `1..T`. `Z` is an `n × q` matrix of
 time-invariant regressors without an intercept, or `nothing`.
 
 A column of `X` that does not vary over time duplicates its own mean `X̄`.

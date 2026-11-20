@@ -34,6 +34,50 @@ research item, theory step 1.
 
 The design (`W`, `B`, `f`) is fixed. Every statement is conditional on it.
 
+## Notation
+
+Each symbol below has one meaning throughout. A symbol used only inside one
+proof is defined there and is not used elsewhere.
+
+**Quotes use the notation of their source.** A theorem or formula quoted
+from a paper keeps that paper's words and symbols exactly, as read from its
+page images, even where a symbol means something else in this note. A line
+after the quote maps its symbols to this note's. The paragraphs that compare
+this note with other papers (Kelejian & Prucha, Lee, Bhansali et al., de
+Jong, Hall & Heyde) also keep those papers' symbols, inside that paragraph
+only.
+
+`i, j, k, l` are indices, and `c` is a generic constant that may change from
+line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, `Θ_q`).
+
+| Symbol | Meaning |
+|---|---|
+| `ε`, `σᵢ²`, `Σ`, `σ²` | the errors; their variances; `Diag(σᵢ²)`; the vector `(σᵢ²)ᵢ` |
+| `δ`, `p = 1 + δ/2`, `q = 2 + δ` | the moment exponent of A1, and the two exponents derived from it |
+| `μ̄`, `μ₄`, `μ₃ᵢ`, `κᵢ` | moment bounds; third moments; fourth cumulants |
+| `hᵢᵢ`, `h̄`, `M`, `P_B` | leverages and their bound; `I − P_B`; the projection on `B` |
+| `S`, `s̄`, `λ` | a smoother (Proposition 4), its largest `Sᵢᵢ`, its penalty |
+| `C`, `Cs`, `γᵢⱼ`, `Ω`, `L` | the moment matrix; its symmetric part and that part's entries; `Cs∘Cs`; the strictly lower part of `Cs` |
+| `P = W′ − Δ`, `Δ` | Jin & Lee's first-step matrix and its diagonal correction |
+| `d`, `D = Diag(d)`, `d̄`, `A = MW + MDM` | the exact-diagonal correction, its largest entry, and the exact-diagonal moment matrix (there `C = A`) |
+| `G`, `G(ϱ)`, `C(ϱ)` | `W(I − ρ₀W)⁻¹`; the same, and the moment matrix, at a plug-in value `ϱ` (Proposition 1) |
+| `t = ρ − ρ₀`, `g₀`, `g₁`, `g₂`, `Γ` | the deviation from `ρ₀`; the coefficients of `g(ρ₀ + t)`; the discriminant `g₁² − 4g₂g₀` |
+| `η` | `f + ε = y₀(ρ₀)` |
+| `b`, `b̂`, `ζ`, `H` | the linear part's coefficient; its estimate; that estimate's noise `ζ = Hε`, with `H = (C + C′)` times the first stage's hat matrix |
+| `V`, `V̂`, `J` | the moment's variance; its estimate; `−E g′(ρ₀)` |
+| `sᵢ`, `Σ̂`, `νᵢ`, `ϑᵢ` | the plug-in variance; `Diag(s)`; its remainder `sᵢ − εᵢ²`; the leverage noise in `ûᵢ` |
+| `û`, `û₀`, `û₁` | `My₀(ρ̂)`; `My`; `MWy` |
+| `r = Mf`, `r_W`, `β`, `c_β` | the approximation (or shrinkage) remainder; its lagged part; the bias `f′Cf`; its size `β/√V` |
+| `θ` | the limit of `K/n` |
+| `κ_W`, `n_W`, `X`, `ωⱼ`, `φⱼ`, `πⱼ` | Proposition 5: `‖W‖_F² ≥ κ_W n`; neighbours per row; `Ws + D`; its eigenvalues and eigenvectors; their overlaps with `B` |
+| `Y` | a generic matrix (Lemmas 2 and 3, and the bound after Lemma 3) |
+| `Z` | a standard normal variable |
+
+In the numerical checks, `a` is the amplitude of `f`, `k` the knots per side
+of a hat basis, `(u, v)` the locations, `R` the replications, and `z` either
+the standardised moment that the check defines or a Monte Carlo z-score; each
+check says which.
+
 ## Assumptions
 
 - **A1.** The `εᵢ` are independent, with mean 0, variances
@@ -76,7 +120,7 @@ At `ρ₀`, `y₀ = f + ε`. Since `Mf = 0`, `Cf = PMf = 0`, so
 `g(ρ₀) = b′ε + ε′Cε`, with `b = C′f = MP′f`. Then:
 - `E g(ρ₀) = tr(CΣ) = Σᵢ Cᵢᵢσᵢ² = 0`, under any heteroskedasticity, because
   `diag(C) = 0`;
-- `V := Var g(ρ₀) = 2σ′(Cs∘Cs)σ + Σᵢ bᵢ²σᵢ²`, where `σ` is the vector of
+- `V := Var g(ρ₀) = 2σ²′(Cs∘Cs)σ² + Σᵢ bᵢ²σᵢ²`, where `σ²` is the vector of
   variances. The zero diagonal removes every third- and fourth-moment term,
   including the covariance between the linear and quadratic parts, because
   `E εᵢεⱼεₖ ≠ 0` only when `i = j = k`.
@@ -88,16 +132,16 @@ At `ρ₀`, `y₀ = f + ε`. Since `Mf = 0`, `Cf = PMf = 0`, so
 (a) `‖M‖_op = 1`, so `‖C‖_op ≤ ‖P‖_op ≤ c_W + maxᵢ|Δᵢᵢ|`, and
 `‖Cs‖_op ≤ ‖C‖_op`.
 
-(b) For any `n × n` matrix `A`, `|(A′M)ᵢᵢ| = |(Aeᵢ)′(Meᵢ)| ≤ ‖A‖_op ‖Meᵢ‖`,
-and `‖Meᵢ‖² = Mᵢᵢ = 1 − hᵢᵢ`. So `Δ = Diag(A′M)Diag(M)⁻¹` satisfies
+(b) For any `n × n` matrix `Y`, `|(Y′M)ᵢᵢ| = |(Yeᵢ)′(Meᵢ)| ≤ ‖Y‖_op ‖Meᵢ‖`,
+and `‖Meᵢ‖² = Mᵢᵢ = 1 − hᵢᵢ`. So `Δ = Diag(Y′M)Diag(M)⁻¹` satisfies
 
-    |Δᵢᵢ| ≤ ‖A‖_op / √(1 − hᵢᵢ),
+    |Δᵢᵢ| ≤ ‖Y‖_op / √(1 − hᵢᵢ),
 
-which is bounded under A3. This covers REsd's `A = G(ρ)`, whose diagonal is
-not zero. When `diag(A) = 0`, as for `A = W`, there is a finer bound:
-`(A′M)ᵢᵢ = −(A′P_B)ᵢᵢ`, and Cauchy–Schwarz gives
+which is bounded under A3. This covers REsd's `Y = G(ϱ)`, whose diagonal is
+not zero. When `diag(Y) = 0`, as for `Y = W`, there is a finer bound:
+`(Y′M)ᵢᵢ = −(Y′P_B)ᵢᵢ`, and Cauchy–Schwarz gives
 
-    |Δᵢᵢ| ≤ ‖Aeᵢ‖ √hᵢᵢ / (1 − hᵢᵢ),
+    |Δᵢᵢ| ≤ ‖Yeᵢ‖ √hᵢᵢ / (1 − hᵢᵢ),
 
 which tends to 0 when `maxᵢ hᵢᵢ → 0`.
 
@@ -112,40 +156,131 @@ ratios, and the operator norm survives the projection. In `tc_clt.jl`,
 
 ## Lemma 3: the triangular part (proved)
 
-Let `L` be the strictly lower-triangular part of a symmetric `A`. Then
-`‖L‖_op ≤ ⌈log₂ n⌉ ‖A‖_op`.
+Let `L` be the strictly lower-triangular part of a symmetric `Y`. Then
+`‖L‖_op ≤ ⌈log₂ n⌉ ‖Y‖_op`.
 
-*Proof.* Pad the index set to `2^m` with `m = ⌈log₂ n⌉`. At level
-`k = 1, …, m`, cut the indices into consecutive blocks of size `2^{m−k+1}`,
-and each block into two halves. Let `L_k` hold the entries of `A` whose row is
+*Proof.* Pad the index set to `2^𝔪` with `𝔪 = ⌈log₂ n⌉`. At level
+`k = 1, …, 𝔪`, cut the indices into consecutive blocks of size `2^{𝔪−k+1}`,
+and each block into two halves. Let `L_k` hold the entries of `Y` whose row is
 in the second half and whose column is in the first half of the same block.
 Each pair `i > j` belongs to exactly one level: the finest one at which `i`
 and `j` share a block but not a half. So `L = Σ_k L_k`. Within one level the
 blocks have disjoint rows and disjoint columns, so `‖L_k‖_op` is the largest
-operator norm of its sub-blocks, and no sub-block of `A` has a norm above
-`‖A‖_op`. ∎
+operator norm of its sub-blocks, and no sub-block of `Y` has a norm above
+`‖Y‖_op`. ∎
 
 The log factor is known to be the right order for triangular truncation
 (Kwapień & Pełczyński 1970; not read), and `tc_schatten.jl` shows it: for an
-interleaved Hilbert matrix with `‖A‖_op < π`, `‖L‖_op/‖A‖_op` grows from 1.90
+interleaved Hilbert matrix with `‖Y‖_op < π`, `‖L‖_op/‖Y‖_op` grows from 1.90
 to 2.77 as n goes from 250 to 4000. In the moment's designs the ratio is only
 0.67–0.69.
 
 **Theorem 1 no longer uses this lemma.** In the Schatten-4 norm
-`‖X‖₄ = (Σ sᵢ⁴)^{1/4}` (`sᵢ` the singular values), triangular truncation is
-bounded with a constant free of n: `‖L‖₄ ≤ C₄‖A‖₄` (Macaev 1961, as used by
-Bhansali, Giraitis & Kokoszka 2007 in their Lemma 2.1; Macaev not read). With
-`‖A‖₄⁴ = ‖A²‖_F² ≤ ‖A‖_op²‖A‖_F²` this gives
+`‖Y‖₄ = (Σₖ ςₖ⁴)^{1/4}` (`ςₖ` the singular values), triangular truncation is
+bounded with a constant free of n: `‖L‖₄ ≤ c_L‖Y‖₄` (Matsaev 1961b,
+Theorem 1, read; used by Bhansali, Giraitis & Kokoszka 2007 in their Lemma
+2.1, who cite Matsaev 1961a instead). With
+`‖Y‖₄⁴ = ‖Y²‖_F² ≤ ‖Y‖_op²‖Y‖_F²` this gives
 
-    ‖L′L‖_F = ‖L‖₄² ≤ C₄²‖A‖_op‖A‖_F,     ‖L‖_op² ≤ ‖L‖₄² ≤ C₄²‖A‖_op‖A‖_F.
+    ‖L′L‖_F = ‖L‖₄² ≤ c_L²‖Y‖_op‖Y‖_F,     ‖L‖_op² ≤ ‖L‖₄² ≤ c_L²‖Y‖_op‖Y‖_F.
 
-In `tc_schatten.jl`, `‖L‖₄/‖A‖₄` stays at 0.82–0.84 for the Hilbert matrix
+In `tc_schatten.jl`, `‖L‖₄/‖Y‖₄` stays at 0.82–0.84 for the Hilbert matrix
 while its operator-norm ratio grows, and at 0.70–0.71 for the moment's
 matrices, n = 400 to 2500. The lemma is kept because its bound is elementary
 and gives the operator norm at the full rate, which the Schatten bound does
 not.
 
-## Theorem 1: CLT for the moment (proved, given Hall & Heyde's Corollary 3.1, Macaev's theorem and two moment inequalities)
+**What Matsaev proves, and how it gives the bound** (read 2026-11-20 from the
+page images of both notes, which are in Russian). Matsaev (1961b), p. 811,
+verbatim, with his symbols:
+
+> Т е о р е м а 1. *Пусть A = G + iH (G = ½(A + A\*)) — вольтерров
+> оператор. Если H ∈ 𝔖_p (1 < p < ∞), то G ∈ 𝔖_p и*
+>
+>     |G|_p ≤ C_p |H|_p,     (2)
+>
+> *где C_p — некоторая константа, зависящая лишь от p. При этом, если под
+> C_p понимать наименьшую в (2) константу, то*
+>
+>     C_p = C_q   (p⁻¹ + q⁻¹ = 1).
+
+(Translation: "Theorem 1. Let A = G + iH (G = ½(A + A\*)) be a Volterra
+operator. If H ∈ 𝔖_p (1 < p < ∞), then G ∈ 𝔖_p and |G|_p ≤ C_p|H|_p (2),
+where C_p is a constant that depends only on p. Moreover, if C_p is taken
+to be the smallest constant in (2), then C_p = C_q (p⁻¹ + q⁻¹ = 1)." The
+printed `C_p` in the last display carries a stray mark above the `p`, a
+printing defect.) A Volterra operator is a compact operator whose spectrum
+is `{0}`.
+
+His `A`, `G`, `H`, `p`, `q`, `C_p` clash with this note's symbols, so the
+derivation below writes them as `T`, `T_R`, `T_I`, `𝔭`, `𝔭′`, `c_𝔭`. In finite
+dimension a strictly lower triangular matrix is nilpotent, so it is a
+Volterra operator, and the theorem applies with no condition on the chain.
+Take `Y` real symmetric with a zero diagonal and `L` its strictly lower
+part, and set `T = 2iL`. Then `T_I = L + L′ = Y` and `T_R = i(L − L′)`, so
+`‖L − L′‖_𝔭 ≤ c_𝔭‖Y‖_𝔭`, and `L = (Y + (L − L′))/2` gives
+`‖L‖_𝔭 ≤ (1 + c_𝔭)/2 · ‖Y‖_𝔭`. A nonzero diagonal `Diag(Y)` costs a factor of 2
+at most: taking the diagonal (a pinching) does not increase a Schatten norm,
+so `‖Y − Diag(Y)‖_𝔭 ≤ 2‖Y‖_𝔭`. So the `c_L` above is at most `1 + c_𝔭` at
+`𝔭 = 4`, free of n.
+
+Two limits. (1) The note is a Doklady announcement, and it outlines its
+proofs. For `1 < p < 2` the outline uses entire functions; for `p = 2` the
+result is Sakhnovich's; for `p > 2`, the case used here, the note says
+(p. 811): "При p > 2 теорему 1 и равенство C_p = C_q (p⁻¹ + q⁻¹ = 1)
+можно вывести из случая 1 < p < 2 с помощью общей теоремы 2 из (¹)"
+("For p > 2, Theorem 1 and the equality C_p = C_q can be derived from the
+case 1 < p < 2 by means of the general Theorem 2 of (¹)"), where (¹) is
+Gohberg & Krein (1961). That theorem was read on 2026-11-20 (p. 1036,
+verbatim, with their symbols):
+
+> Т е о р е м а 2. *Пусть 𝔖_I — одно из пространств 𝔖_p (1 < p < ∞),
+> 𝔖_Π^(0), 𝔖_π, а 𝔖_II — одно из пространств 𝔖_p (1 < p ≤ ∞), 𝔖_Π^(0).
+> Если пространство 𝔖_I ⊂ 𝔇 и отображается оператором 𝒥 непрерывно в
+> пространство 𝔖_II, то 𝔖\*_II ⊂ 𝔇 и отображается непрерывно оператором
+> 𝒥 в пространство 𝔖\*_I. Обратно, если пространство 𝔖\*_II ⊂ 𝔇
+> отображается оператором 𝒥 непрерывно в пространство 𝔖\*_I и выполняется
+> дополнительное условие 𝒥(𝔎) ⊂ 𝔖_II, то 𝔖_I ⊂ 𝔇 и отображается
+> непрерывно оператором 𝒥 в пространство 𝔖_II.*
+>
+> *В обоих случаях из двух операторов 𝒥(𝔖_I → 𝔖_II) и 𝒥(𝔖\*_II → 𝔖\*_I),
+> порожденных оператором 𝒥 при этих отображениях, второй является
+> сопряженным к первому.*
+>
+> *В случае 𝔖_I = 𝔖_1 теорема остается справедливой, если в ее
+> формулировке пространство 𝔖\*_I заменить на 𝔖_∞.*
+>
+> Точно такая же теорема имеет место для оператора 𝒮.
+
+(Translation: "Theorem 2. Let 𝔖_I be one of the spaces 𝔖_p (1 < p < ∞),
+𝔖_Π^(0), 𝔖_π, and 𝔖_II one of the spaces 𝔖_p (1 < p ≤ ∞), 𝔖_Π^(0). If the
+space 𝔖_I ⊂ 𝔇 and is mapped by the operator 𝒥 continuously into the space
+𝔖_II, then 𝔖\*_II ⊂ 𝔇 and is mapped continuously by 𝒥 into the space 𝔖\*_I.
+Conversely, if the space 𝔖\*_II ⊂ 𝔇 is mapped by 𝒥 continuously into the
+space 𝔖\*_I and the additional condition 𝒥(𝔎) ⊂ 𝔖_II holds, then 𝔖_I ⊂ 𝔇
+and is mapped continuously by 𝒥 into the space 𝔖_II. In both cases, of the
+two operators 𝒥(𝔖_I → 𝔖_II) and 𝒥(𝔖\*_II → 𝔖\*_I) generated by 𝒥 under
+these maps, the second is the adjoint of the first. In the case 𝔖_I = 𝔖_1
+the theorem remains valid if 𝔖\*_I is replaced by 𝔖_∞ in its statement.
+Exactly the same theorem holds for the operator 𝒮.") Here
+`𝒥(X) = ∫_𝔓 PX dP` and `𝒮(X) = i∫_𝔓 (PX dP − dP XP)`, over a continuous chain
+`𝔓` of orthogonal projections `P`, and `𝔇` is their common domain (p. 1036).
+With `𝔖_I = 𝔖_II = 𝔖_𝔭′` and `(𝔖_𝔭′)* = 𝔖_𝔭`, the bound for `𝔭′ = 4/3` gives
+the bound for `𝔭 = 4` with the same constant.
+Gohberg & Krein state it without proof, but in finite dimension it is
+elementary: the strictly lower truncation is an orthogonal projection on the
+entries, so it is self-adjoint in the trace pairing `⟨Y₁, Y₂⟩ = tr(Y₁′Y₂)`,
+and Schatten duality gives it the same norm on `𝔖_𝔭` as on `𝔖_𝔭′`. So the
+step from `𝔭 < 2` to `𝔭 = 4` needs nothing unread. (2) Matsaev (1961a), the
+note Bhansali et al. cite, is about a different space. Its Theorem 1 bounds
+the triangular truncation from the Matsaev ideal `𝔖_ω`
+(`Σₖ ςₖ/(2k − 1) < ∞`) into the compact operators, with the sharp constant
+`2/π`. It mentions `𝔖_𝔭` only in a remark, crediting the convergence of the
+truncation integral, when the imaginary part is in a Schatten class of
+index above 1, to Gohberg & Krein. So the
+result this note uses is in 1961b, not in 1961a.
+
+## Theorem 1: CLT for the moment (proved, given Hall & Heyde's Corollary 3.1, Matsaev's theorem and two moment inequalities)
 
 Assume A1, so the errors need only `2 + δ` moments. Write `σ̲, σ̄` for the
 variance bounds. If
@@ -159,70 +294,70 @@ Lemma 2. (The first version of this theorem needed
 (c′) is implied by A6, and it is weaker than A6 when the quadratic
 part dominates `V`.
 
-*Proof.* Write `c = Cs`, which is symmetric with zero diagonal, and
-`uᵢ = Σ_{j<i} cᵢⱼεⱼ`, so that `u = Lε`. Then `ε′Cε = 2Σᵢ εᵢuᵢ`, and
-`g = Σᵢ ξᵢ` with `ξᵢ = εᵢ(bᵢ + 2uᵢ)`. Since `uᵢ` depends only on
+*Proof.* Write `γᵢⱼ` for the entries of `Cs`, which is symmetric with zero diagonal, and
+`wᵢ = Σ_{j<i} γᵢⱼεⱼ`, so that `w = Lε`. Then `ε′Cε = 2Σᵢ εᵢwᵢ`, and
+`g = Σᵢ ξᵢ` with `ξᵢ = εᵢ(bᵢ + 2wᵢ)`. Since `wᵢ` depends only on
 `ε₁, …, εᵢ₋₁`, the `ξᵢ` are martingale differences for
 `Fᵢ = σ(ε₁, …, εᵢ)`. Also
 
-    V = Σᵢ σᵢ²bᵢ² + 2Σ_{i≠j} σᵢ²σⱼ²cᵢⱼ²  ≥  max(σ̲²‖b‖², 2σ̲⁴‖Cs‖_F²).
+    V = Σᵢ σᵢ²bᵢ² + 2Σ_{i≠j} σᵢ²σⱼ²γᵢⱼ²  ≥  max(σ̲²‖b‖², 2σ̲⁴‖Cs‖_F²).
 
 Hall & Heyde's (1980) Corollary 3.1 (p. 58, read from the page image) needs
-the two conditions below, with limit `η² = 1`. Its nesting condition (3.21)
-is not needed: by the Remarks on p. 59 it can be replaced by `η²` being
-measurable, which a constant trivially is (the stability of the limit is
-then lost, and it is not needed here). So the errors may form a triangular
-array.
+the two conditions below, with limit 1 (their `η² = 1`). Its nesting condition
+(3.21) is not needed. Their Remarks on p. 59 say: "It is possible to replace
+(3.21) by a measurability condition on η²", provided "the stability is
+dropped", and "if η² is constant, then it is trivially measurable". Stability
+is not needed here, so the errors may form a triangular array.
 
-1. **Conditional variance.** `S = Σᵢ E(ξᵢ²|Fᵢ₋₁) = Σᵢ σᵢ²(bᵢ + 2uᵢ)²`, with
-   `E S = V`, and `S − V = 4A + 4(B − E B)`, where:
-   - `A = Σᵢσᵢ²bᵢuᵢ = (L′Σb)′ε`. So
-     `Var A ≤ σ̄²‖L′Σb‖² ≤ σ̄⁶‖L‖_op²‖b‖²`. By the Schatten-4 bound after
-     Lemma 3, `‖L‖_op² ≤ C₄²‖Cs‖_op‖Cs‖_F`. Since
+1. **Conditional variance.** `𝒱 = Σᵢ E(ξᵢ²|Fᵢ₋₁) = Σᵢ σᵢ²(bᵢ + 2wᵢ)²`, with
+   `E 𝒱 = V`, and `𝒱 − V = 4𝒜 + 4(ℬ − E ℬ)`, where:
+   - `𝒜 = Σᵢσᵢ²bᵢwᵢ = (L′Σb)′ε`. So
+     `Var 𝒜 ≤ σ̄²‖L′Σb‖² ≤ σ̄⁶‖L‖_op²‖b‖²`. By the Schatten-4 bound after
+     Lemma 3, `‖L‖_op² ≤ c_L²‖Cs‖_op‖Cs‖_F`. Since
      `V² ≥ 8σ̲⁶‖b‖²‖Cs‖_F²` (from `(x + y)² ≥ 4xy`),
-     `Var A/V² ≤ c‖Cs‖_op/‖Cs‖_F`.
-   - `B = u′Σu = ε′Dε` with `D = L′ΣL`, which is symmetric and positive
-     semidefinite. Split it as `B − E B = B₁ + B₂`, with
-     `B₁ = Σ_{j≠k} Dⱼₖεⱼεₖ` and `B₂ = Σⱼ Dⱼⱼ(εⱼ² − σⱼ²)`.
-     - **`B₁` needs only second moments.** Its terms are uncorrelated except
-       in the pairs `{j, k} = {l, m}`, so `E B₁² = 2Σ_{j≠k} Dⱼₖ²σⱼ²σₖ² ≤
-       2σ̄⁴‖D‖_F²`. Since `0 ≼ L′ΣL ≼ σ̄²L′L`,
-       `‖D‖_F ≤ σ̄²‖L′L‖_F ≤ σ̄²C₄²‖Cs‖_op‖Cs‖_F`. With `V ≥ 2σ̲⁴‖Cs‖_F²`,
-       `E B₁²/V² ≤ c‖Cs‖_op²/‖Cs‖_F²`.
-     - **`B₂` is a sum of independent, mean-zero terms with `p` moments.**
+     `Var 𝒜/V² ≤ c‖Cs‖_op/‖Cs‖_F`.
+   - `ℬ = w′Σw = ε′Φε` with `Φ = L′ΣL`, which is symmetric and positive
+     semidefinite. Split it as `ℬ − E ℬ = ℬ₁ + ℬ₂`, with
+     `ℬ₁ = Σ_{j≠k} Φⱼₖεⱼεₖ` and `ℬ₂ = Σⱼ Φⱼⱼ(εⱼ² − σⱼ²)`.
+     - **`ℬ₁` needs only second moments.** Its terms are uncorrelated except
+       in the pairs `{j, k} = {l, m}`, so `E ℬ₁² = 2Σ_{j≠k} Φⱼₖ²σⱼ²σₖ² ≤
+       2σ̄⁴‖Φ‖_F²`. Since `0 ≼ L′ΣL ≼ σ̄²L′L`,
+       `‖Φ‖_F ≤ σ̄²‖L′L‖_F ≤ σ̄²c_L²‖Cs‖_op‖Cs‖_F`. With `V ≥ 2σ̲⁴‖Cs‖_F²`,
+       `E ℬ₁²/V² ≤ c‖Cs‖_op²/‖Cs‖_F²`.
+     - **`ℬ₂` is a sum of independent, mean-zero terms with `p` moments.**
        By von Bahr & Esseen's (1965) inequality, for `1 ≤ p ≤ 2`,
-       `E|Σⱼ Xⱼ|^p ≤ 2Σⱼ E|Xⱼ|^p`. Here
+       `E|Σⱼ Ξⱼ|^p ≤ 2Σⱼ E|Ξⱼ|^p`. Here
        `E|εⱼ² − σⱼ²|^p ≤ 2^{p−1}(E|εⱼ|^{2p} + σⱼ^{2p}) ≤ 2^p μ̄`, by
        Jensen's inequality for the second term. So
-       `E|B₂|^p ≤ 2^{p+1}μ̄ Σⱼ Dⱼⱼ^p`. Each `Dⱼⱼ = Σᵢσᵢ²Lᵢⱼ² ≤
-       σ̄²‖Cs eⱼ‖² ≤ σ̄²‖Cs‖_op²`, and `Σⱼ Dⱼⱼ = tr D ≤ σ̄²‖L‖_F² =
-       σ̄²‖Cs‖_F²/2`. So `Σⱼ Dⱼⱼ^p ≤ (maxⱼ Dⱼⱼ)^{p−1} Σⱼ Dⱼⱼ ≤
+       `E|ℬ₂|^p ≤ 2^{p+1}μ̄ Σⱼ Φⱼⱼ^p`. Each `Φⱼⱼ = Σᵢσᵢ²Lᵢⱼ² ≤
+       σ̄²‖Cs eⱼ‖² ≤ σ̄²‖Cs‖_op²`, and `Σⱼ Φⱼⱼ = tr Φ ≤ σ̄²‖L‖_F² =
+       σ̄²‖Cs‖_F²/2`. So `Σⱼ Φⱼⱼ^p ≤ (maxⱼ Φⱼⱼ)^{p−1} Σⱼ Φⱼⱼ ≤
        σ̄^{2p}‖Cs‖_op^{2(p−1)}‖Cs‖_F²/2`, and with `V^p ≥
        (2σ̲⁴)^p‖Cs‖_F^{2p}`,
-       `E|B₂|^p/V^p ≤ c (‖Cs‖_op²/‖Cs‖_F²)^{p−1} = c (‖Cs‖_op/‖Cs‖_F)^δ`.
+       `E|ℬ₂|^p/V^p ≤ c (‖Cs‖_op²/‖Cs‖_F²)^{p−1} = c (‖Cs‖_op/‖Cs‖_F)^δ`.
 
-   The constants depend only on `σ̲`, `σ̄`, `μ̄`, `δ` and `C₄`. Every bound
-   tends to 0 by (a), so `A/V`, `B₁/V` and `B₂/V` tend to 0 in probability
-   (Chebyshev's and Markov's inequalities), and `S/V → 1` in probability.
-   The earlier proof used fourth moments here, because `Var(ε′Dε)` contains
-   `Σⱼ Dⱼⱼ² Var(εⱼ²)`, and in the Lyapunov step below, which was of order 4.
+   The constants depend only on `σ̲`, `σ̄`, `μ̄`, `δ` and `c_L`. Every bound
+   tends to 0 by (a), so `𝒜/V`, `ℬ₁/V` and `ℬ₂/V` tend to 0 in probability
+   (Chebyshev's and Markov's inequalities), and `𝒱/V → 1` in probability.
+   The earlier proof used fourth moments here, because `Var(ε′Φε)` contains
+   `Σⱼ Φⱼⱼ² Var(εⱼ²)`, and in the Lyapunov step below, which was of order 4.
 2. **Lyapunov of order `q = 2 + δ`, which implies the conditional
-   Lindeberg condition.** For `Xᵢ = ξᵢ/√V` and any `η > 0`,
-   `E Σᵢ E[Xᵢ² 1{|Xᵢ| > η} | Fᵢ₋₁] = Σᵢ E[Xᵢ² 1{|Xᵢ| > η}] ≤
-   η^{−δ} Σᵢ E|ξᵢ|^q / V^{q/2}`, so if the right side tends to 0 the
+   Lindeberg condition.** For `υᵢ = ξᵢ/√V` and any `τ > 0`,
+   `E Σᵢ E[υᵢ² 1{|υᵢ| > τ} | Fᵢ₋₁] = Σᵢ E[υᵢ² 1{|υᵢ| > τ}] ≤
+   τ^{−δ} Σᵢ E|ξᵢ|^q / V^{q/2}`, so if the right side tends to 0 the
    conditional sum tends to 0 in `L¹`, hence in probability.
 
-   By independence of `εᵢ` and `uᵢ`,
-   `E|ξᵢ|^q = E|εᵢ|^q · E|bᵢ + 2uᵢ|^q ≤ μ̄ 2^{q−1}(|bᵢ|^q + 2^q E|uᵢ|^q)`.
+   By independence of `εᵢ` and `wᵢ`,
+   `E|ξᵢ|^q = E|εᵢ|^q · E|bᵢ + 2wᵢ|^q ≤ μ̄ 2^{q−1}(|bᵢ|^q + 2^q E|wᵢ|^q)`.
    By Rosenthal's (1970) inequality for the independent, mean-zero terms of
-   `uᵢ = Σ_{j<i} cᵢⱼεⱼ`, with `rᵢ² = Σ_{j<i} cᵢⱼ²`,
+   `wᵢ = Σ_{j<i} γᵢⱼεⱼ`, with `ℓᵢ² = Σ_{j<i} γᵢⱼ²`,
 
-       E|uᵢ|^q ≤ C_q [Σⱼ |cᵢⱼ|^q E|εⱼ|^q + (Σⱼ cᵢⱼ²σⱼ²)^{q/2}] ≤ C_q (μ̄ + σ̄^q) rᵢ^q,
+       E|wᵢ|^q ≤ Θ_q [Σⱼ |γᵢⱼ|^q E|εⱼ|^q + (Σⱼ γᵢⱼ²σⱼ²)^{q/2}] ≤ Θ_q (μ̄ + σ̄^q) ℓᵢ^q,
 
-   because `Σⱼ|cᵢⱼ|^q ≤ (Σⱼcᵢⱼ²)^{q/2}` for `q ≥ 2`. Then:
+   because `Σⱼ|γᵢⱼ|^q ≤ (Σⱼγᵢⱼ²)^{q/2}` for `q ≥ 2`. Then:
    - `Σᵢ|bᵢ|^q ≤ (maxᵢbᵢ²)^{δ/2}‖b‖² ≤ (maxᵢbᵢ²)^{δ/2} V/σ̲²`, so this part
      of the ratio is at most `c (maxᵢbᵢ²/V)^{δ/2}`;
-   - `Σᵢ rᵢ^q ≤ (maxᵢ rᵢ²)^{δ/2} Σᵢ rᵢ² ≤ ‖Cs‖_op^δ ‖Cs‖_F²/2`, because a
+   - `Σᵢ ℓᵢ^q ≤ (maxᵢ ℓᵢ²)^{δ/2} Σᵢ ℓᵢ² ≤ ‖Cs‖_op^δ ‖Cs‖_F²/2`, because a
      row norm is at most the operator norm, and with
      `V^{q/2} ≥ (2σ̲⁴)^{q/2}‖Cs‖_F^q` this part is at most
      `c (‖Cs‖_op/‖Cs‖_F)^δ`.
@@ -232,54 +367,75 @@ array.
 
 **The cost of fewer moments is the rate, not the conditions.** Every bound
 above is a power of the same two ratios as before, `‖Cs‖_op/‖Cs‖_F` and
-`maxᵢbᵢ²/V`. The bounds that used fourth moments (`B₂` and Lyapunov) now
+`maxᵢbᵢ²/V`. The bounds that used fourth moments (`ℬ₂` and Lyapunov) now
 have exponents `δ` and `δ/2` where they had 2 and 1. So with
 `δ` small the normal approximation should improve slowly in n, and
 `tc_clt_moments.jl` shows that (see the numerical check below).
 
 **Against Kelejian & Prucha (2001)** (Theorem 1, Assumptions 1–3 and the
-proof in their appendix, read 2026-11-19 from the page images). Their CLT
-covers the same linear-quadratic form with independent, heteroskedastic
-errors, and they too use a martingale CLT (their Theorem A.1, from Gänssler &
-Stute 1977, a special case of Hall & Heyde's Corollary 3.1). Their
-conditions differ from ours in three places:
-- they need **bounded absolute row sums** of `A`, `sup Σᵢ|aᵢⱼ| < ∞`, which a
-  dense `M` breaks; Theorem 1 replaces this with (a);
-- they need `n⁻¹σ²_Q ≥ c > 0`, the rate `n`; Theorem 1 needs no rate;
-- they need only `2 + η` moments when `aᵢᵢ = 0` (their Assumption 3(a)), and
-  `4 + η` otherwise; Theorem 1 now matches them, with `2 + δ` (the
-  zero diagonal is what allows it: a nonzero `Cᵢᵢ` would bring
-  `Σᵢ Cᵢᵢ(εᵢ² − σᵢ²)` into `g`, whose variance needs fourth moments). No
-  truncation is needed, because the zero diagonal leaves the `εᵢ²` only
-  inside the conditional variance, where a law of large numbers with `p`
-  moments is enough.
+proof in their appendix, read 2026-11-19 from the page images; the quotes
+below re-checked against them on 2026-11-20). Their CLT covers the same
+linear-quadratic form, `Q_n = ε′_nA_nε_n + b′_nε_n` (their (3.1)), with
+independent, heteroskedastic errors, and they too use a martingale CLT
+(their Theorem A.1, from Gänssler & Stute 1977, a special case of Hall &
+Heyde's Corollary 3.1). Their `A_n` (symmetric), `b_n`, `ε_{i,n}` and
+`σ²_{Q_n}` are this note's `Cs`, `b`, `εᵢ` and `V`. Their conditions differ
+from ours in three places:
+- Assumption 2 needs bounded absolute column sums,
+  "sup_{1≤j≤n,n≥1} Σ_{i=1}^n |a_{ij,n}| < ∞", which a dense `M` breaks;
+  Theorem 1 replaces this with (a);
+- Theorem 1 assumes "n⁻¹σ²_{Q_n} ≥ c for some c > 0", the rate `n`; our
+  Theorem 1 needs no rate;
+- Assumption 3 needs only "sup_{1≤i≤n,n≥1} E|ε_{i,n}|^{2+η₂} < ∞ for some
+  η₂ > 0 and a_{ii,n} = 0" (part (a)), and `4 + η₂` moments otherwise (part
+  (b)); Theorem 1 now matches them, with `2 + δ` (the zero diagonal is what
+  allows it: a nonzero `Cᵢᵢ` would bring `Σᵢ Cᵢᵢ(εᵢ² − σᵢ²)` into `g`, whose
+  variance needs fourth moments). No truncation is needed, because the zero
+  diagonal leaves the `εᵢ²` only inside the conditional variance, where a
+  law of large numbers with `p` moments is enough.
 
 **Against Lee (2004)** (as restated, with its proof, in Appendix 1A of
-chapter 1 of Lee 2023, held in `ExtRef/`). It extends Kelejian & Prucha to entries of
-uniform order `1/hₙ` and a variance of order `n/hₙ`, with
-`h_n^{1+2/δ}/n → 0`. It still assumes bounded row and column sums, so it
-does not cover a dense `M` either.
+chapter 1 of Lee 2023, held in `ExtRef/`; quotes checked against the page
+image of p. 36 on 2026-11-20). Lemma 1A.1 extends Kelejian & Prucha to
+large groups. It assumes that "{A_n} is a sequence of symmetric matrices
+with row and column sums uniformly bounded", that "the elements of A_n are
+of uniform order O(1/h_n)", that "the variance σ²_{Q_n} is O(n/h_n)", that
+"the moment E(|v|^{4+2δ}) for some δ > 0 of v exists", for i.i.d. `v`, and
+concludes: "If lim_{n→∞} h_n^{1+2/δ}/n = 0, then Q_n/σ_{Q_n} →D N(0, 1)".
+(Lee's `δ` is his own moment exponent, not this note's.) The bounded row and
+column sums still exclude a dense `M`.
 
 **What Bhansali, Giraitis & Kokoszka (2007) add** (read 2026-11-19, from the
-page images). Their Theorem 2.1 is for a quadratic form alone, in i.i.d.
-variables, with a nonzero diagonal allowed. Under finite fourth moments it
-needs `Δₙ = (‖Ã′Ã‖_F + maxₜ Σₛ aₜₛ²)/‖A‖_F² → 0`, with `Ã` the strictly
-lower-triangular part, which their Lemma 2.1 shows is implied by
-`‖A‖_op/‖A‖_F → 0`. With the diagonal of order `o(‖A‖_F²)` it needs only
-`2 + δ` moments. It does not cover a linear part or heteroskedastic errors,
-so it does not contain Theorem 1. Its Lemma 2.1 is what removes the log
-factor here.
+page images; the quotes below re-checked against them on 2026-11-20). Their
+Theorem 2.1 is for a quadratic form alone, `T_n = Σ_{t,k=1}^n a_{n;tk}Z_tZ_k`
+in i.i.d. `Z_t` with `EZ_k = 0`, `EZ_k² = 1`, and a nonzero diagonal is
+allowed. In their notation `‖A_n‖` is the Euclidean (Frobenius) norm,
+`‖A_n‖_sp` the spectral norm and `Ã_n` the strictly lower-triangular part of
+`A_n`. Under "EZ_t⁴ < ∞" it needs
 
-**What de Jong (1987) adds** (read 2026-11-19, from the page images).
-His Theorem 5.2 treats the quadratic part alone: `Σ_{i≠j} aᵢⱼXᵢXⱼ`, with the
-`Xᵢ` independent and not necessarily identically distributed, `EXᵢ = 0`,
-`EXᵢ² = 1` and `aᵢᵢ = 0`. It gives normality under three conditions:
-- (1) `K(n)⁴σ(n)⁻² maxᵢ Σⱼaᵢⱼ² → 0` for some sequence `K(n)`;
-- (2) `maxᵢ EXᵢ²1{|Xᵢ| > K(n)} → 0`;
-- (3) `σ(n)⁻² maxᵢ μᵢ² → 0`, where the `μᵢ` are the eigenvalues of `(aᵢⱼ)`.
+    Δ_n = (‖Ã′_nÃ_n‖ + max_{t=1,…,n} Σ_{s=1}^n a²_{ts}) / ‖A_n‖² → 0     (their (2.1)–(2.2)),
 
-With `Xᵢ = εᵢ/σᵢ` and `aᵢⱼ = σᵢσⱼcᵢⱼ`, condition (3) is our condition (a),
-and (1)–(2) hold with uniformly bounded `2 + δ`
+and their Lemma 2.1 shows "Δ_n ≤ C‖A_n‖_sp/‖A_n‖" (2.9), so `Δ_n → 0`
+follows from our `‖Cs‖_op/‖Cs‖_F → 0`. Part (iii) needs only
+"EZ_t^{2+δ} < ∞ (for some δ > 0) and Σ_{t=1}^n a²_{n;tt} = o(‖A_n‖²)" (2.6).
+It does not cover a linear part or heteroskedastic errors, so it does not
+contain Theorem 1. Its Lemma 2.1, in the form (2.8),
+"‖Ã′_nÃ_n‖ ≤ C‖A_n‖_sp‖A_n‖", is what removes the log factor here.
+
+**What de Jong (1987) adds** (read 2026-11-19, from the page images; the
+quotes below re-checked against them on 2026-11-20). His Theorem 5.2 (p. 275)
+treats the quadratic part alone, "W(n) = Σ_{1≤i≠j≤n} a_ij X_i X_j", "a
+quadratic form in independent random variables X_i (EX_i = 0, EX_i² = 1),
+with μ_1, …, μ_n the eigenvalues of the symmetric matrix (a_ij), with
+vanishing diagonal elements: a_ii = 0 for all i". It concludes
+"σ(n)⁻¹ W(n) →d N(0, 1)" under three conditions, for "a sequence of real
+numbers K(n)":
+- 1) "K(n)⁴ σ(n)⁻² max_{1≤i≤n} Σ_{1≤j≤n} a_ij² → 0";
+- 2) "max_{1≤i≤n} EX_i² 1{|X_i| > K(n)} → 0";
+- 3) "σ(n)⁻² max_{1≤i≤n} μ_i² → 0".
+
+With `Xᵢ = εᵢ/σᵢ` and `aᵢⱼ = σᵢσⱼγᵢⱼ`, condition 3) is our condition (a),
+and 1)–2) hold with uniformly bounded `2 + δ`
 moments. So **the quadratic part alone needs no fourth
 moments.** The martingale proof above is needed for the linear and quadratic
 parts jointly, which de Jong's theorem does not cover.
@@ -295,68 +451,68 @@ Assume A1–A9, and choose `ρ̂` by the **sign rule**: of the two roots of
 so `ρ̂ − ρ₀ = O_p(n^{−1/2})`. Moreover `|g′(ρ̂)|/J → 1` in probability, so
 the feasible standard error `√V̂ / |g′(ρ̂)|` is valid whenever `V̂/V → 1`.
 Proposition 2 proves that for the coded `V̂` when K/n → 0 (under A10 and
-four moments); for K/n → c > 0 it is open.
+four moments); for K/n → θ > 0 it is open.
 
 *Proof.* Write `η = f + ε = y₀(ρ₀)` and `t = ρ − ρ₀`. Since `y = (I − ρ₀W)⁻¹η`,
 `Wy = Gη`, and `y₀(ρ) = η − tGη`. So `g` is exactly a quadratic in `t`:
 
-    g(ρ₀ + t) = g₀ + g₁t + a t²,   g₀ = g(ρ₀),   g₁ = g′(ρ₀) = −2η′G′Csη,   a = η′G′CsGη.
+    g(ρ₀ + t) = g₀ + g₁t + g₂t²,   g₀ = g(ρ₀),   g₁ = g′(ρ₀) = −2η′G′Csη,   g₂ = η′G′CsGη.
 
-(In the code, `g(ρ) = c − bρ + aρ²`, so `g′(ρ) = −(b − 2ρa)`.)
+(The code writes `g(ρ) = c − bρ + aρ²` in `ρ`, so `g′(ρ) = −(b − 2ρa)`; those are the code's scalars, not `g₂`, the vector `b` or a constant.)
 
 1. **Orders.** Under A2, A3 and A7, `‖Cs‖_op` and `‖G‖_op` are bounded
    (Lemma 2), and `‖Cs‖_F² ≤ n‖Cs‖_op²`.
    - `g₀ = O_p(√n)`: Theorem 1 gives `g₀ = O_p(√V)`, and
      `V ≤ 2σ̄⁴‖Cs‖_F² + σ̄²‖C′f‖² = O(n)` by A8.
-   - `a = O_p(n)`: `|a| ≤ ‖Cs‖_op‖G‖_op²‖η‖²`, and `E‖η‖² = ‖f‖² + Σσᵢ² = O(n)`,
+   - `g₂ = O_p(n)`: `|g₂| ≤ ‖Cs‖_op‖G‖_op²‖η‖²`, and `E‖η‖² = ‖f‖² + Σσᵢ² = O(n)`,
      so Markov's inequality applies. Only second moments are used.
    - `g₁ = −J + o_p(n)`. Since `E ε = 0`, `E g₁ = −2[f′G′Csf + tr(G′CsΣ)] = −J`.
-     With `A = (G′Cs + CsG)/2`, which has `‖A‖_op ≤ c_G‖Cs‖_op` and
-     `‖A‖_F ≤ c_G‖Cs‖_F = O(√n)`,
-     `g₁ + J = −2[2f′Aε + Σ_{i≠j}Aᵢⱼεᵢεⱼ + Σᵢ Aᵢᵢ(εᵢ² − σᵢ²)]`. The linear
-     term has variance at most `4σ̄²‖A‖_op²‖f‖² = O(n)`, and the off-diagonal
-     term has second moment at most `2σ̄⁴‖A‖_F² = O(n)`: both are `O_p(√n)`.
+     With `Ψ = (G′Cs + CsG)/2`, which has `‖Ψ‖_op ≤ c_G‖Cs‖_op` and
+     `‖Ψ‖_F ≤ c_G‖Cs‖_F = O(√n)`,
+     `g₁ + J = −2[2f′Ψε + Σ_{i≠j}Ψᵢⱼεᵢεⱼ + Σᵢ Ψᵢᵢ(εᵢ² − σᵢ²)]`. The linear
+     term has variance at most `4σ̄²‖Ψ‖_op²‖f‖² = O(n)`, and the off-diagonal
+     term has second moment at most `2σ̄⁴‖Ψ‖_F² = O(n)`: both are `O_p(√n)`.
      The diagonal term is a sum of independent, mean-zero terms with `p`
      moments, so by von Bahr & Esseen
-     `E|Σᵢ Aᵢᵢ(εᵢ² − σᵢ²)|^p ≤ 2^{p+1}μ̄ Σᵢ|Aᵢᵢ|^p ≤ 2^{p+1}μ̄ n‖A‖_op^p`. It is
+     `E|Σᵢ Ψᵢᵢ(εᵢ² − σᵢ²)|^p ≤ 2^{p+1}μ̄ Σᵢ|Ψᵢᵢ|^p ≤ 2^{p+1}μ̄ n‖Ψ‖_op^p`. It is
      therefore `O_p(n^{1/p})`, which is `o_p(n)` because `p > 1`. (With fourth
      moments it would be `O_p(√n)`; `o_p(n)` is all that is needed.)
-2. **The discriminant and the two roots.** `D = g₁² − 4ag₀ = J²(1 + o_p(1)) −
-   O_p(n)·O_p(√n) = J²(1 + o_p(1))`, because `J² ≥ cn²` by A9. So `D > 0`
-   with probability → 1. At the two roots of a quadratic, `g′` equals `+√D`
-   and `−√D`, so the sign rule picks exactly one root, `t̂`, at which
-   `g′(ρ₀ + t̂) = g₁ + 2at̂ = −√D = −J(1 + o_p(1))`.
+2. **The discriminant and the two roots.** `Γ = g₁² − 4g₂g₀ = J²(1 + o_p(1)) −
+   O_p(n)·O_p(√n) = J²(1 + o_p(1))`, because `J² ≥ cn²` by A9. So `Γ > 0`
+   with probability → 1. At the two roots of a quadratic, `g′` equals `+√Γ`
+   and `−√Γ`, so the sign rule picks exactly one root, `t̂`, at which
+   `g′(ρ₀ + t̂) = g₁ + 2g₂t̂ = −√Γ = −J(1 + o_p(1))`.
 3. **The chosen root is the consistent one.** From `g(ρ₀ + t̂) = 0`,
-   `t̂ (g₁ + a t̂) = −g₀`. Write `g₁ + at̂ = [(g₁ + 2at̂) + g₁]/2`; both terms
-   are `−J(1 + o_p(1))`, so `g₁ + at̂ = −J(1 + o_p(1))` and
+   `t̂ (g₁ + g₂t̂) = −g₀`. Write `g₁ + g₂t̂ = [(g₁ + 2g₂t̂) + g₁]/2`; both terms
+   are `−J(1 + o_p(1))`, so `g₁ + g₂t̂ = −J(1 + o_p(1))` and
 
        t̂ = g₀ / J · (1 + o_p(1)) = O_p(√n/n) = O_p(n^{−1/2}).
 
    This needs no prior consistency argument: the identity holds at the
    chosen root whatever its size, because the derivative condition fixes
-   `g₁ + at̂` directly.
+   `g₁ + g₂t̂` directly.
 4. **The limit.** `J t̂/√V = (g₀/√V)(1 + o_p(1)) → N(0, 1)` by Theorem 1 and
-   Slutsky's lemma. And `|g′(ρ̂)| = √D = J(1 + o_p(1))`. ∎
+   Slutsky's lemma. And `|g′(ρ̂)| = √Γ = J(1 + o_p(1))`. ∎
 
-**The other root** is `t̃ = g₀/(a t̂)` (the product of the roots is `g₀/a`), so
-`|t̃| = (J/|a|)(1 + o_p(1))`, of the order of a constant: it does not
-approach `ρ₀`. If `a` is near 0 it is far away; it is never a competitor in
+**The other root** is `t̃ = g₀/(g₂t̂)` (the product of the roots is `g₀/g₂`), so
+`|t̃| = (J/|g₂|)(1 + o_p(1))`, of the order of a constant: it does not
+approach `ρ₀`. If `g₂` is near 0 it is far away; it is never a competitor in
 the limit.
 
 **The code's rule is not the sign rule.** `cfe_root` keeps the root in
-`(−1, 1)` nearest the OLS ratio `e₁′e₀/e₁′e₁`, which is not a consistent
+`(−1, 1)` nearest the OLS ratio `û₁′û₀/û₁′û₁` (`û₀ = My`, `û₁ = MWy`), which is not a consistent
 estimator of `ρ₀`, so the proof does not cover it. `tc_roots.jl` measures
 the difference in the coverage design (`ρ₀ = 0.4`, normal and `t₃` errors,
 n = 400 to 2500, R = 1000 each): the discriminant was positive in all 8000
 replications, the two rules disagreed once (`t₃`, n = 400), and the other
 root was at least 1.37 from `ρ₀` (median about 2). The sign rule needs the
 sign of `J`, which A9 assumes. It cannot be read off `g′` at either root,
-since those are `±√D` by construction; it needs a consistent preliminary
+since those are `±√Γ` by construction; it needs a consistent preliminary
 estimate, such as a 2SLS fit, at which to evaluate `−g′`. A package
 implementation should do that, or report both roots.
 
 **The rate for K.** Nothing in Theorem 1 needs `K/n → 0`. A3 and A5 allow
-`K/n → c ∈ [0, 1)`. This is weaker than the published rate conditions for
+`K/n → θ ∈ [0, 1)`. This is weaker than the published rate conditions for
 spline GMM, such as `k_n²/n → 0` (Lu, Tian & Yang 2024). It is possible
 because the zero diagonal removes the trace bias exactly, at any `K`. Rate
 conditions are otherwise needed to make that bias small. A large `K` still
@@ -369,8 +525,8 @@ Corollary; replaces Remark 1).** Drop A4, so `f = P_Bf + r` with
 `r = Mf ≠ 0`, and read A6 for `b̃ = (C + C′)f`. Write `β = f′Cf`, which is
 `E g(ρ₀)` exactly, since `tr(CΣ) = 0`. Then
 `(g(ρ₀) − β)/√V → N(0, 1)`, with `V` computed from `b̃`; and if
-`β/√V → c`, then `J(ρ̂ − ρ₀)/√V → N(c, 1)`, so the nominal 95% interval
-covers with probability `P(|Z + c| ≤ 1.96)`. The interval is valid if and
+`β/√V → c_β`, then `J(ρ̂ − ρ₀)/√V → N(c_β, 1)`, so the nominal 95% interval
+covers with probability `P(|Z + c_β| ≤ 1.96)`. The interval is valid if and
 only if `β = o(√n)`.
 
 For the coded moment, `C = A = M(W + DM)`, and `β` splits into
@@ -391,11 +547,11 @@ because `r = Mr`. ∎
 
 **The sketched remark kept only the first term.** That term is at most
 `‖W + D‖_op‖r‖² ≤ c n‖r‖∞²`, so it is `o(√n)` when `√n‖r‖∞² → 0`; with
-`‖r‖∞ = O(K^{−s/d})` for smoothness `s` in `d` dimensions, that is
-`K ≫ n^{d/(4s)}`. The second term is at most `‖r‖‖r_W‖`, and `r_W` need not
+`‖r‖∞ = O(K^{−s_f/d_f})` for smoothness `s_f` in `d_f` dimensions, that is
+`K ≫ n^{d_f/(4s_f)}`. The second term is at most `‖r‖‖r_W‖`, and `r_W` need not
 be small: a covariate `x` in `B` that is rough in space has a lag `Wx` that
 the basis cannot represent. In the worst case this needs
-`‖r‖∞ = o(n^{−1/2})`, that is `K ≫ n^{d/(2s)}`, twice the exponent. When
+`‖r‖∞ = o(n^{−1/2})`, that is `K ≫ n^{d_f/(2s_f)}`, twice the exponent. When
 `r` is smooth and `r_W` is rough, the two are nearly orthogonal and
 `r′r_W` is of order `‖r‖∞ √n` instead, which needs only `‖r‖∞ → 0`. So the
 binding condition is `β = o(√n)` itself, and it is a **lower** bound on K.
@@ -406,10 +562,10 @@ are not redone here): `û` gains `r`, so `sᵢ` gains
 
 **Numerical check (`tc_approx.jl`).** n = 900, kNN `W`, a tensor hat basis
 plus a covariate `x`, `f = a·sin(2πu)cos(πv) + x` with `a` = 1 and 4,
-smooth variances, `ρ₀ = 0.4`, R = 1000. `β`, its two terms, `V`, `c` and
+smooth variances, `ρ₀ = 0.4`, R = 1000. `β`, its two terms, `V`, `c_β` and
 `J` are exact; the bias and coverage of `ρ̂` (HC2 `V̂`) are simulated.
 
-| a | K | ‖r‖∞ | ‖r_W‖∞ | r′(W+D)r | r′r_W | c = β/√V | bias: predicted β/J | simulated | coverage: predicted | simulated |
+| a | K | ‖r‖∞ | ‖r_W‖∞ | r′(W+D)r | r′r_W | c_β = β/√V | bias: predicted β/J | simulated | coverage: predicted | simulated |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 10 | 1.13 | 1.21 | 87.4 | −1.09 | 2.46 | 0.107 | 0.116 | 0.309 | 0.211 |
 | 1 | 17 | 0.29 | 1.20 | 6.40 | −0.14 | 0.22 | 0.0122 | 0.0122 | 0.944 | 0.933 |
@@ -422,16 +578,16 @@ smooth variances, `ρ₀ = 0.4`, R = 1000. `β`, its two terms, `V`, `c` and
 | 4 | 170 | 0.089 | 1.09 | 0.02 | 0.22 | 0.02 | 0.0015 | 0.0003 | 0.950 | 0.947 |
 
 (All rows are in `tc_approx_output.txt`, including a = 1 at K = 101 and 170
-and a = 4 at K = 10, where `c = 15.7`.)
+and a = 4 at K = 10, where `c_β = 15.7`.)
 
 - **`r_W` is not small**: `‖r_W‖∞` is 1.0–1.3 at every K, because of the
   covariate. The cross term `r′r_W` is the larger part of `β` at a = 4 and
   K ≥ 101, so the sketched remark's `r′(W+D)r` alone would understate the
   bias there by a factor of 3 to 12. It is still far below `‖r‖‖r_W‖`,
   because a smooth `r` and a rough `r_W` are nearly orthogonal.
-- **The prediction holds while `c` is moderate.** For `c` ≤ 1.1 the
+- **The prediction holds while `c_β` is moderate.** For `c_β` ≤ 1.1 the
   simulated bias matches `β/J` (`|z|` ≤ 1.9) and the coverage matches
-  `P(|Z + c| ≤ 1.96)` within 2.4 points. For `c` of 2.5 and more, the
+  `P(|Z + c_β| ≤ 1.96)` within 2.4 points. For `c_β` of 2.5 and more, the
   first-order expansion understates the bias (0.116 against 0.107) and
   overstates the coverage (0.211 against 0.309). That is outside the
   local result.
@@ -441,15 +597,15 @@ and a = 4 at K = 10, where `c = 15.7`.)
   simulation cannot separate them (`z` at most 2.6). The
   split itself is exact and needs no simulation.
 - **Under-smoothing is the price.** Coverage is within 2 points of 0.95
-  once `c` ≤ 0.25,
+  once `c_β` ≤ 0.25,
   which here means K ≥ 17 at a = 1 and K ≥ 50 at a = 4: a stronger
   surface needs a larger K. Because the zero diagonal removes the trace
   bias at any K, raising K costs efficiency only (the sd rises from 0.054
   to 0.100 at a = 1 as K goes from 17 to 170), not validity.
 
 **Proposition 1 (REsd, the two-step; proved, given the Corollary).** Write
-`C(r) = (G(r)′ − Δ(r))M`, with `G(r) = W(I − rW)⁻¹` and
-`Δ(r) = Diag(G(r)′M)Diag(M)⁻¹`, so `diag C(r) = 0` for every `r`. Jin &
+`C(ϱ) = (G(ϱ)′ − Δ(ϱ))M`, with `G(ϱ) = W(I − ϱW)⁻¹` and
+`Δ(ϱ) = Diag(G(ϱ)′M)Diag(M)⁻¹`, so `diag C(ϱ) = 0` for every `ϱ`. Jin &
 Lee's REsd takes the first-step root `ρ̃` (with `C₁ = (W′ − Δ)M`) and then
 the root `ρ̂` of `y₀(ρ)′C(ρ̃)y₀(ρ)`, by the sign rule. Let `ρ̂*` be the
 infeasible root with `C(ρ₀)`. Assume A1–A9, with A5, A6 and A9 holding for both `C₁`
@@ -457,38 +613,38 @@ and `C(ρ₀)`, and Theorem 1's conditions (a) and (c′) for `C(ρ₀)`. Then
 `ρ̂ − ρ̂* = o_p(n^{−1/2})`, and so `J*(ρ̂ − ρ₀)/√V* → N(0, 1)` with `J*` and
 `V*` those of `C(ρ₀)`: the plug-in costs nothing in the limit.
 
-*Proof.* Write `C_r` and `C_rr` for the derivatives in `r`, and `G = G(ρ₀)`.
-1. **Uniform bounds near `ρ₀`.** With `c_G` from A7, for `|r − ρ₀| ≤ ε =
-   1/(2c_G)` the Neumann series `(I − rW)⁻¹ = (I − ρ₀W)⁻¹ Σₖ ((r − ρ₀)G)ᵏ`
-   gives `‖(I − rW)⁻¹‖_op ≤ 2‖(I − ρ₀W)⁻¹‖_op`, so `‖G(r)‖_op` is bounded
-   on that interval. Since `∂G/∂r = G(r)²` and `∂²G/∂r² = 2G(r)³`, and `Δ` is
-   linear in `G′` (`Δ[A] = Diag(AM)Diag(M)⁻¹` for `A = G′`, `(G²)′`,
-   `(G³)′`), Lemma 2(b) gives `|Δ[A]ᵢᵢ| ≤ ‖A‖_op/√(1 − h̄)`. So
-   `‖C(r)‖_op`, `‖C_r(r)‖_op` and `‖C_rr(r)‖_op` are bounded uniformly on the
+*Proof.* Write `C_ϱ` and `C_ϱϱ` for the derivatives in `ϱ`, and `G = G(ρ₀)`.
+1. **Uniform bounds near `ρ₀`.** With `c_G` from A7, for `|ϱ − ρ₀| ≤
+   1/(2c_G)` the Neumann series `(I − ϱW)⁻¹ = (I − ρ₀W)⁻¹ Σₖ ((ϱ − ρ₀)G)ᵏ`
+   gives `‖(I − ϱW)⁻¹‖_op ≤ 2‖(I − ρ₀W)⁻¹‖_op`, so `‖G(ϱ)‖_op` is bounded
+   on that interval. Since `∂G/∂ϱ = G(ϱ)²` and `∂²G/∂ϱ² = 2G(ϱ)³`, and `Δ` is
+   linear in `G′` (`Δ[Y] = Diag(YM)Diag(M)⁻¹` for `Y = G′`, `(G²)′`,
+   `(G³)′`), Lemma 2(b) gives `|Δ[Y]ᵢᵢ| ≤ ‖Y‖_op/√(1 − h̄)`. So
+   `‖C(ϱ)‖_op`, `‖C_ϱ(ϱ)‖_op` and `‖C_ϱϱ(ϱ)‖_op` are bounded uniformly on the
    interval, which contains `ρ̃` with probability → 1 (the Corollary for
    `C₁`: `ρ̃ − ρ₀ = O_p(n^{−1/2})`).
-2. **Orthogonality.** `Mf = 0` gives `C(r)f = 0`, and `diag C(r) = 0`, for
-   every `r`. Differentiating, `C_r f = 0` and `diag C_r = 0`. So, with
+2. **Orthogonality.** `Mf = 0` gives `C(ϱ)f = 0`, and `diag C(ϱ) = 0`, for
+   every `ϱ`. Differentiating, `C_ϱ f = 0` and `diag C_ϱ = 0`. So, with
    `η = f + ε`,
 
-       η′C_r(ρ₀)η = (C_r′f)′ε + ε′C_r ε,   E η′C_r(ρ₀)η = f′C_r f + tr(C_rΣ) = 0,
+       η′C_ϱ(ρ₀)η = (C_ϱ′f)′ε + ε′C_ϱ ε,   E η′C_ϱ(ρ₀)η = f′C_ϱ f + tr(C_ϱΣ) = 0,
 
    and both terms are `O_p(√n)` with second moments: the linear one has
-   variance at most `σ̄²‖C_r‖_op²‖f‖² = O(n)`, and the quadratic one, whose
-   matrix has a zero diagonal, has variance at most `2σ̄⁴‖C_r‖_F² = O(n)`.
+   variance at most `σ̄²‖C_ϱ‖_op²‖f‖² = O(n)`, and the quadratic one, whose
+   matrix has a zero diagonal, has variance at most `2σ̄⁴‖C_ϱ‖_F² = O(n)`.
    This is the Neyman orthogonality of the remark that this proposition
    replaces, now with its proof.
 3. **The three coefficients.** In the Corollary's notation, with `C(ρ̃)` in
    place of a fixed `C`, the quadratic in `t = ρ − ρ₀` has coefficients
-   `g₀(ρ̃) = η′C(ρ̃)η`, `g₁(ρ̃) = −2η′G′Cs(ρ̃)η` and `a(ρ̃) = η′G′Cs(ρ̃)Gη`.
-   By Taylor's theorem in `r`, with `ρ̄` between `ρ̃` and `ρ₀`:
-   - `g₀(ρ̃) − g₀(ρ₀) = (ρ̃ − ρ₀)η′C_r(ρ₀)η + ½(ρ̃ − ρ₀)²η′C_rr(ρ̄)η
+   `g₀(ρ̃) = η′C(ρ̃)η`, `g₁(ρ̃) = −2η′G′Cs(ρ̃)η` and `g₂(ρ̃) = η′G′Cs(ρ̃)Gη`.
+   By Taylor's theorem in `ϱ`, with `ρ̄` between `ρ̃` and `ρ₀`:
+   - `g₀(ρ̃) − g₀(ρ₀) = (ρ̃ − ρ₀)η′C_ϱ(ρ₀)η + ½(ρ̃ − ρ₀)²η′C_ϱϱ(ρ̄)η
      = O_p(n^{−1/2})O_p(√n) + O_p(n^{−1})O_p(n) = O_p(1)`, using step 2 for
-     the first term and `|η′C_rr(ρ̄)η| ≤ sup‖C_rr‖_op‖η‖² = O_p(n)` for the
+     the first term and `|η′C_ϱϱ(ρ̄)η| ≤ sup‖C_ϱϱ‖_op‖η‖² = O_p(n)` for the
      second. Since `V* ≥ 2σ̲⁴‖Cs(ρ₀)‖_F² ≥ cn` by A5, this is `o_p(√V*)`.
    - `g₁(ρ̃) − g₁(ρ₀) = O_p(n^{−1/2})·O_p(n) = o_p(n)`, by the uniform bound
-     on `‖C_r‖_op`; so `g₁(ρ̃) = −J* + o_p(n)`.
-   - `a(ρ̃) = O_p(n)`, by the uniform bound on `‖C‖_op`.
+     on `‖C_ϱ‖_op`; so `g₁(ρ̃) = −J* + o_p(n)`.
+   - `g₂(ρ̃) = O_p(n)`, by the uniform bound on `‖C‖_op`.
 4. **Conclusion.** These are exactly the orders the Corollary's steps 2–4
    use, with `g₀(ρ̃)/√V* = g₀(ρ₀)/√V* + o_p(1) → N(0, 1)` by Theorem 1. So
    the sign rule picks `t̂ = (g₀(ρ̃)/J*)(1 + o_p(1))`, and the infeasible
@@ -496,7 +652,7 @@ and `C(ρ₀)`, and Theorem 1's conditions (a) and (c′) for `C(ρ₀)`. Then
    `[g₀(ρ̃) − g₀(ρ₀)]/J* + o_p(√n/n) = O_p(1/n) + o_p(n^{−1/2})`. ∎
 
 Only the mean-zero property in step 2 needs the zero diagonal and `Mf = 0`.
-Without it, `(ρ̃ − ρ₀)E η′C_rη` would be of order `n^{−1/2}·n = √n`, the
+Without it, `(ρ̃ − ρ₀)E η′C_ϱη` would be of order `n^{−1/2}·n = √n`, the
 same order as `g₀`, and the plug-in would change the limit.
 
 **Numerical check (`tc_resd.jl`).** `tc_coverage_tails.jl`'s design with
@@ -519,7 +675,7 @@ which checks step 2's identities.
 - **Power check:** the fixed wrong plug-in `C(ρ₀ + 0.3)` stays at 0.20–0.24
   of `sd(ρ̂*)` at every n, so the check can tell a plug-in that matters
   from one that does not. That estimator is still nearly unbiased (bias
-  −0.010 to −0.002), as any fixed `r` gives a valid moment.
+  −0.010 to −0.002), as any fixed `ϱ` gives a valid moment.
 - REsd's sd is 3–10% below the first step's (0.1301 against 0.1444 at
   n = 400; 0.0497 against 0.0513 at n = 2500), and its coverage with the
   robust variance and the code's root rule is 0.946–0.952.
@@ -532,7 +688,7 @@ moment `g(ρ) = y₀′Ay₀` with `A = MW + MDM` and `(M∘M)d = −diag(MW)`, 
 symmetric. Then:
 - **Lemma 2 holds with `Sᵢᵢ` in place of `hᵢᵢ`.** `‖M‖_op ≤ 1`. The
   eigenvalues of `M` lie in `[0, 1]`, so `M² ≼ M` and
-  `‖Meᵢ‖² = (M²)ᵢᵢ ≤ Mᵢᵢ`; hence `|(A′M)ᵢᵢ|/Mᵢᵢ ≤ ‖A‖_op/√Mᵢᵢ`, the bound of
+  `‖Meᵢ‖² = (M²)ᵢᵢ ≤ Mᵢᵢ`; hence `|(Y′M)ᵢᵢ|/Mᵢᵢ ≤ ‖Y‖_op/√Mᵢᵢ`, the bound of
   (b). The finer bound uses `‖Seᵢ‖² = (S²)ᵢᵢ ≤ Sᵢᵢ` the same way.
 - **Theorem 1 holds as stated**, since its proof uses only `‖Cs‖_op`,
   `‖Cs‖_F` and A5–A6, never idempotency.
@@ -542,8 +698,8 @@ symmetric. Then:
   breaks it exactly as too small a K does.
 - **The variance estimate needs two changes.** Under homoskedasticity
   `E ûᵢ² = σ²(M²)ᵢᵢ`, not `σ²Mᵢᵢ`, so the plug-in is `sᵢ = ûᵢ²/(M²)ᵢᵢ`.
-  With `f̂ = Sy₀`, `â = (A + A′)Sy₀` and the noise term is `diag(HΣ̂H′)`
-  with `H = (A + A′)S`, the general form of the projection's `G(Q′Σ̂Q)G′`.
+  With `f̂ = Sy₀`, `b̂ = (A + A′)Sy₀` and the noise term is `diag(HΣ̂H′)`
+  with `H = (A + A′)S`, the general form of the projection's `H = (C + C′)P_B`.
   This `V̂` is consistent (part (c) below).
 
 **The idempotent shortcut is wrong here.** The code forms the moment from
@@ -559,7 +715,7 @@ basis with a second-difference penalty, plus an unpenalised covariate; n =
 900, kNN `W`, `f = a·sin(2πu)cos(πv) + x`, smooth variances, normal errors,
 `ρ₀ = 0.4`, R = 1000. Coverage is of the 95% interval at the feasible root.
 
-| a | λ | tr S | max Sᵢᵢ | KS of z₀ | c = β/√V | bias: predicted | simulated | coverage: predicted | oracle | general `V̂` | shortcut moment |
+| a | λ | tr S | max Sᵢᵢ | KS of z₀ | c_β = β/√V | bias: predicted | simulated | coverage: predicted | oracle | general `V̂` | shortcut moment |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 0.001 | 222 | 0.93 | 0.021 | 0.003 | 0.0004 | 0.0027 | 0.950 | 0.955 | 0.951 | 0.953 |
 | 1 | 0.1 | 131 | 0.75 | 0.027 | 0.014 | 0.0011 | 0.0031 | 0.950 | 0.954 | 0.948 | 0.879 |
@@ -575,11 +731,11 @@ basis with a second-difference penalty, plus an unpenalised covariate; n =
 - **Theorem 1 holds for the smoother.** In all 12 cells, `z₀ =
   (g(ρ₀) − β)/√V` has mean within ±0.06, sd 0.98–1.01, and a KS distance
   0.016–0.034 from N(0, 1), below the 5% critical value 0.043. That includes
-  λ = 0.001, where `max Sᵢᵢ` = 0.93 and `max|dᵢ|` reaches 44: `‖As‖_op` stays
+  λ = 0.001, where `max Sᵢᵢ` = 0.93 and `max|dᵢ|` reaches 44: `‖Cs‖_op` stays
   at 0.71, because a large `dᵢ` sits where `Mᵢᵢ` is small.
-- **Shrinkage bias behaves as Proposition 3 says.** For `c` ≤ 0.66 the
+- **Shrinkage bias behaves as Proposition 3 says.** For `c_β` ≤ 0.66 the
   simulated bias matches `β/J` (`|z|` ≤ 1.0) and the general `V̂`'s coverage
-  is within 1.0 point of `P(|Z + c| ≤ 1.96)`. For `c` ≥ 1.6 the first-order
+  is within 1.0 point of `P(|Z + c_β| ≤ 1.96)`. For `c_β` ≥ 1.6 the first-order
   bias is too small (`z` from 3.8 up), as in `tc_approx.jl`.
 - **Power checks.** The shortcut moment has `E g(ρ₀)` from −14 to +710
   instead of 0. Where the shrinkage bias is small (λ = 0.1 and 1 at a = 1,
@@ -604,34 +760,34 @@ Assume A1 with four moments, A2, A4–A9, Proposition 4's conditions on `S`,
 
 *Proof.* Proposition 2's three steps, with these changes.
 - **`mᵢ` is bounded below**: `mᵢ = Mᵢᵢ² + Σ_{j≠i} Sᵢⱼ² ≥ (1 − s̄)²`.
-- **The remainder in `sᵢ`.** At `ρ₀`, `ûᵢ = zᵢ + rᵢ` with `z = Mε`, and
-  `zᵢ = Mᵢᵢεᵢ − qᵢ` with `qᵢ = Σ_{j≠i} Sᵢⱼεⱼ`. Since `(S²)ᵢᵢ ≤ Sᵢᵢ`,
-  `Σ_{j≠i} Sᵢⱼ² ≤ Sᵢᵢ(1 − Sᵢᵢ)`, so `E qᵢ² ≤ σ̄²Sᵢᵢ` and
-  `E qᵢ⁴ ≤ cSᵢᵢ²`. Then `sᵢ = εᵢ² + dᵢ` with
-  `dᵢ = εᵢ²(Mᵢᵢ²/mᵢ − 1) + (−2Mᵢᵢεᵢqᵢ + qᵢ² + 2rᵢzᵢ + rᵢ²)/mᵢ`, and
-  `|Mᵢᵢ²/mᵢ − 1| ≤ Sᵢᵢ/(1 − s̄)²`. So `E dᵢ² ≤ c(Sᵢᵢ + rᵢ²)`, using
-  `|rᵢ| ≤ c`. Hence `E‖d‖² ≤ c(tr S + ‖r‖²) = o(n)` and
-  `Σᵢ (E dᵢ²)^{1/2} ≤ c(√(n tr S) + √n‖r‖) = o(n)`. These are the two facts
-  steps 1 and 2 used, with `tr S + ‖r‖²` in place of `K`. `Ω = As∘As` keeps a
+- **The remainder in `sᵢ`.** At `ρ₀`, `ûᵢ = (Mε)ᵢ + rᵢ`, and
+  `(Mε)ᵢ = Mᵢᵢεᵢ − ϑᵢ` with `ϑᵢ = Σ_{j≠i} Sᵢⱼεⱼ`. Since `(S²)ᵢᵢ ≤ Sᵢᵢ`,
+  `Σ_{j≠i} Sᵢⱼ² ≤ Sᵢᵢ(1 − Sᵢᵢ)`, so `E ϑᵢ² ≤ σ̄²Sᵢᵢ` and
+  `E ϑᵢ⁴ ≤ cSᵢᵢ²`. Then `sᵢ = εᵢ² + νᵢ` with
+  `νᵢ = εᵢ²(Mᵢᵢ²/mᵢ − 1) + (−2Mᵢᵢεᵢϑᵢ + ϑᵢ² + 2rᵢ(Mε)ᵢ + rᵢ²)/mᵢ`, and
+  `|Mᵢᵢ²/mᵢ − 1| ≤ Sᵢᵢ/(1 − s̄)²`. So `E νᵢ² ≤ c(Sᵢᵢ + rᵢ²)`, using
+  `|rᵢ| ≤ c`. Hence `E‖ν‖² ≤ c(tr S + ‖r‖²) = o(n)` and
+  `Σᵢ (E νᵢ²)^{1/2} ≤ c(√(n tr S) + √n‖r‖) = o(n)`. These are the two facts
+  steps 1 and 2 used, with `tr S + ‖r‖²` in place of `K`. `Ω = Cs∘Cs` keeps a
   zero diagonal and bounded row sums, by Proposition 4's Lemma 2.
-- **Step 1 (quadratic part)** goes through unchanged with this `d`.
-- **Step 2 (linear part).** Now `â = μ + η` with `μ = (A + A′)Sf =
-  b − (A + A′)r` and `η = Hε`. The extra mean `w = (A + A′)r` has
-  `‖w‖² ≤ c‖r‖² = o(n)`, so `Σ wᵢ²sᵢ = O_p(‖r‖²)` (`E sᵢ ≤ c`) and the cross
-  term with `b` is `O_p(√n · ‖r‖) = o_p(n)`. `Σ Var ηᵢ = tr(HΣH′) ≤
+- **Step 1 (quadratic part)** goes through unchanged with this `ν`.
+- **Step 2 (linear part).** Now `b̂ = b_S + ζ` with `b_S = (A + A′)Sf =
+  b − b_r`, `b_r = (A + A′)r` and `ζ = Hε`. The extra mean `b_r` has
+  `‖b_r‖² ≤ c‖r‖² = o(n)`, so `Σᵢ (b_r)ᵢ²sᵢ = O_p(‖r‖²)` (`E sᵢ ≤ c`) and the cross
+  term with `b` is `O_p(√n · ‖r‖) = o_p(n)`. `Σ Var ζᵢ = tr(HΣH′) ≤
   c‖S‖_F² ≤ c tr S`, and the noise term's mean is at most `c‖H‖_F²`, so both
-  are `O_p(tr S)`. In `Σ bᵢ²dᵢ`, the zero-diagonal quadratic form
-  `−2Σ bᵢ²Mᵢᵢεᵢqᵢ/mᵢ` has variance at most `cΣᵢ bᵢ⁴Sᵢᵢ = o(n²)`. The
-  linear form `2Σ bᵢ²rᵢzᵢ/mᵢ` has variance at most `cΣ bᵢ⁴rᵢ² = o(n²)`
+  are `O_p(tr S)`. In `Σ bᵢ²νᵢ`, the zero-diagonal quadratic form
+  `−2Σ bᵢ²Mᵢᵢεᵢϑᵢ/mᵢ` has variance at most `cΣᵢ bᵢ⁴Sᵢᵢ = o(n²)`. The
+  linear form `2Σ bᵢ²rᵢ(Mε)ᵢ/mᵢ` has variance at most `cΣ bᵢ⁴rᵢ² = o(n²)`
   (A6). The rest has absolute mean at most `cΣ bᵢ²(Sᵢᵢ + rᵢ²) = o(n)`.
 - **Step 3 (`ρ̂` for `ρ₀`)** is unchanged: `û(ρ̂) = û − tMWy` and
-  `â(ρ̂) = â − tHWy` with `‖M‖_op, ‖H‖_op ≤ c`, and `Σ ûᵢ⁴ = O_p(n)` because
+  `b̂(ρ̂) = b̂ − tHWy` with `‖M‖_op, ‖H‖_op ≤ c`, and `Σ ûᵢ⁴ = O_p(n)` because
   `|rᵢ| ≤ c`. ∎
 
 The proof hides two opposite `O(‖r‖²)` effects. The shrinkage in `ûᵢ` adds
-`(2rᵢzᵢ + rᵢ²)/mᵢ` to `sᵢ`, which raises `V̂`. `â` estimates the shrunk
-signal `μ`, not `b`, which lowers the linear part by
-`Δ_b = Σᵢ (μᵢ² − bᵢ²)σᵢ²`. Over-smoothing therefore biases `V̂` too, not only
+`(2rᵢ(Mε)ᵢ + rᵢ²)/mᵢ` to `sᵢ`, which raises `V̂`. `b̂` estimates the shrunk
+signal `b_S`, not `b`, which lowers the linear part by
+`ϖ_b = Σᵢ ((b_S)ᵢ² − bᵢ²)σᵢ²`. Over-smoothing therefore biases `V̂` too, not only
 `ρ̂`. The condition `‖r‖² = o(n)` is separate from the Corollary's
 `β = o(√n)`: `β` is an indefinite quadratic form in `r` (Proposition 3),
 so neither condition implies the other.
@@ -639,9 +795,9 @@ so neither condition implies the other.
 **Numerical check (`tc_smoother_vhat.jl`).** Same design as
 `tc_smoother.jl`, at `ρ₀`, R = 500. Under normal errors the mean gap between
 `V̂` with the feasible `s` and with `r` removed from `s` is exact, and so is
-`Δ_b`:
+`ϖ_b`:
 
-| a | λ | ‖r‖²/n | `V̂/V` feasible | `r` removed | 1 + Δ_b/V | gap: simulated | exact | first order with `b` |
+| a | λ | ‖r‖²/n | `V̂/V` feasible | `r` removed | 1 + ϖ_b/V | gap: simulated | exact | first order with `b` |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 0.001 | 0.0000 | 1.008 | 1.008 | 1.000 | 0.0000 | 0.0000 | 0.0000 |
 | 1 | 10 | 0.0042 | 0.993 | 0.988 | 0.984 | 0.0053 | 0.0046 | 0.0043 |
@@ -655,27 +811,27 @@ so neither condition implies the other.
 - **The exact gap matches the simulation** in all 10 cells, with `|z|` ≤ 2.2.
   Two cells have `z` = 2.1 and 2.2, both where the gap is largest relative
   to its SE.
-- **`Δ_b` accounts for the r-removed mean** to within 0.004 where `r`
+- **`ϖ_b` accounts for the r-removed mean** to within 0.004 where `r`
   matters; the 0.000–0.008 left at small λ is HC2's own bias. So the two
   effects explain `V̂`'s bias, and the shrunk signal is the larger one.
-- **Power check.** The first-order shift with `b` in place of `μ` misses
+- **Power check.** The first-order shift with `b` in place of `b_S` misses
   by 50% at a = 1, λ = 100 (0.0605 against 0.0396) and by a factor of 4.6
   at a = 4, λ = 100 (1.47 against 0.32).
 - **Where `‖r‖²/n` ≤ 0.002,** `V̂/V` is 1.000–1.008, within the projection's
   HC2 range; that is λ ≤ 1 for both amplitudes. In this design `β` binds
   first: at a = 4, λ = 1, `V̂` is unbiased but coverage is 0.663
-  (`tc_smoother.jl`), because `c` = 1.6.
+  (`tc_smoother.jl`), because `c_β` = 1.6.
 
 **Choosing λ (measured; no theory).** Propositions 3 and 4 say when an
 interval is valid, not how to pick λ. Two ways were tried in
-`tc_lambda.jl`: GCV, and a plug-in estimate of `c` (same design as
+`tc_lambda.jl`: GCV, and a plug-in estimate of `c_β` (same design as
 `tc_smoother.jl`, λ on a half-decade grid from 10⁻³ to 10², R = 500).
 - GCV is `n‖M_λy₀p‖²/(n − tr S_λ)²`, where `y₀p` comes from a pilot fit at
   λ = 10⁻³.
-- The plug-in is `ĉ(λ) = (f̃′A_λf̃ − ŝ′diag(S_pA_λS_p))/√V̂_λ`, with
+- The plug-in is `ĉ_β(λ) = (f̃′A_λf̃ − ŝ′diag(S_pA_λS_p))/√V̂_λ`, with
   `f̃ = S_py₀p` from the same pilot.
 
-| a | λ | tr S | c | ĉ: mean | ĉ: sd | sd ρ̂ | RMSE ρ̂ | coverage | GCV picks (of 500) |
+| a | λ | tr S | c_β | ĉ_β: mean | ĉ_β: sd | sd ρ̂ | RMSE ρ̂ | coverage | GCV picks (of 500) |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 0.001 | 222 | 0.003 | 0.001 | 0.03 | 0.119 | 0.119 | 0.960 | 0 |
 | 1 | 0.1 | 131 | 0.014 | 0.068 | 0.84 | 0.075 | 0.075 | 0.944 | 4 |
@@ -693,20 +849,20 @@ With GCV's own choice, coverage is **0.888** (a = 1) and **0.320**
 (a = 4). (All 22 rows are in `tc_lambda_output.txt`.)
 
 - **GCV over-smooths for inference.** It picks λ = 3–10 at a = 1 and
-  λ = 1–3 at a = 4. Those values give a good fit of `f`, but `c` is 0.3–4
+  λ = 1–3 at a = 4. Those values give a good fit of `f`, but `c_β` is 0.3–4
   there. Under-coverage is mild for a weak surface and severe for a strong
   one. GCV must not be the default λ of a smoothed TC-CFE.
 - **The RMSE-best λ is already too large for an interval.** RMSE is
-  smallest where `c` ≈ 0.26 (a = 1) and 0.6 (a = 4), and coverage there is
+  smallest where `c_β` ≈ 0.26 (a = 1) and 0.6 (a = 4), and coverage there is
   0.944 and 0.908. This is the usual undersmoothing result: a valid interval
-  needs `c` → 0, so λ must be below the RMSE-optimal one. The price is
+  needs `c_β` → 0, so λ must be below the RMSE-optimal one. The price is
   precision. `sd(ρ̂)` doubles from λ = 1 to λ = 0.001.
-- **`c` cannot be estimated well enough to pick λ.** While `c` ≤ 4, `ĉ`'s
+- **`c_β` cannot be estimated well enough to pick λ.** While `c_β` ≤ 4, `ĉ_β`'s
   bias is at most 0.2, small beside its sd (0.645 against 0.598, 4.26
   against 4.14). Its sd,
   however, is 0.8–2.9 in the range that matters, because `f̃′A_λf̃` carries
-  noise of the same order as `√V`. So it can flag a large bias (`c` ≳ 4) but
-  cannot tell `c` = 0.3 from 0. Beyond `c` ≈ 4 it overshoots (30.7 against
+  noise of the same order as `√V`. So it can flag a large bias (`c_β` ≳ 4) but
+  cannot tell `c_β` = 0.3 from 0. Beyond `c_β` ≈ 4 it overshoots (30.7 against
   14.8). The cause is not checked; a likely one is the pilot's own error
   in `f̃` once `A_λ` is far from `A_p`.
 - **What this leaves.** The largest λ with coverage ≥ 0.94 is about 1/3
@@ -718,14 +874,14 @@ With GCV's own choice, coverage is **0.888** (a = 1) and **0.320**
   check. The same holds for K with a projection (`tc_approx.jl`).
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
-non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κn`; a
-row-standardised `W` with at most `m` neighbours per row has `κ = 1/m`.
+non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
+row-standardised `W` with at most `n_W` neighbours per row has `κ_W = 1/n_W`.
 For the exact-diagonal moment, with `d̄ = maxᵢ|dᵢ|`,
 
-    ‖Cs‖_F²/n ≥ κ/2 − 2(K/n)(c_W + d̄)².
+    ‖Cs‖_F²/n ≥ κ_W/2 − 2(K/n)(c_W + d̄)².
 
-So A5 holds whenever `limsup K/n < κ/(4(c_W + d̄)²)`, and in particular
-when `K/n → 0` with `d̄` bounded, with `liminf ‖Cs‖_F²/n ≥ κ/2`. A
+So A5 holds whenever `limsup K/n < κ_W/(4(c_W + d̄)²)`, and in particular
+when `K/n → 0` with `d̄` bounded, with `liminf ‖Cs‖_F²/n ≥ κ_W/2`. A
 sufficient condition for bounded `d̄` is `maxᵢ hᵢᵢ ≤ h̄ < 1/2`, which gives
 
     d̄ ≤ maxᵢ‖Weᵢ‖ √h̄ / ((1 − h̄)(1 − 2h̄)).
@@ -733,12 +889,12 @@ sufficient condition for bounded `d̄` is `maxᵢ hᵢᵢ ≤ h̄ < 1/2`, which 
 For Jin & Lee's `C = (W′ − Δ)M` the same holds with `max|Δᵢᵢ|` in place of
 `d̄`, which Lemma 2(b) bounds under A3 alone.
 
-**(b) The spectral form.** With `X = Ws + D = Σⱼ λⱼφⱼφⱼ′` and
+**(b) The spectral form.** With `X = Ws + D = Σⱼ ωⱼφⱼφⱼ′` and
 `πⱼ = ‖P_Bφⱼ‖²`, the overlap of the basis with eigenvector `φⱼ`,
 
-    ‖Cs‖_F² ≥ Σⱼ λⱼ²(1 − 2πⱼ) = ‖X‖_F² (1 − 2π̄_w),   π̄_w = Σⱼ λⱼ²πⱼ / Σⱼ λⱼ².
+    ‖Cs‖_F² ≥ Σⱼ ωⱼ²(1 − 2πⱼ) = ‖X‖_F² (1 − 2π̄_w),   π̄_w = Σⱼ ωⱼ²πⱼ / Σⱼ ωⱼ².
 
-So A5 holds whenever the λ²-weighted mean overlap `π̄_w` stays below 1/2:
+So A5 holds whenever the ω²-weighted mean overlap `π̄_w` stays below 1/2:
 the basis must not absorb half of `X`'s energy. That condition does not
 mention K/n at all; (a) is the special case that bounds every `πⱼ`-weighted
 sum by `K‖X‖_op²`. It is the moment-matrix analogue of the spectral overlap
@@ -752,20 +908,20 @@ Frobenius inner product and sum to `X`, so
 most `‖P_B‖_F²‖X‖_op² = K‖X‖_op² ≤ K(c_W + d̄)²`. Since `diag Ws = 0`,
 `‖X‖_F² = ‖Ws‖_F² + ‖D‖_F² ≥ ‖Ws‖_F²`, and
 `‖Ws‖_F² = (‖W‖_F² + tr W²)/2 ≥ ‖W‖_F²/2` because `tr W² = Σᵢⱼ WᵢⱼWⱼᵢ ≥ 0`.
-For a row-standardised row with at most `m` entries, `Σⱼ Wᵢⱼ² ≥ 1/m`. For
+For a row-standardised row with at most `n_W` entries, `Σⱼ Wᵢⱼ² ≥ 1/n_W`. For
 `d̄`: `(M∘M)d = −diag(MW) = diag(P_BW)`, and
 `|eᵢ′P_BWeᵢ| ≤ ‖P_Beᵢ‖‖Weᵢ‖ = √hᵢᵢ‖Weᵢ‖`. Row `i` of `M∘M` has diagonal
 `(1 − hᵢᵢ)²` and off-diagonal sum `Σ_{j≠i} hᵢⱼ² = hᵢᵢ(1 − hᵢᵢ)`, so its
 dominance margin is `(1 − hᵢᵢ)(1 − 2hᵢᵢ)`, and
 `‖(M∘M)⁻¹‖_∞ ≤ 1/((1 − h̄)(1 − 2h̄))`. For (b), the same orthogonal
 split gives `‖MXM‖_F² ≥ ‖X‖_F² − 2‖P_BX‖_F²` (with `X` symmetric,
-`‖XP_B‖_F = ‖P_BX‖_F`), and `‖P_BX‖_F² = tr(XP_BX) = Σⱼ λⱼ²φⱼ′P_Bφⱼ`. ∎
+`‖XP_B‖_F = ‖P_BX‖_F`), and `‖P_BX‖_F² = tr(XP_BX) = Σⱼ ωⱼ²φⱼ′P_Bφⱼ`. ∎
 
 **How sharp it is (`tc_a5.jl`).** Exact computation, no simulation, for the
-n = 900 kNN `W` (k = 6, so `κ` = 1/6 and the bound on `‖Ws‖_F²/n` is 0.083;
+n = 900 kNN `W` (k = 6, so `κ_W` = 1/6 and the bound on `‖Ws‖_F²/n` is 0.083;
 the actual value is 0.153) with the Chebyshev and hat bases used above:
 
-| basis | K/n | max hᵢᵢ | ‖Cs‖_F²/n | d̄ | (a), measured ‖Ws‖_F, d̄ | (a), 1/(2m) | (a), the d̄ bound | π̄_w | (b) spectral |
+| basis | K/n | max hᵢᵢ | ‖Cs‖_F²/n | d̄ | (a), measured ‖Ws‖_F, d̄ | (a), 1/(2n_W) | (a), the d̄ bound | π̄_w | (b) spectral |
 |---|---|---|---|---|---|---|---|---|---|
 | hat | 0.006 | 0.02 | 0.148 | 0.022 | 0.137 | 0.068 | 0.066 | 0.031 | 0.143 |
 | hat | 0.019 | 0.11 | 0.134 | 0.087 | 0.093 | 0.024 | 0.003 | 0.119 | 0.117 |
@@ -901,35 +1057,35 @@ homoskedastic plug-in (the power check).
 
 The estimator, as coded in `tc_lib.jl` and `tc_jinlee.jl`, is
 
-    V̂ = 2σ̂′(Cs∘Cs)σ̂ + Σᵢ (âᵢ² − noiseᵢ) σ̂ᵢ²,   σ̂ᵢ² = ûᵢ²/Mᵢᵢ,  û = My₀(ρ̂).
+    V̂ = 2s′(Cs∘Cs)s + Σᵢ (b̂ᵢ² − noiseᵢ) sᵢ,   sᵢ = ûᵢ²/Mᵢᵢ,  û = My₀(ρ̂).
 
-**The linear part.** Since `CP_B = PMP_B = 0`, `â = (C + C′)P_By₀ = b + η`, with
-`η = C′P_Bε`. So `E âᵢ² = bᵢ² + Var ηᵢ`, and
-`Σᵢ Var ηᵢ = tr(C′P_BΣP_BC) ≤ σ̄²‖C‖_op² K`. So without the noise term, the
+**The linear part.** Since `CP_B = PMP_B = 0`, `b̂ = (C + C′)P_By₀ = b + ζ`, with
+`ζ = C′P_Bε`. So `E b̂ᵢ² = bᵢ² + Var ζᵢ`, and
+`Σᵢ Var ζᵢ = tr(C′P_BΣP_BC) ≤ σ̄²‖C‖_op² K`. So without the noise term, the
 linear part is biased upwards by `O(K)`, against `V ≍ n`: a relative bias of
 `O(K/n)`. That matches the 3–10% excess measured at K/n of 0.1–0.2 before the
-term was added. The noise term, `diag(H(Q′Σ̂Q)H′)` with `H = C′Q`, estimates
-`Var ηᵢ` and removes it.
+term was added. The noise term, `diag(HΣ̂H′) = (H∘H)s` with `H = (C + C′)P_B` and
+`Σ̂ = Diag(s)`, estimates `Var ζᵢ` and removes it.
 
 **The plug-in variances are the weak point when K/n does not vanish.**
 `E ûᵢ² = Σⱼ Mᵢⱼ²σⱼ²`, with `Mᵢⱼ = −hᵢⱼ` for `j ≠ i` and
 `Σ_{j≠i} hᵢⱼ² = hᵢᵢ(1 − hᵢᵢ)`. So
 
-    E σ̂ᵢ² − σᵢ² = Σ_{j≠i} hᵢⱼ²(σⱼ² − σᵢ²) / (1 − hᵢᵢ),
+    E sᵢ − σᵢ² = Σ_{j≠i} hᵢⱼ²(σⱼ² − σᵢ²) / (1 − hᵢᵢ),
 
 which is at most `hᵢᵢ · maxⱼ|σⱼ² − σᵢ²|`. It is zero under
 homoskedasticity, `O(K/n)` on average otherwise, and does not vanish if
-`K/n → c > 0`. The products `σ̂ᵢ²σ̂ⱼ²` in the quadratic part add a
+`K/n → θ > 0`. The products `sᵢsⱼ` in the quadratic part add a
 correlation bias of the same order: `Cov(ûᵢ², ûⱼ²)` involves
-`(Σₖ MᵢₖMⱼₖσₖ²)²`, and summing `cᵢⱼ²hᵢⱼ²` over all pairs gives at most
-`maxᵢⱼ cᵢⱼ² · K`, so the relative bias is `O(K/n)`. This is probably the 1–3%
+`(Σₖ MᵢₖMⱼₖσₖ²)²`, and summing `γᵢⱼ²hᵢⱼ²` over all pairs gives at most
+`maxᵢⱼ γᵢⱼ² · K`, so the relative bias is `O(K/n)`. This is probably the 1–3%
 conservative bias seen in `tc_null.jl`.
 
 **The conjecture for step 2,** under A1–A6 with bounded eighth moments, which
 the variance of the degree-4 terms of `V̂` needs:
 - `V̂/V → 1` in probability when `K/n → 0`;
-- the same when `K/n → c > 0` under homoskedasticity;
-- `V̂` is inconsistent under heteroskedasticity with `K/n → c > 0`.
+- the same when `K/n → θ > 0` under homoskedasticity;
+- `V̂` is inconsistent under heteroskedasticity with `K/n → θ > 0`.
 
 This is the many-covariates problem for heteroskedasticity-robust variances
 (Cattaneo, Jansson & Newey 2018; Kline, Saggio & Sølvsten 2020). It suggests a
@@ -984,7 +1140,7 @@ estimates. For `i ≠ j`, with third moments `μ₃`,
 
     E[sᵢsⱼ] = σᵢ²σⱼ²(1 + Mᵢⱼ²/(MᵢᵢMⱼⱼ)) + [fᵢfⱼ(MΣM)ᵢⱼ + fᵢMᵢⱼMⱼⱼμ₃ⱼ + fⱼMᵢⱼMᵢᵢμ₃ᵢ]/(MᵢᵢMⱼⱼ),
 
-and `âᵢ²sᵢ` in the linear part has a bias of the same kind. Kline et al.
+and `b̂ᵢ²sᵢ` in the linear part has a bias of the same kind. Kline et al.
 remove these by sample splitting, which needs their condition
 `P_{iℓ,1}P_{iℓ,2} = 0`; a dense projection does not satisfy it.
 
@@ -1035,7 +1191,7 @@ same design and seeds, with `f` scaled so that the linear part is 90% of
 - **The linear part is close to unbiased**: 0.93–1.04 in 27 of 30 cells; at
   K/n = 0.39 two `χ²₃` cells reach 0.88 and one normal cell 1.11. The
   prediction written before the run,
-  that the linear part's `2bᵢfᵢ(GQ′ΣM)ᵢᵢ/Mᵢᵢ` bias would show here at
+  that the linear part's `2bᵢfᵢ(HΣM)ᵢᵢ/Mᵢᵢ` bias would show here at
   10–16%, was wrong. The 16% shortfall in `tc_vhat_lo.jl` came with a weak
   `f` and is not this term.
 - HC2 is good here (0.987–1.035), because its quadratic part, which carries
@@ -1079,7 +1235,7 @@ E V̂/V over the six variance-and-error cells:
 - **Leave-one-out's strong-signal bias stays with bounded leverage.** Its
   quadratic part is 0.68–0.99 at K/n ≤ 0.19, where the leverage is at most
   0.88. This fits the `fᵢfⱼ(MΣM)ᵢⱼ/(MᵢᵢMⱼⱼ)` term: with constant variances
-  `(MΣM)ᵢⱼ = −σ²Pᵢⱼ`, which for a local basis is of order K/n between
+  `(MΣM)ᵢⱼ = −σ²(P_B)ᵢⱼ`, which for a local basis is of order K/n between
   neighbours, and `fᵢfⱼ ≈ fᵢ²` for a smooth `f`. So the relative bias is
   of order the signal-to-noise ratio times K/n, and is negative.
 - **HC2's bias is in its quadratic part** (up to 1.44 of its true value), so
@@ -1109,8 +1265,8 @@ root `ρ̂`. Assume A1 with `μ₄ = supᵢ E εᵢ⁴ < ∞`, A2–A9, A10 and 
 Then `V̂/V → 1` in probability. Neither the noise term nor any leave-out
 correction is needed for this; both act only on the `O(K/n)` bias.
 
-*Proof.* Write `Ω = Cs∘Cs` and `G₂ = (C + C′)P_B`, so that `V = 2σ²′Ωσ² +
-Σᵢ bᵢ²σᵢ²` and `V̂ = 2s′Ωs + Σᵢ (âᵢ² − (G₂∘G₂ s)ᵢ)sᵢ`. Since A5 gives
+*Proof.* Write `Ω = Cs∘Cs` and `H = (C + C′)P_B`, so that `V = 2σ²′Ωσ² +
+Σᵢ bᵢ²σᵢ²` and `V̂ = 2s′Ωs + Σᵢ (b̂ᵢ² − ((H∘H)s)ᵢ)sᵢ`. Since A5 gives
 `V ≥ 2σ̲⁴‖Cs‖_F² ≥ cn`, it is enough to show `V̂ − V = o_p(n)`. Two facts
 carry the argument:
 - **`Ω` is bounded although `Cs` is dense.** Its entries are non-negative,
@@ -1118,62 +1274,62 @@ carry the argument:
   `Σⱼ Csᵢⱼ² = ‖Cs eᵢ‖² ≤ ‖Cs‖_op² ≤ c` (Lemma 2). So `‖Ω‖_op ≤ c` and
   `‖Ω‖_F² ≤ nc²`.
 - **`sᵢ` is `εᵢ²` plus a remainder of order `hᵢᵢ`.** At `ρ₀`, with `f ∈ span
-  B`, `ûᵢ = Mᵢᵢεᵢ − rᵢ` with `rᵢ = Σ_{j≠i} hᵢⱼεⱼ`. Then `sᵢ = εᵢ² + dᵢ`,
-  `dᵢ = −hᵢᵢεᵢ² − 2εᵢrᵢ + rᵢ²/Mᵢᵢ`. From `Σ_{j≠i} hᵢⱼ² = hᵢᵢ(1 − hᵢᵢ)`,
-  `E rᵢ² ≤ σ̄²hᵢᵢ` and `E rᵢ⁴ ≤ (3σ̄⁴ + μ₄)hᵢᵢ²`; with A3 this gives
-  `E dᵢ² ≤ c hᵢᵢ`. Hence `E‖d‖² ≤ cK` and `Σᵢ (E dᵢ²)^{1/2} ≤ c Σᵢ √hᵢᵢ ≤
+  B`, `ûᵢ = Mᵢᵢεᵢ − ϑᵢ` with `ϑᵢ = Σ_{j≠i} hᵢⱼεⱼ`. Then `sᵢ = εᵢ² + νᵢ`,
+  `νᵢ = −hᵢᵢεᵢ² − 2εᵢϑᵢ + ϑᵢ²/Mᵢᵢ`. From `Σ_{j≠i} hᵢⱼ² = hᵢᵢ(1 − hᵢᵢ)`,
+  `E ϑᵢ² ≤ σ̄²hᵢᵢ` and `E ϑᵢ⁴ ≤ (3σ̄⁴ + μ₄)hᵢᵢ²`; with A3 this gives
+  `E νᵢ² ≤ c hᵢᵢ`. Hence `E‖ν‖² ≤ cK` and `Σᵢ (E νᵢ²)^{1/2} ≤ c Σᵢ √hᵢᵢ ≤
   c√(nK)`, by Cauchy–Schwarz and `Σᵢ hᵢᵢ = K`. Both are `o(n)` when
   `K/n → 0`.
 
-1. **Quadratic part at `ρ₀`.** With `e = (εᵢ²)ᵢ`,
+1. **Quadratic part at `ρ₀`.** With `ε² = (εᵢ²)ᵢ`,
 
-       s′Ωs − σ²′Ωσ² = (e − σ²)′Ω(e − σ²) + 2σ²′Ω(e − σ²) + 2e′Ωd + d′Ωd.
+       s′Ωs − σ²′Ωσ² = (ε² − σ²)′Ω(ε² − σ²) + 2σ²′Ω(ε² − σ²) + 2ε²′Ων + ν′Ων.
 
    The first term has mean zero because `Ω` has a zero diagonal and the
    `εᵢ² − σᵢ²` are independent; its variance is at most
    `2μ₄²‖Ω‖_F² = O(n)`. The second has variance at most `4μ₄‖Ωσ²‖² = O(n)`.
-   So both are `O_p(√n)`. For the third, `E|e′Ωd| ≤ Σᵢⱼ Ωᵢⱼ (E εⱼ⁴)^{1/2}
-   (E dᵢ²)^{1/2} ≤ c Σᵢ √hᵢᵢ = O(√(nK))`, using the row sums of `Ω`. The
-   fourth is at most `‖Ω‖_op‖d‖² = O_p(K)`.
-2. **Linear part at `ρ₀`.** `â = b + η`, with `η = C′P_Bε`. Split
-   `Σᵢ âᵢ²sᵢ − Σᵢ bᵢ²σᵢ²` into four pieces:
+   So both are `O_p(√n)`. For the third, `E|ε²′Ων| ≤ Σᵢⱼ Ωᵢⱼ (E εⱼ⁴)^{1/2}
+   (E νᵢ²)^{1/2} ≤ c Σᵢ √hᵢᵢ = O(√(nK))`, using the row sums of `Ω`. The
+   fourth is at most `‖Ω‖_op‖ν‖² = O_p(K)`.
+2. **Linear part at `ρ₀`.** `b̂ = b + ζ`, with `ζ = C′P_Bε`. Split
+   `Σᵢ b̂ᵢ²sᵢ − Σᵢ bᵢ²σᵢ²` into four pieces:
    - `Σ bᵢ²(εᵢ² − σᵢ²)` has variance at most `μ₄ Σ bᵢ⁴ ≤ μ₄ maxᵢ bᵢ² ‖b‖²`,
      which is `o(n²)` by A6 and `‖b‖² = O(n)` (A8, Lemma 2).
-   - `Σ bᵢ²dᵢ`. Its part `−2Σ bᵢ²εᵢrᵢ` is a quadratic form in `ε` with a
+   - `Σ bᵢ²νᵢ`. Its part `−2Σ bᵢ²εᵢϑᵢ` is a quadratic form in `ε` with a
      zero diagonal and matrix entries `bᵢ²hᵢₖ`, so its variance is at most
      `4σ̄⁴ Σᵢ bᵢ⁴ hᵢᵢ = o(n²)`. Its other parts have absolute mean at most
      `c Σᵢ bᵢ² hᵢᵢ`, which is `o(n)` by A10.
-   - `2Σ bᵢηᵢsᵢ ≤ 2(Σ bᵢ²sᵢ)^{1/2}(Σ ηᵢ²sᵢ)^{1/2}`, and
-   - `Σ ηᵢ²sᵢ` and the noise term `s′(G₂∘G₂)s`. Their means are at most
-     `c Σᵢ Var ηᵢ ≤ c‖C‖_op²K` and `c‖G₂‖_F² ≤ cK`, because
-     `E ηᵢ⁴ ≤ c (Var ηᵢ)²`, `E sᵢ² ≤ c` and `E sᵢsₖ ≤ c` under four moments.
+   - `2Σ bᵢζᵢsᵢ ≤ 2(Σ bᵢ²sᵢ)^{1/2}(Σ ζᵢ²sᵢ)^{1/2}`, and
+   - `Σ ζᵢ²sᵢ` and the noise term `s′(H∘H)s`. Their means are at most
+     `c Σᵢ Var ζᵢ ≤ c‖C‖_op²K` and `c‖H‖_F² ≤ cK`, because
+     `E ζᵢ⁴ ≤ c (Var ζᵢ)²`, `E sᵢ² ≤ c` and `E sᵢsₖ ≤ c` under four moments.
      So they are `O_p(K)`, and the cross term is `O_p(√(nK))`.
 3. **Replacing `ρ₀` by `ρ̂`.** With `t = ρ̂ − ρ₀ = O_p(n^{−1/2})` (the
-   Corollary) and `m = MWy`, `û(ρ̂) = û − tm` and `â(ρ̂) = â − tG₂Wy`. Here
-   `‖m‖² = O_p(n)` and `‖G₂Wy‖² = O_p(n)` by A7 and A8, so the change `δa` in
-   `â` has `‖δa‖ = O_p(1)`. The change in `s` is
-   `δsᵢ = (−2tûᵢmᵢ + t²mᵢ²)/Mᵢᵢ`, with
-   `‖δs‖ ≤ c(|t| ‖û‖₄‖m‖ + t²‖m‖²) = O_p(n^{−1/2} n^{1/4} n^{1/2}) + O_p(1)
+   Corollary) and `û₁ = MWy`, `û(ρ̂) = û − tû₁` and `b̂(ρ̂) = b̂ − tHWy`. Here
+   `‖û₁‖² = O_p(n)` and `‖HWy‖² = O_p(n)` by A7 and A8, so the change
+   `b̂_t = b̂(ρ̂) − b̂` has `‖b̂_t‖ = O_p(1)`. The change `s_t = s(ρ̂) − s` is
+   `(s_t)ᵢ = (−2tûᵢ(û₁)ᵢ + t²(û₁)ᵢ²)/Mᵢᵢ`, with
+   `‖s_t‖ ≤ c(|t| ‖û‖₄‖û₁‖ + t²‖û₁‖²) = O_p(n^{−1/2} n^{1/4} n^{1/2}) + O_p(1)
    = O_p(n^{1/4})`, because `Σ ûᵢ⁴ = O_p(n)` under four moments. So the
-   quadratic part moves by at most `‖Ω‖_op(2‖s‖‖δs‖ + ‖δs‖²) =
+   quadratic part moves by at most `‖Ω‖_op(2‖s‖‖s_t‖ + ‖s_t‖²) =
    O_p(n^{3/4})`. The linear part moves by terms such as
-   `|t| Σ âᵢ²|ûᵢmᵢ|/Mᵢᵢ ≤ c|t|(Σ âᵢ²ûᵢ²)^{1/2}(Σ âᵢ²mᵢ²)^{1/2}`, which is
-   `O_p(n^{−1/2})·O_p(√n)·o_p(n)`, since `Σ bᵢ²mᵢ² ≤ maxᵢ bᵢ² ‖m‖² = o_p(n²)`
-   by A6; and `Σ (2âᵢδaᵢ + δaᵢ²)sᵢ`, which is
+   `|t| Σ b̂ᵢ²|ûᵢ(û₁)ᵢ|/Mᵢᵢ ≤ c|t|(Σ b̂ᵢ²ûᵢ²)^{1/2}(Σ b̂ᵢ²(û₁)ᵢ²)^{1/2}`, which is
+   `O_p(n^{−1/2})·O_p(√n)·o_p(n)`, since `Σ bᵢ²(û₁)ᵢ² ≤ maxᵢ bᵢ² ‖û₁‖² = o_p(n²)`
+   by A6; and `Σ (2b̂ᵢ(b̂_t)ᵢ + (b̂_t)ᵢ²)sᵢ`, which is
    `O_p(√n)·O_p(maxᵢ sᵢ)^{1/2} + O_p(maxᵢ sᵢ) = O_p(n^{3/4})`, since
    `maxᵢ sᵢ = O_p(√n)` when `E sᵢ² ≤ c`. All of these are `o_p(n)`. ∎
 
 **What the proof says about the measurements.** The remainders are of order
 `√(K/n)` relative to `V` in the worst case, and the measured bias at
 K/n ≈ 0.05 (0.990–1.042 in all the designs above) is smaller than that. The
-proof does not cover `K/n → c > 0`, where `Σ √hᵢᵢ ≍ n` and the bias
+proof does not cover `K/n → θ > 0`, where `Σ √hᵢᵢ ≍ n` and the bias
 measured above stays. The conjecture asked for eighth moments; consistency
 needs only four. The eighth would be needed for a rate, or for the variance
 of `V̂`.
 
 **The CJN version.** With `s = (M∘M)⁻¹û²` the same steps go through if
 `‖(M∘M)⁻¹‖_∞` is bounded, which Cattaneo, Jansson & Newey obtain from
-`maxᵢ hᵢᵢ < 1/2`; then `E s = σ²` exactly, the `dᵢ` have mean zero, and A10
+`maxᵢ hᵢᵢ < 1/2`; then `E s = σ²` exactly, the `νᵢ` have mean zero, and A10
 is not needed. That condition is stronger than A3, and the designs above
 (leverage up to 0.94) do not satisfy it, although CJN measured well there
 at K/n ≤ 0.11.
@@ -1233,38 +1389,38 @@ the hat-basis design (R = 1000):
   term cancels. Power: the same test separates the uncorrected mean from 1,
   for example 0.964 at K/n = 0.19 with rough variances, a `z` of −5.4.
 - **A plug-in correction works up to K/n = 0.19.** Subtracting
-  `4 tr(ΩΛ[(MSM)∘(MSM)]Λ)` with `S = Diag(s)` gives 0.986–1.015 at
+  `4 tr(ΩΛ[(MΣ̂M)∘(MΣ̂M)]Λ)` with `Σ̂ = Diag(s)` gives 0.986–1.015 at
   K/n ≤ 0.19 (`|z|` ≤ 2.0), at no cost in sd. At K/n = 0.25, where the
   leverage reaches 0.94, it fails: 0.52–0.92, `z` from −5 to −28. There the
-  plug-in `(MSM)ᵢⱼ²` carries its own bias, which involves `σₖ⁴` and so
+  plug-in `(MΣ̂M)ᵢⱼ²` carries its own bias, which involves `σₖ⁴` and so
   cannot be removed from one observation per unit.
 - This corrects only the quadratic part; the next paragraph does the linear
   part.
 
 **The exact bias of CJN's linear part (proved; `tc_cjn_lin.jl`).** At `ρ₀`,
-`â = b + η` with `η = Hε`, `H = MWP_B`, and the noise term is
-`noiseᵢ = Σₖ Hᵢₖ²sₖ`. Write `X = (MΣM)∘(MΣM)`. Then
+`b̂ = b + ζ` with `ζ = Hε`, `H = MWP_B`, and the noise term is
+`noiseᵢ = Σₖ Hᵢₖ²sₖ`. Write `𝒳 = (MΣM)∘(MΣM)`. Then
 
-    E Σᵢ(âᵢ² − noiseᵢ)sᵢ − Σᵢ bᵢ²σᵢ²
-        = 2Σᵢ bᵢHᵢᵢμ₃ᵢ + 2Σᵢₖ Λᵢₖ(HΣM)ᵢₖ² − 2Σᵢ[(H∘H)ΛXΛ]ᵢᵢ,
+    E Σᵢ(b̂ᵢ² − noiseᵢ)sᵢ − Σᵢ bᵢ²σᵢ²
+        = 2Σᵢ bᵢHᵢᵢμ₃ᵢ + 2Σᵢₖ Λᵢₖ(HΣM)ᵢₖ² − 2Σᵢ[(H∘H)Λ𝒳Λ]ᵢᵢ,
 
 the skewness, cross and noise terms.
 
-*Proof.* For linear forms `ξ = α′ε` and `ζ = γ′ε` in independent `ε`,
-`E[ξζ²] = Σₗ αₗγₗ²μ₃ₗ` and
-`E[ξ²ζ²] = E ξ² E ζ² + 2(E ξζ)² + Σₗ αₗ²γₗ²κₗ`. With `ξ = ηᵢ`, `ζ = ûₖ`
+*Proof.* For linear forms `Υ₁ = α′ε` and `Υ₂ = ψ′ε` in independent `ε`,
+`E[Υ₁Υ₂²] = Σₗ αₗψₗ²μ₃ₗ` and
+`E[Υ₁²Υ₂²] = E Υ₁² E Υ₂² + 2(E Υ₁Υ₂)² + Σₗ αₗ²ψₗ²κₗ`. With `Υ₁ = ζᵢ`, `Υ₂ = ûₖ`
 and `Λ(M∘M) = I`:
-- `E[ηᵢsᵢ] = Σₖ Λᵢₖ Σₗ HᵢₗMₖₗ²μ₃ₗ = Hᵢᵢμ₃ᵢ`;
-- `E[ηᵢ²sᵢ] = σᵢ² Var ηᵢ + 2Σₖ Λᵢₖ(HΣM)ᵢₖ² + Hᵢᵢ²κᵢ`, since
+- `E[ζᵢsᵢ] = Σₖ Λᵢₖ Σₗ HᵢₗMₖₗ²μ₃ₗ = Hᵢᵢμ₃ᵢ`;
+- `E[ζᵢ²sᵢ] = σᵢ² Var ζᵢ + 2Σₖ Λᵢₖ(HΣM)ᵢₖ² + Hᵢᵢ²κᵢ`, since
   `Σₖ Λᵢₖ E ûₖ² = σᵢ²`;
 - `E[noiseᵢsᵢ] = Σₖ Hᵢₖ²(σₖ²σᵢ² + Cov(sₖ, sᵢ))`, where
-  `Cov s = 2ΛXΛ + Diag(κ)` from the previous proof, which gives
-  `σᵢ² Var ηᵢ + 2[(H∘H)ΛXΛ]ᵢᵢ + Hᵢᵢ²κᵢ`.
+  `Cov s = 2Λ𝒳Λ + Diag(κ)` from the previous proof, which gives
+  `σᵢ² Var ζᵢ + 2[(H∘H)Λ𝒳Λ]ᵢᵢ + Hᵢᵢ²κᵢ`.
 
-The `Var ηᵢ` and `κᵢ` terms cancel between the last two. ∎
+The `Var ζᵢ` and `κᵢ` terms cancel between the last two. ∎
 
 The cross term vanishes under homoskedasticity, since then
-`HΣM = σ²MWP_BM = 0`. The noise term does not: `ΛXΛ = σ⁴Λ` there. The skewness term needs a
+`HΣM = σ²MWP_BM = 0`. The noise term does not: `Λ𝒳Λ = σ⁴Λ` there. The skewness term needs a
 per-unit `μ₃ᵢ`, which one observation cannot estimate, so the correction
 below leaves it out.
 
@@ -1365,7 +1521,7 @@ is weak identification, which shows as a large `sd(ρ̂)` and a small
 `‖Cs‖_F²`. Proposition 6 fixes that with a different interval.
 
 **Proposition 6 (an interval that does not need identification; proved).**
-Let `V̂(ρ)` be the HC2 `V̂` evaluated at a candidate `ρ` (its `sᵢ`, `â` and
+Let `V̂(ρ)` be the HC2 `V̂` evaluated at a candidate `ρ` (its `sᵢ`, `b̂` and
 noise term computed from `y₀(ρ)`). Define the test-inversion set
 
     CS = {ρ ∈ (−1, 1) : g(ρ)² ≤ 1.96² V̂(ρ)}.
@@ -1385,9 +1541,9 @@ with the moment itself, and keep the `ρ` that are not rejected. (Both papers
 are cited from their standard use; neither has been read for this note.) The Wald
 interval `ρ̂ ± 1.96√V̂/|g′(ρ̂)|` needs `J/√V → ∞` (A9), through the
 Corollary. `CS` does not, so its coverage holds however small `J` is.
-`CS` is cheap to compute. `g(ρ) = c − bρ + aρ²` is quadratic. `V̂(ρ)` is
-an exact quartic in `ρ`, because `sᵢ(ρ) = (e₀ − ρe₁)ᵢ²/Mᵢᵢ` is quadratic,
-`â(ρ)` is linear and the noise term is linear in `s`. So `CS` is the set
+`CS` is cheap to compute. `g` is quadratic in `ρ`. `V̂(ρ)` is
+an exact quartic in `ρ`, because `sᵢ(ρ) = (û₀ − ρû₁)ᵢ²/Mᵢᵢ` is quadratic,
+`b̂(ρ)` is linear and the noise term is linear in `s`. So `CS` is the set
 where a quartic polynomial is non-negative. It can be an interval, a union
 of intervals, or the whole range, and the last means the data say nothing
 about `ρ`.
@@ -1507,20 +1663,22 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    `χ²₃` errors (`tc_ar.jl`), at no cost in length where identification is
    strong. Over the whole grid with normal and `χ²₃` errors (180 cells),
    `CS` covers 0.932–0.992, and over-covers (to 0.99) only where the
-   leverage is near 0.95. Open: `CS` for K/n → c > 0, which needs
+   leverage is near 0.95. Open: `CS` for K/n → θ > 0, which needs
    Proposition 2's open case.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
-   and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ` is
+   and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
    too noisy (sd 0.8–2.9) to choose λ. Still open: a data-driven λ (or K)
-   with a coverage guarantee, for example one targeting `c` rather than the
+   with a coverage guarantee, for example one targeting `c_β` rather than the
    fit of `f`.
 5. Reading: de Jong (1987), Bhansali, Giraitis & Kokoszka (2007), Kelejian &
    Prucha (2001) and Hall & Heyde's §3.2 are read. Cattaneo, Jansson & Newey
    (2018) §3 and Kline, Saggio & Sølvsten (2020) §4.2 have been read via
-   alphaXiv. Macaev's theorem (1961), von Bahr & Esseen's inequality (1965)
-   and Rosenthal's inequality (1970) are used as they are usually stated,
-   and have not been read.
+   alphaXiv. Matsaev's theorem (1961b, Theorem 1) and the duality step for
+   `p > 2` (Gohberg & Krein 1961, Theorem 2) were read on 2026-11-20; the
+   proof for `1 < p < 2` is outlined in the note, not given in full. Von Bahr & Esseen's inequality (1965) and
+   Rosenthal's inequality (1970) are used as they are usually stated, and
+   have not been read.
 6. Theorem 1 now needs `2 + δ` moments (done 2026-11-19). Consistency of
    `V̂` needs four (Proposition 2); eighth moments would be needed only for
    a rate or for the variance of `V̂`.
@@ -1528,7 +1686,10 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
 ## References
 
 All have been checked to exist (via Scite, or by resolving the DOI), except
-Macaev (1961). Read for this note: de Jong (1987), §2 and §5, from the page
+the two Matsaev notes and Gohberg & Krein (1961), which have no DOI; they
+were checked against their Math-Net.Ru records (dan25286, dan25330,
+dan24853), and all three are read. Read for this
+note: de Jong (1987), §2 and §5, from the page
 images of Springer's free copy; Cattaneo, Jansson & Newey (2018), §3 (arXiv
 1507.02493); Kline, Saggio & Sølvsten (2020), §4.2 (arXiv 1806.01494); and,
 from the page images of the copies in `ExtRef/`, Bhansali, Giraitis &
@@ -1570,9 +1731,18 @@ Lee (2023), ch. 1, §1.8.3 and Appendix 1A. The others have not been read.
 - von Bahr, B., & Esseen, C.-G. (1965). Inequalities for the rth absolute
   moment of a sum of random variables, 1 ≤ r ≤ 2. *The Annals of
   Mathematical Statistics*, 36(1), 299–303. doi:10.1214/aoms/1177700291
-- Macaev, V. I. (1961). A class of completely continuous operators. *Doklady
-  Akademii Nauk SSSR*, 139, 548–551 (in Russian). Cited from Bhansali et al.;
-  not checked or read.
+- Gohberg, I. C., & Krein, M. G. (1961). On the theory of triangular
+  representations of nonselfadjoint operators. *Doklady Akademii Nauk
+  SSSR*, 137(5), 1034–1037 (in Russian). Math-Net.Ru dan24853. Read
+  2026-11-20; its Theorem 2 is the duality step for `p > 2`.
+- Matsaev (Macaev), V. I. (1961a). A class of completely continuous
+  operators. *Doklady Akademii Nauk SSSR*, 139(3), 548–551 (in Russian).
+  Math-Net.Ru dan25286. Read 2026-11-20. Cited by Bhansali et al. for the
+  `𝔖_p` bound, which is not in it: its theorem is on `𝔖_ω`.
+- Matsaev (Macaev), V. I. (1961b). Volterra operators obtained from
+  self-adjoint operators by perturbation. *Doklady Akademii Nauk SSSR*,
+  139(4), 810–813 (in Russian). Math-Net.Ru dan25330. Read 2026-11-20; its
+  Theorem 1 is the `𝔖_p` bound used for Theorem 1 here.
 - Kwapień, S., & Pełczyński, A. (1970). The main triangle projection in matrix
   spaces and its applications. *Studia Mathematica*, 34, 43–67.
   doi:10.4064/sm-34-1-43-67

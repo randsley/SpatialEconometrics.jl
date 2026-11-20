@@ -566,7 +566,7 @@ method: `k = 20` is simply further from `k = 6` than most applications would
 stray.
 
 # References
-Kubara, M., & Kopczewska, K. (2023). Akaike information criterion in
+Kubara, M., & Kopczewska, K. (2024). Akaike information criterion in
 choosing the optimal k-nearest neighbours of the spatial weight matrix.
 *Spatial Economic Analysis*, 19(1), 73–91.
 """
@@ -1042,7 +1042,8 @@ Keyword arguments other than `specs` and `w_names` are passed through to
 reading about there before reporting a number from here.
 
 # References
-LeSage, J. P. (2014). *Spatial Statistics*, 9, 122–145.
+LeSage, J. P. (2014). Spatial econometric panel data model specification: A
+Bayesian approach. *Spatial Statistics*, 9, 122–145.
 """
 function bayes_spec_probs(
     y::AbstractVector{T},
@@ -1132,7 +1133,7 @@ end
 """
     sdem_roadmap(y, X, Ws; criterion = :marginal, w_names, specs, kwargs...)
 
-The Sutton & Sutton (2023) specification search for the local-spillover
+The Sutton & Sutton (2024) specification search for the local-spillover
 case: for each candidate weight matrix, decide which of the local
 specifications fits best, then read the winner across weight matrices.
 
@@ -1155,7 +1156,7 @@ decided together; a margin near zero says the data do not separate them, and
 should be reported rather than resolved by taking the maximum.
 
 # References
-Sutton, J. & Sutton, J. (2023). A road map to capture the spatial dependence
+Sutton, J. & Sutton, J. (2024). A road map to capture the spatial dependence
 underlying regions' economic resilience. *Spatial Economic Analysis*, 19(1),
 57–72.
 """

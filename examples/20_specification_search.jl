@@ -8,7 +8,7 @@
 # to check. This example is that check.
 #
 # Demonstrates:
-#   - sdm_tests: the Koley & Bera (2023) Durbin score battery
+#   - sdm_tests: the Koley & Bera (2024) Durbin score battery
 #   - reading the robust pair rather than the plain pair, and why
 #   - the per-covariate statistics, for which X enters lagged
 #   - running the battery against data from three known specifications

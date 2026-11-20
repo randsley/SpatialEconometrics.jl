@@ -7,11 +7,11 @@
 > the default GS2SLS's panel inference (AUDIT 34–36); the Claude Code skill
 > (#14); and the notebooks on Google Colab. No tag is registered.
 >
-> 33 submodules, 4,182 test assertions in 63 top-level testsets with both
-> package extensions installed and 4,147 (plus 2 broken markers) without
+> 33 submodules, 4,241 test assertions in 64 top-level testsets with both
+> package extensions installed and 4,206 (plus 2 broken markers) without
 > them, measured on 2026-11-20 on Julia 1.13.4, and without them on 1.10.13.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
-> 66 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
 > item #15's exposure mapping and spatial difference-in-differences landed
@@ -302,8 +302,8 @@ spatial lags belong in the model, and which `W` to run it on.
 
 | Feature | Description | Reference |
 |---|---|---|
-| ~~Durbin score tests~~ — **delivered**, see `sdm_tests` | Five Rao score statistics for the spatial Durbin model: joint `ρ = 0, θ = 0`; `ρ = 0` with and without `θ ≠ 0`; `θ = 0` with and without `ρ ≠ 0`; plus significance of each individual Durbin term | Koley & Bera (2023); Bera & Yoon (1993) |
-| ~~SDEM specification roadmap~~ — **delivered**, see `sdem_roadmap` | Iterative search over {SDE, SLX, SE} × `W`, for the local-spillover case where the Durbin terms sit in the error | Sutton & Sutton (2023) |
+| ~~Durbin score tests~~ — **delivered**, see `sdm_tests` | Five Rao score statistics for the spatial Durbin model: joint `ρ = 0, θ = 0`; `ρ = 0` with and without `θ ≠ 0`; `θ = 0` with and without `ρ ≠ 0`; plus significance of each individual Durbin term | Koley & Bera (2024); Bera & Yoon (1993) |
+| ~~SDEM specification roadmap~~ — **delivered**, see `sdem_roadmap` | Iterative search over {SDE, SLX, SE} × `W`, for the local-spillover case where the Durbin terms sit in the error | Sutton & Sutton (2024) |
 | ~~Bayesian SD vs SDE comparison~~ — **delivered**, see `bayes_spec_probs` | Posterior model probabilities over global versus local spillovers, jointly with the `W` specification | LeSage (2014, 2015) |
 
 The score tests were the closest fit to what was already here, and are now
@@ -568,7 +568,7 @@ literature are to select `W` by a criterion or to estimate it.
 
 | Feature | Description | Reference |
 |---|---|---|
-| ~~knn `W` selection by AIC~~ — **delivered**, see `select_knn_w` | Refit the same model for `k = 2…50` and read AIC against `k`; the curve is non-monotone with an interior minimum, and a wrong `k` biases `ρ̂` badly — measured at −35.1% at `k = 2` and +29.1% at `k = 20` against a true `k = 6`, wider than the source's "up to 20%" because the range searched is wider | Kubara & Kopczewska (2023) |
+| ~~knn `W` selection by AIC~~ — **delivered**, see `select_knn_w` | Refit the same model for `k = 2…50` and read AIC against `k`; the curve is non-monotone with an interior minimum, and a wrong `k` biases `ρ̂` badly — measured at −35.1% at `k = 2` and +29.1% at `k = 20` against a true `k = 6`, wider than the source's "up to 20%" because the range searched is wider | Kubara & Kopczewska (2024) |
 | Endogenous `W`, control function | `w_ij = h_ij(Z, ρ_ij)` with a known bounded `h`, where the variables that form `W` follow `Z = X₂Γ + ε` and are correlated with the outcome error through `E(v\|ε) = ε'δ`. Fit `Y = λWY + X₁β + (Z − X₂Γ̂)δ + ξ` by generalised 2SIV, by QMLE (its quasi-likelihood carries `ln\|I − λW\|`, which the package's log-determinant routines already supply) or by GMM. **Not scheduled.** The earlier wording of this row, `w_ij = f(d_ij, Z_ij; γ)` estimated by concentrated ML, did not match either source once read | Qu & Lee (2015): **read**, §§2–3; asymptotics and Monte Carlo unread |
 | Endogenous `W`, observed-variable weights | Panel `y(t) = μ + X(t)β + λW(t)y(t) + Y(t)γ + u(t)` with `E[w*_ij(t)] = f[p_ij(t), q_ij(t)]`, approximated as linear in the observed `p_ij`. Instruments are built from `X`, the exogenous weight variables and their fitted values; 2SLS with a HAC covariance; `N → ∞` with `T` fixed; order condition `k + 2g ≥ 1 + q`. Reuses the GS2SLS machinery. **Not scheduled** | Kelejian & Piras (2014): **read** in the accepted manuscript, which has no journal pagination; application unread |
 | Convex combination of weight matrices | `W_c(Γ) = Σ_ℓ γ_ℓ W_ℓ` with `γ_ℓ ∈ [0,1]`, `Σγ_ℓ = 1`, `ρ ∈ (−1, 1)`. Write `y = Xβ + Ωω` with `[y, W₁y, …, W_Ly]` precomputed, and take `ln\|I − ρW_c\| ≈ −Σ_{i=1}^{4} ρ^i tr(W_c^i)/i` with the traces precomputed as polynomials in Γ (`tr(W_iW_j)` by Hadamard sums). Flat priors, `β` and `σ²` integrated out; Metropolis–Hastings-guided Monte Carlo integration gives log-marginal likelihoods, then Bayesian model averaging over the `2^L − L − 1` subsets of two or more matrices. Extends `bayes_spec_probs` and can reuse `precompute_neumann_traces`. **Not scheduled.** The order-4 truncation needs its own accuracy test against the exact log-determinant | Debarsy & LeSage (2020): **read**, §2 and §2.6 of the accepted author version; effects (§2.5), §2.6.3 and the illustration unread |
@@ -1151,7 +1151,8 @@ and the method are in `research/trace_cfe/`.
      for the moment now has a full proof: martingale differences and Hall &
      Heyde's Corollary 3.1. It needs only `‖Cs‖_op/‖Cs‖_F → 0`: the
      triangular part is bounded in the Schatten-4 norm with no log factor
-     (Macaev's theorem, via Bhansali, Giraitis & Kokoszka 2007, Lemma 2.1),
+     (Matsaev 1961, *Dokl.* 139(4), Theorem 1, read 2026-11-20; Bhansali,
+     Giraitis & Kokoszka 2007, Lemma 2.1, cite his other 1961 note),
      checked in `tc_schatten.jl` against a matrix whose triangular part grows
      like log n in the operator norm. It needs only `2 + δ` moments: the
      zero diagonal leaves the `εᵢ²` only in the conditional variance, where
@@ -1248,12 +1249,13 @@ and the method are in `research/trace_cfe/`.
      projected TC-CFE in `src/` should report. Over the whole grid
      with normal and `χ²₃` errors (180 cells) `CS` covers 0.932–0.992; it
      over-covers only where the leverage is near 0.95.
-     Proposition 5 derives A5 from `W`: `‖Cs‖_F²/n ≥ κ/2 −
-     2(K/n)(c_W + d̄)²` with `κn ≤ ‖W‖_F²`, so A5 holds for K/n → 0. In
+     Proposition 5 derives A5 from `W`: `‖Cs‖_F²/n ≥ κ_W/2 −
+     2(K/n)(c_W + d̄)²` with `κ_W n ≤ ‖W‖_F²`, so A5 holds for K/n → 0. In
      `tc_a5.jl` the bound is close at small K/n (0.137 against 0.148) and
      vanishes by K/n ≈ 0.05. A spectral form, `‖Cs‖_F² ≥ ‖X‖_F²(1 − 2π̄_w)`
-     with `π̄_w` the λ²-weighted overlap of `B` with the eigenvectors of
-     `X = Ws + D`, needs no rate on K/n and is sharper (0.143 against
+     with `π̄_w` the overlap of `B` with the eigenvectors of `X = Ws + D`,
+     weighted by the squared eigenvalues `ωⱼ²`, needs no rate on K/n and is
+     sharper (0.143 against
      0.148); it vanishes where `π̄_w` passes 1/2, at K/n ≈ 0.10. Beyond that
      A5 stays an assumption. `tc_a5.jl` also shows `d` exploding (to 10⁹)
      where the leverage reaches 1.
@@ -1262,7 +1264,8 @@ and the method are in `research/trace_cfe/`.
 - **Checks still owed** by the null-distribution rule:
   - ~~a null-distribution check of the robust variance with REsd's matrix~~:
     done by `validation/mc_root_rho.jl` (2026-11-20; below);
-  - a penalised smoother, where `M = I − S_λ` is not idempotent;
+  - ~~a penalised smoother, where `M = I − S_λ` is not idempotent~~:
+    done by `validation/mc_root_rho_smoother.jl` (2026-11-20; below);
   - Geniaux's own E3 design.
 - **Outcome if the theory holds:** a note on Geniaux: one closed-form
   correction, Jin & Lee's, removes the bias his three safeguards target.
@@ -1281,8 +1284,17 @@ and the method are in `research/trace_cfe/`.
   errors; R = 1000). `CS` covers 0.935–0.975 and the Wald interval
   0.931–0.975 in every cell. `|bias|` is at most 0.060, against −0.05 to
   −1.76 for `closed_form_rho` on the same draws, and the package equals the
-  research code to 2.5e-14. AUDIT, "`root_rho`". Not built: the penalised
-  smoother, and a rule for choosing K.
+  research code to 2.5e-14. AUDIT, "`root_rho`".
+- **Built (2026-11-20, later): the penalised smoother.** `root_rho(y, X, W;
+  basis, penalty, lambda)`, with `tensor_pspline(u, v; k)` for the basis and
+  a difference penalty (testset 47, section 4 of `examples/34_root_rho.jl`).
+  The moment is the one-step exact-diagonal `y₀′Ay₀`, `A = MW + MDM`, formed
+  as a matrix, with HC2 `ûᵢ²/(M²)ᵢᵢ` (Proposition 4). `lambda` has no
+  default, and `r.df = tr S` is reported. The shrinkage bias `f′Af` is the
+  price: `validation/mc_root_rho_smoother.jl` (108 cells): in the 75 cells with `c ≤ 0.25` both intervals cover
+  0.934–0.982; elsewhere `CS` is within 0.027 of `P(|Z + c| ≤ 1.96)`.
+  AUDIT, "`root_rho` with a penalised smoother". Not built: a rule for
+  choosing K or λ.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
@@ -1721,6 +1733,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ the heteroskedasticity-robust GS2SLS and the default path's panel fixes, AUDIT 36) | 32 | 4,139 ¶⁷ | 29,005 |
 | **v0.6.0** (tagged 2026-11-19, = the row above) | 32 | 4,139 ¶⁷ | 29,005 |
 | **master** (+ `root_rho`, the research item on a growing basis built) | 33 | 4,182 ¶⁸ | 29,391 |
+| **master** (+ `root_rho` with a penalised smoother, and `tensor_pspline`) | 33 | 4,241 ¶⁹ | 29,643 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1845,9 +1858,22 @@ the standardised moment in 46d on 1.10 (0.103 against 0.231; 0.102 on
 rose from 62 to 63. The `src/` count rose by 386: the new module's 381
 lines and the umbrella's 5.
 
-Measured on master: 33 submodules plus the umbrella across 29,391 lines of
-`src/`, 11,493 lines of tests, 5,313 lines of examples across 34 scripts,
-398 lines of package extensions, 66 documentation pages and 20 notebooks
+¶⁹ Measured locally on 2026-11-20: 4,241 passed on Julia 1.13.4 with both
+extensions, and 4,206 plus 2 broken on 1.10.13 without them, both 59 above
+¶⁸: testset 47 (`root_rho` with a penalised smoother, 59 assertions). Its
+smallest margin is 2.80×, for the variance of `g(ρ₀)/√V` under `f₀` in 47d on
+1.10 (0.0319 against 0.0894); on 1.13 it is 2.95×, for the mean of the
+centred moment under a shrunk `f`. Testsets 46c and 47c now make a fixed
+number of assertions: they had guarded `@test`s over the intervals of `CS`,
+so 47c ran 2 fewer on 1.13's draw than on 1.10's.
+Top-level testsets rose from 63 to 64. The `src/` count rose by 252: 210 in
+`RootRho.jl` (the smoother path, its variance, `tensor_pspline` and the
+docstring) and 42 in 13 other files, where titleless references got full
+entries.
+
+Measured on master: 33 submodules plus the umbrella across 29,643 lines of
+`src/`, 11,660 lines of tests, 5,332 lines of examples across 34 scripts,
+398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 
 The `v0.4.0` row sits 68 lines above the measured row before it, and no
@@ -2084,12 +2110,12 @@ development line rather than across three releases.
 - Kelejian, H. H., & Piras, G. (2014). Estimation of spatial models with endogenous weighting matrices, and an application to a demand model for cigarettes. *Regional Science and Urban Economics*, 46, 140–149. **Read in part** in the accepted manuscript.
 - Kelejian, H. H., & Prucha, I. R. (2010). Specification and estimation of spatial autoregressive models with autoregressive and heteroskedastic disturbances. *Journal of Econometrics*, 157(1), 53–67. doi:10.1016/j.jeconom.2009.10.025
 - Klier, T., & McMillen, D. P. (2008). Clustering of auto supplier plants in the United States. *Journal of Business & Economic Statistics*, 26(4), 460–471.
-- Koley, M., & Bera, A. (2023). To use, or not to use the spatial Durbin model? — that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
-- Kopczewska, K., & Elhorst, J. P. (2023). New developments in spatial econometric modelling. *Spatial Economic Analysis*, 19(1), 1–7.
+- Koley, M., & Bera, A. (2024). To use, or not to use the spatial Durbin model? — that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
+- Kopczewska, K., & Elhorst, J. P. (2024). New developments in spatial econometric modelling. *Spatial Economic Analysis*, 19(1), 1–7.
 - Kostov, P. (2009). A spatial quantile regression hedonic model of agricultural land prices. *Spatial Economic Analysis*, 4(1), 53–72.
 - Krisztin, T., & Piribauer, P. (2021). A Bayesian approach for estimation of weight matrices in spatial autoregressive models. arXiv:2101.11938v2 (working paper; an earlier draft of the *Spatial Economic Analysis* article). **Read in part** from the TeX source.
-- Krzyśko, M., Nijkamp, P., Ratajczak, W., Wołyński, W., & Wenerska, B. (2023). Spatio-temporal principal component analysis. *Spatial Economic Analysis*, 19(1), 8–29.
-- Kubara, M., & Kopczewska, K. (2023). Akaike information criterion in choosing the optimal k-nearest neighbours of the spatial weight matrix. *Spatial Economic Analysis*, 19(1), 73–91.
+- Krzyśko, M., Nijkamp, P., Ratajczak, W., Wołyński, W., & Wenerska, B. (2024). Spatio-temporal principal component analysis. *Spatial Economic Analysis*, 19(1), 8–29.
+- Kubara, M., & Kopczewska, K. (2024). Akaike information criterion in choosing the optimal k-nearest neighbours of the spatial weight matrix. *Spatial Economic Analysis*, 19(1), 73–91.
 - Lam, C., & Souza, P. C. L. (2020). Estimation and selection of spatial weight matrix in a spatial lag model. *Journal of Business & Economic Statistics*, 38(3), 693–710. https://doi.org/10.1080/07350015.2019.1569526. **Read in part** in the accepted manuscript (Warwick WRAP 112458).
 - Lee, L.-F. (2004). Asymptotic distributions of quasi-maximum likelihood estimators for spatial autoregressive models. *Econometrica*, 72(6), 1899–1925. https://doi.org/10.1111/j.1468-0262.2004.00558.x
 - Lee, L. F., & Liu, X. (2010). Efficient GMM estimation of high order spatial autoregressive models with autoregressive disturbances. *Econometric Theory*, 26(1), 187–230.
@@ -2117,7 +2143,7 @@ development line rather than across three releases.
 - Shi, W., & Lee, L. F. (2017). Spatial dynamic panel data models with interactive fixed effects. *Journal of Econometrics*, 197(2), 323–347.
 - Smirnov, O. A. (2022). A closed-form consistent estimator for linear models with spatial dependence. *Geographical Analysis*, 54(1), 3–31. doi:10.1111/gean.12268 (online 28 Dec 2020, hence "2020" in Geniaux). **Verified and read** (2026-11-13) from the Early View version (paginated 1–29) held in `ExtRef/`; the DOI and title are confirmed by Scite and the issue pages come from library catalogues. Main text read in full; the cells of Tables 2–7 are scrambled by text extraction and were read through the prose that reports them. Geniaux's two uses of it check out: the estimator and the conservative variance (its Tables 3 and 6: the estimated variance exceeds the MSE by 10–20% at moderate `ρ` and by a factor of 2–3 at strong `ρ`).
 - Su, L., & Jin, S. (2010). Profile quasi-maximum likelihood estimation of partially linear spatial autoregressive models. *Journal of Econometrics*, 157(1), 18–33. doi:10.1016/j.jeconom.2009.10.033. **Verified, read in part** (2026-11-13), from the submitted manuscript of 23 Aug 2007 held in `ExtRef/`. Read: §1, §2 (model and the two-step profile QMLE), §3 (Assumptions 1–8), the statements of Theorems 4.1–4.4 and 5.1–5.4 as far as text extraction preserves them, §6 (simulations) and §7. Not read: the Appendix proofs. Its abstract carries the same content as the published one, in more detail. Because this is the pre-review manuscript, equation and theorem numbers may not match the article. In the simulations the asymptotic standard error of `m̂(0)` (about 0.08) is roughly half the empirical one (0.13–0.22) in the Table 3 rows that extraction keeps legible, so check the page images before relying on pointwise bands.
-- Sutton, J., & Sutton, J. (2023). A road map to capture the spatial dependence underlying regions' economic resilience. *Spatial Economic Analysis*, 19(1), 57–72.
+- Sutton, J., & Sutton, J. (2024). A road map to capture the spatial dependence underlying regions' economic resilience. *Spatial Economic Analysis*, 19(1), 57–72.
 - Vuong, Q. H. (1989). Likelihood ratio tests for model selection and non-nested hypotheses. *Econometrica*, 57(2), 307–333.
 - Walde, J., Larch, M., & Tappeiner, G. (2008). Performance contest between MLE and GMM for huge spatial autoregressive models. *Journal of Statistical Computation and Simulation*, 78(2), 151–166. **Cited only as a corrected result, and not used.** It advises against the Chebyshev approximation on a test at `q = 2`; Bivand (2010) shows `q = 5` performs well and reports that a correction was to be submitted.
 - Wang, C., Kockelman, K. M., & Wang, X. (2013). The spatial dimensions of land use change dynamics in the Austin, Texas Metropolitan Area. *Transportation Research Record*, 2397(1), 131–142.

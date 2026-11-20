@@ -18,6 +18,9 @@ r = root_rho(y, X, W; basis = B)
 r.rho, r.se, r.ci_wald, r.cs
 ```
 
+The basis can also be penalised, as a P-spline: see
+[With a penalised smoother](#With-a-penalised-smoother).
+
 ## The moment
 
 Write `y₀(ρ) = y − ρWy` and `M = I − P_[X,B]`. Smirnov's closed form solves
@@ -34,6 +37,16 @@ Jin & Lee (2012) replace `W` by a matrix with a zero diagonal:
 g(ρ) = y_0(ρ)'\,C\,y_0(ρ), \qquad C = (A − Δ)M,\quad
 Δ = \mathrm{Diag}(AM)\,\mathrm{Diag}(M)^{-1}.
 ```
+
+In Jin & Lee's own notation (2012, p. 451), the first step solves
+
+```math
+y_n'S_n'(ρ)\{W_n' − \mathrm{Diag}(W_n'M_{Z_n})[\mathrm{Diag}(M_{Z_n})]^{-1}\}M_{Z_n}S_n(ρ)y_n = 0,
+```
+
+and REsd uses ``G_n'(\hat ρ_n) − \mathrm{Diag}[G_n'(\hat ρ_n)M_{Z_n}][\mathrm{Diag}(M_{Z_n})]^{-1}``
+in place of the braces. Their `S_n(ρ)y_n` is `y₀(ρ)` here, `M_{Z_n}` is `M`,
+and the braces times `M_{Z_n}` are `C`.
 
 Then `diag C = 0` and `C[X, B] = 0`, so `E g(ρ₀) = tr(CΣ) = 0` for any
 diagonal `Σ`: the moment is exact under heteroskedasticity of unknown form,
@@ -89,13 +102,48 @@ fits `f` best:
 `β̂` is reported as a point estimate from least squares of `y − ρ̂Wy` on
 `[X, B]`, **without standard errors**: the theory covers `ρ` only.
 
+## With a penalised smoother
+
+A penalty lets the basis be large without spending one degree of freedom
+per column:
+
+```julia
+ps = tensor_pspline(u, v; k = 15)         # 225 hat functions and a difference penalty
+r = root_rho(y, X, W; ps..., lambda = 0.1)
+r.df                                      # tr S, the effective number of columns
+```
+
+The first stage is then `S = Z(Z′Z + λΩ̃)⁻¹Z′`, with `X` unpenalised, and
+`M = I − S` is not idempotent. Two things change.
+
+- **The moment.** It is the one-step exact-diagonal moment
+  `y₀′Ay₀`, with `A = MW + MDM` and `(M∘M)d = −diag(MW)`, so `diag A = 0`.
+  Jin & Lee's two-step is not used. Its plug-in result needs `Mf = 0`, and a
+  smoother shrinks `f`, so `Mf ≠ 0`. `A` is formed as a matrix: the shortcut
+  through residual vectors, `(My₀)′(MWy₀ + DMy₀)`, is a different moment when
+  `M² ≠ M`, and it is biased.
+- **The variance.** The HC2 plug-in is `ûᵢ²/(M²)ᵢᵢ`, and the noise term uses
+  `H = (A + A′)S` (THEORY.md, Proposition 4(c)).
+
+**The shrinkage is a bias.** At the true `ρ` the moment's mean is `f′Af`,
+not zero. It grows with `λ`, and both intervals under-cover once
+`c = f′Af/√V` is not small: the test-inversion set covers at about
+`P(|Z + c| ≤ 1.96)`. So choose `λ` **small**, smaller than a good fit of `f`
+needs. GCV and the RMSE-optimal `λ` were too large for valid inference in
+`research/trace_cfe/tc_lambda.jl`, which is why `lambda` has no default.
+Report `ρ̂` across a few `λ`, as section 4 of `examples/34_root_rho.jl`
+does. `df/n` above 0.30 gives a warning, and a unit with `Sᵢᵢ` above 0.99
+is refused.
+
 ## Cost
 
 Everything is dense: about four `n × n` matrices. `n` is capped at
 `max_dense_n = 4000` by default (about 0.5 GB); raise it if the memory is
 there. With the largest basis of the Monte Carlo (`K/n` ≈ 0.19), one
 replication (a `root_rho` fit plus a `closed_form_rho` fit) took 0.12 s at
-`n = 900` and 0.35 s at `n = 1600`.
+`n = 900` and 0.35 s at `n = 1600`. The penalised smoother holds about six
+`n × n` matrices and solves one dense `n × n` system. One fit took 0.10 s at
+`n = 900` (`k = 15`) and 0.29 s at `n = 1600` (`k = 20`).
 
 ## What is proved and what is measured
 
@@ -104,10 +152,11 @@ dimension. The results for a basis that grows with `n` are in
 `research/trace_cfe/THEORY.md`: a CLT for the moment with a dense `M`
 (Theorem 1), the first step's plug-in having no first-order effect
 (Proposition 1), the consistency of HC2 `V̂` (Proposition 2), and the
-validity of `CS` without identification (Proposition 6). **No one else has
+validity of `CS` without identification (Proposition 6). The penalised
+smoother, its moment and its `V̂` are Proposition 4. **No one else has
 checked these proofs.**
 
-## What the Monte Carlo shows
+## What the Monte Carlo shows: the projection
 
 `validation/mc_root_rho.jl` uses 108 cells of 1000 replications each. The
 cells cross:
@@ -143,6 +192,45 @@ Throughout, `ρ₀ = 0.4`. The Monte Carlo SE of a coverage near 0.95 is 0.007.
   In these cells `CS` gives a wide set where the data say little about `ρ`.
   In every other cell, `CS` and the Wald interval agree closely.
 
+## What the Monte Carlo shows: the smoother
+
+`validation/mc_root_rho_smoother.jl` uses 108 cells of 1000 replications
+each. The cells cross:
+
+- `W`: kNN-6, rook, kNN-20;
+- `n` = 400, 900, 1600, with `k` = 10, 15, 20 knots a side (`k²/n` = 0.25);
+- `λ` = 0.01, 0.1, 1;
+- `f = x + a·sin(2πu)cos(πv)` with `a` = 1 or 4;
+- smooth variances with normal errors, or rough variances with
+  standardised `χ²₃` errors.
+
+Throughout, `ρ₀ = 0.4`. In each cell the size of the shrinkage bias,
+`c = f′Af/√V`, is computed exactly, and with it the predicted coverage
+`P(|Z + c| ≤ 1.96)`. The pass criterion, set before the run: in every cell
+with `c ≤ 0.25`, both intervals cover within 0.93–0.99. In the other cells
+the coverage is compared with the prediction.
+
+**Results** (`validation/mc_root_rho_smoother_output.txt`, 310 minutes).
+The pass criterion holds:
+- **`c ≤ 0.25` (75 of 108 cells):** the Wald interval covers 0.935–0.982 and
+  `CS` 0.934–0.982, and `|bias|` of `ρ̂` is at most 0.045. This includes the
+  weakly identified kNN-20 cells at `n = 400`, where up to 62 of 1000 draws
+  have no root and `CS` still covers 0.929–0.964.
+- **`c > 0.25` (33 cells):** the coverage falls as predicted. `CS` is within
+  0.027 of `P(|Z + c| ≤ 1.96)` in every cell, and the Wald interval within
+  −0.007 to +0.077 of it. At `a = 4`, `λ = 1`, `c` reaches 8.2 and both
+  intervals cover almost never: the bias is `f′Af`, not noise.
+- **What sets `c`:** with `a = 1`, every cell at `λ ≤ 0.1` has `c ≤ 0.13`;
+  with `a = 4`, `λ = 0.01` keeps `c ≤ 0.33`, but `λ = 0.1` already gives up
+  to 1.8. So choose `λ` small enough that `r.df` stays well above the
+  smoothness of `f`, and report results across a few `λ`. There is no rule
+  for choosing `λ` yet.
+- **Power:** the residual-vector shortcut, on the same draws, is biased by
+  −0.015 to −0.244 in the `c ≤ 0.25` cells, and its Wald interval covers
+  below 0.93 in 48 of them (down to 0.512).
+- **The package against the dense reference:** `ρ̂` equal to 1.6e-14 and the
+  SE to 6.4e-16, on the first draw of every cell.
+
 ## References
 
 - Anderson, T. W., & Rubin, H. (1949). Estimation of the parameters of a
@@ -151,7 +239,8 @@ Throughout, `ρ₀ = 0.4`. The Monte Carlo SE of a coverage near 0.95 is 0.007.
 - Jin, F., & Lee, L.-F. (2012). Approximated likelihood and root estimators
   for spatial interaction in spatial autoregressive models. *Regional
   Science and Urban Economics*, 42(3), 446–458.
-- Smirnov, O. A. (2022). Closed-form estimator for spatial autoregressive
-  models. *Geographical Analysis*, 54(1), 3–31.
+- Smirnov, O. A. (2022). A closed-form consistent estimator for linear
+  models with spatial dependence. *Geographical Analysis*, 54(1), 3–31.
+  https://doi.org/10.1111/gean.12268
 - Stock, J. H., & Wright, J. H. (2000). GMM with weak identification.
   *Econometrica*, 68(5), 1055–1096.

@@ -14,7 +14,7 @@ The estimator here puts the spillover in the regression instead, where it
 can be measured.
 
 ```math
-y_{it} = \mu_i + \gamma_t + \tau \, D_i \text{post}_t + \delta \, E_i \text{post}_t + \varepsilon_{it}
+y_{it} = \mu_i + \xi_t + \tau \, D_i \text{post}_t + \delta \, E_i \text{post}_t + \varepsilon_{it}
 ```
 
 with ``E = WD`` the **exposure**: the fraction of ``i``'s neighbours that
@@ -567,8 +567,9 @@ description.
 
 ## References
 
-- Delgado, M. & Florax, R. (2015). Difference-in-differences techniques for
-  spatial spillovers. *Economics Letters*, 137.
+- Delgado, M. S. & Florax, R. J. G. M. (2015). Difference-in-differences
+  techniques for spatial data: local autocorrelation and spatial interaction.
+  *Economics Letters*, 137, 123–126.
 - Chagas, A., Azzoni, C. & Almeida, A. (2016). A spatial
   difference-in-differences analysis of the impact of sugarcane production.
   *Regional Science and Urban Economics*, 59.

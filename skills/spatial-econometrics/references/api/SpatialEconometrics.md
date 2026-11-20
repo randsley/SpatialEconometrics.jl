@@ -220,8 +220,13 @@ See also [`robust_coeftable`](@ref), `vcov_driscoll_kraay`,
 `vcov_conley`.
 
 ### References
-Driscoll, J. & Kraay, A. (1998). *Review of Economics and Statistics*,
-80(4). Conley, T. (1999). *Journal of Econometrics*, 92(1).
+Driscoll, J. C., & Kraay, A. C. (1998). Consistent covariance matrix
+estimation with spatially dependent panel data. *Review of Economics and
+Statistics*, 80(4), 549–560. https://doi.org/10.1162/003465398557825
+
+Conley, T. G. (1999). GMM estimation with cross sectional dependence.
+*Journal of Econometrics*, 92(1), 1–45.
+https://doi.org/10.1016/S0304-4076(98)00084-0
 
 ## `spatial_effects`
 

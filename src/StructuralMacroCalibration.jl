@@ -212,7 +212,9 @@ balanced matrix alone.
     calibration or estimation problem.
 
 # References
-Junius, T. & Oosterhaven, J. (2003). *Economic Systems Research*, 15(1).
+Junius, T., & Oosterhaven, J. (2003). The solution of updating or
+regionalizing a matrix with both positive and negative entries. *Economic
+Systems Research*, 15(1), 87–96. https://doi.org/10.1080/0953531032000056954
 """
 function balance_gras_full(X0::AbstractMatrix{T}, u::AbstractVector{T}, v::AbstractVector{T}; kwargs...) where {T<:AbstractFloat}
     return solve_gras_primal_dual(X0, u, v; kwargs...)

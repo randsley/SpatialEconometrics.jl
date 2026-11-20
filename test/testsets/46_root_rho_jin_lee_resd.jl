@@ -69,15 +69,16 @@
         z = 1.959963984540054
         q(ρ) = (r.c - r.b * ρ + r.a * ρ^2)^2 - z^2 * RR._polyval(r.vpoly, ρ)
         sc = z^2 * RR._polyval(r.vpoly, r.rho)          # the scale of q near ρ̂
+        # A fixed number of assertions, whatever the number of intervals or
+        # whether the set touches a bound: a guarded @test that does not run
+        # leaves no trace but the count, and the count differs by RNG stream.
         @test !isempty(r.cs)
-        for (lo, hi) in r.cs
-            for e in (lo, hi)
-                e in r.rho_bounds || @test abs(q(e)) < 1e-8 * sc
-            end
-            @test all(q(t) <= 0 for t in range(lo, hi; length = 9)[2:end-1])
-            lo > r.rho_bounds[1] && @test q(lo - 1e-4) > 0
-            hi < r.rho_bounds[2] && @test q(hi + 1e-4) > 0
-        end
+        ends = [e for (lo, hi) in r.cs for e in (lo, hi)]
+        @test any(e ∉ r.rho_bounds for e in ends)     # the next check is not vacuous
+        @test all(e in r.rho_bounds || abs(q(e)) < 1e-8 * sc for e in ends)
+        @test all(all(q(t) <= 0 for t in range(lo, hi; length = 9)[2:end-1]) for (lo, hi) in r.cs)
+        @test all(lo == r.rho_bounds[1] || q(lo - 1e-4) > 0 for (lo, hi) in r.cs)
+        @test all(hi == r.rho_bounds[2] || q(hi + 1e-4) > 0 for (lo, hi) in r.cs)
         @test any(lo <= r.rho <= hi for (lo, hi) in r.cs)
         # The root finder on a quartic with known roots −0.5, 0.2, 0.3, 0.8.
         pk = [1.0]

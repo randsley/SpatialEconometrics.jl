@@ -667,8 +667,10 @@ In six-period panels with constant variance its intervals then covered at
 0.89–0.92, and Sargan's test rejected 13% of true nulls.
 
 # References
-Kelejian, H. & Prucha, I. (1998). *Journal of Real Estate Finance and
-Economics*, 17(1).
+Kelejian, H. H., & Prucha, I. R. (1998). A generalized spatial two-stage
+least squares procedure for estimating a spatial autoregressive model with
+autoregressive disturbances. *Journal of Real Estate Finance and Economics*,
+17(1), 99–121. https://doi.org/10.1023/A:1007707430416
 
 Kelejian, H. H. & Prucha, I. R. (2010). Specification and estimation of
 spatial autoregressive models with autoregressive and heteroskedastic

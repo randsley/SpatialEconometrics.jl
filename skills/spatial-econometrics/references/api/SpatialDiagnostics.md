@@ -145,7 +145,9 @@ column.
 A [`ScoreTestResult`](@ref).
 
 ### References
-Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56.
+Koley, M., & Bera, A. K. (2024). To use, or not to use the spatial Durbin
+model? – that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
+https://doi.org/10.1080/17421772.2023.2256810
 
 ## `lm_test_durbin_terms`
 
@@ -169,7 +171,9 @@ multiple-testing caveat: read [`lm_test_sdm`](@ref) first.
 A `Vector` of [`ScoreTestResult`](@ref), length `k`.
 
 ### References
-Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56.
+Koley, M., & Bera, A. K. (2024). To use, or not to use the spatial Durbin
+model? – that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
+https://doi.org/10.1080/17421772.2023.2256810
 
 ## `lm_test_error`
 
@@ -233,8 +237,11 @@ column.
 A [`ScoreTestResult`](@ref).
 
 ### References
-Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56.
-Bera, A. K., & Yoon, M. J. (1993). *Econometric Theory*, 9(4), 649–658.
+Koley, M., & Bera, A. K. (2024). To use, or not to use the spatial Durbin
+model? – that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
+https://doi.org/10.1080/17421772.2023.2256810
+Bera, A. K., & Yoon, M. J. (1993). Specification testing with locally
+misspecified alternatives. *Econometric Theory*, 9(4), 649–658.
 
 ## `lm_test_robust_error`
 
@@ -252,8 +259,9 @@ separates an error process from a lag process when both plain tests reject.
 An [`LMTestResult`](@ref).
 
 ### References
-Anselin, L., Bera, A., Florax, R. & Yoon, M. (1996). *Regional Science and
-Urban Economics*, 26(1).
+Anselin, L., Bera, A. K., Florax, R., & Yoon, M. J. (1996). Simple
+diagnostic tests for spatial dependence. *Regional Science and Urban
+Economics*, 26(1), 77–104. https://doi.org/10.1016/0166-0462(95)02111-6
 
 ## `lm_test_robust_lag`
 
@@ -297,7 +305,9 @@ Chi-squared with 1 degree of freedom. `X` must include an intercept column.
 A [`ScoreTestResult`](@ref).
 
 ### References
-Koley, M., & Bera, A. (2023). *Spatial Economic Analysis*, 19(1), 30–56.
+Koley, M., & Bera, A. K. (2024). To use, or not to use the spatial Durbin
+model? – that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
+https://doi.org/10.1080/17421772.2023.2256810
 
 ## `lm_test_sdm`
 
@@ -323,7 +333,7 @@ A [`ScoreTestResult`](@ref).
 See also [`sdm_tests`](@ref), which runs the whole battery.
 
 ### References
-Koley, M., & Bera, A. (2023). To use, or not to use the spatial Durbin
+Koley, M., & Bera, A. (2024). To use, or not to use the spatial Durbin
 model? — that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
 
 ## `lm_tests`
@@ -363,8 +373,9 @@ m = t.robust_lag.p_value < t.robust_error.p_value ?
     residuals are taken around zero and every statistic is wrong.
 
 ### References
-Anselin, L., Bera, A., Florax, R. & Yoon, M. (1996). *Regional Science and
-Urban Economics*, 26(1).
+Anselin, L., Bera, A. K., Florax, R., & Yoon, M. J. (1996). Simple
+diagnostic tests for spatial dependence. *Regional Science and Urban
+Economics*, 26(1), 77–104. https://doi.org/10.1016/0166-0462(95)02111-6
 
 ## `moran_global`
 
@@ -452,7 +463,7 @@ Anselin, L. (1995). Local indicators of spatial association — LISA.
 
     sdm_tests(y, X, W) -> NamedTuple
 
-Run the Koley & Bera (2023) Durbin battery and return it as
+Run the Koley & Bera (2024) Durbin battery and return it as
 `(; joint, lag, robust_lag, durbin, robust_durbin, terms)`.
 
 `lag` is [`lm_test_lag`](@ref), included because it is the `rho = 0`
@@ -517,9 +528,9 @@ counterpart does not. The price is power when both are present — row three,
 where `robust_durbin` reaches 0.448 against `durbin`'s 0.772.
 
 ### References
-Koley, M., & Bera, A. (2023). To use, or not to use the spatial Durbin
+Koley, M., & Bera, A. (2024). To use, or not to use the spatial Durbin
 model? — that is the question. *Spatial Economic Analysis*, 19(1), 30–56.
 
-Bera, A. K., & Yoon, M. J. (1993). Simple diagnostic tests for spatial
-dependence. *Econometric Theory*, 9(4), 649–658.
+Bera, A. K., & Yoon, M. J. (1993). Specification testing with locally
+misspecified alternatives. *Econometric Theory*, 9(4), 649–658.
 

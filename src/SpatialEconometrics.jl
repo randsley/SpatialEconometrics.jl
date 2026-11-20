@@ -108,7 +108,7 @@ import .SpatialNetworks: network_weights, group_weights, PeerIdentification, pee
 import .SpatialCommonFactors: CDTestResult, pesaran_cd, AlphaExponentResult, alpha_exponent, DependenceVerdict, dependence_verdict, SpCCEModel, fit_sp_cce
 import .SpatioTemporalModels: STARModel, fit_star, InteractiveFEModel, fit_interactive_fe, factor_projection, IRFResult, space_time_irf, spatial_forecast
 import .SemiparametricSpatial: local_polynomial_smoother, SpectralOverlapResult, spectral_overlap, PartiallyLinearSARModel, fit_partially_linear_sar, ClosedFormRhoResult, closed_form_rho, TVCoefSARModel, fit_tv_coef_sar
-import .RootRho: RootRhoResult, root_rho
+import .RootRho: RootRhoResult, root_rho, tensor_pspline
 import .CREDynamicSpatialPanel: CREDynamicSpatialPanelModel, fit_cre_dynamic_spatial_panel
 import .CommonShockDynamicPanel: CommonShockDynamicPanelModel, fit_common_shock_dynamic_panel
 import .SpatialGARCH: SpatialLogGARCHModel, fit_spatial_log_garch
@@ -148,8 +148,13 @@ See also [`robust_coeftable`](@ref), `vcov_driscoll_kraay`,
 `vcov_conley`.
 
 # References
-Driscoll, J. & Kraay, A. (1998). *Review of Economics and Statistics*,
-80(4). Conley, T. (1999). *Journal of Econometrics*, 92(1).
+Driscoll, J. C., & Kraay, A. C. (1998). Consistent covariance matrix
+estimation with spatially dependent panel data. *Review of Economics and
+Statistics*, 80(4), 549–560. https://doi.org/10.1162/003465398557825
+
+Conley, T. G. (1999). GMM estimation with cross sectional dependence.
+*Journal of Econometrics*, 92(1), 1–45.
+https://doi.org/10.1016/S0304-4076(98)00084-0
 """
 function robust_vcov(m::SpatialRegressionModel, spec::ConleySpatialHAC)
     Z_eff, bread_inv = SpatialHAC.extract_spatial_jacobian_scores(m.X_aug, m.W, m.coef, m.rho, m.sigma2, m.vcov, length(m.y), 1)
@@ -587,7 +592,7 @@ export
     ClosedFormRhoResult, closed_form_rho,
     TVCoefSARModel, fit_tv_coef_sar,
     # Root estimator with a growing basis (Jin & Lee 2012, REsd)
-    RootRhoResult, root_rho,
+    RootRhoResult, root_rho, tensor_pspline,
     # Short-T dynamic spatial panel with correlated random effects (Li & Yang 2021)
     CREDynamicSpatialPanelModel, fit_cre_dynamic_spatial_panel,
     # Short-T dynamic spatial panel with common shocks (Bai & Chen 2026)

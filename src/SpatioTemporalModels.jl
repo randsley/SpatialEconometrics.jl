@@ -739,8 +739,10 @@ end
 
 # References
 
-- Bai, J. (2009). *Econometrica*, 77(4), 1229–1279.
-- Shi, W., & Lee, L. F. (2017). *Journal of Econometrics*, 197(2), 323–347.
+- Bai, J. (2009). Panel data models with interactive fixed effects.
+  *Econometrica*, 77(4), 1229–1279.
+- Shi, W., & Lee, L.-F. (2017). Spatial dynamic panel data models with
+  interactive fixed effects. *Journal of Econometrics*, 197(2), 323–347.
 """
 function fit_interactive_fe(
     y::AbstractVector{T},

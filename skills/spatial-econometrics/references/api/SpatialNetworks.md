@@ -341,9 +341,9 @@ Fortin's (2009) rank condition.
 Their Proposition 1: social effects are identified if `I`, `G` and `G²` are
 linearly independent; if those are linearly dependent and no individual is
 isolated, social effects are **not** identified. Their footnote 17 gives the
-check used here, in their words: vectorize each matrix, stack the columns,
-and verify whether the matrix formed by concatenating these stacked vectors
-has rank three.
+check used here: vectorize each matrix, stack its columns on top of each
+other, and check whether the matrix formed from these stacked vectors has
+rank three.
 
 With `fixed_effects = true` the model is their eq. (10), the structural
 equation after the within-local transformation `(I - G)` that sweeps out a
