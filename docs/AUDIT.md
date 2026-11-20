@@ -5586,7 +5586,7 @@ header; it is not data, and the script now runs the warm-up silently.
 
 ## `root_rho`: the sign rule's assumption `J > 0`, and a check for it
 
-Added on 2026-11-20 after a review of the theory note (`research/review.md`).
+Added on 2026-11-20 after a review of the theory note.
 `root_rho` takes the root of the quadratic moment at which `g′ < 0`. That
 picks the consistent root only if `J = −E g′(ρ₀) > 0` (THEORY.md, A9),
 which was assumed and not stated in the docstring. If `J < 0`, the rule's

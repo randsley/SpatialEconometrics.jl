@@ -15,7 +15,7 @@ proved, and the leave-out alternatives are measured. Then Proposition 3
 (approximation error) replaces the sketched Remark 1, which had missed a
 first-order term, and Proposition 4 (a penalised smoother) replaces
 Remark 3, and Proposition 5 gives a primitive condition for A5.
-Revised on 2026-11-20 after a review (`research/review.md`): a gap in
+Revised on 2026-11-20 after a review: a gap in
 Proposition 2, step 3, is closed (the `ζ` part of `b̂`), the steps it
 asked to be explicit are written out, the meaning of `H` is fixed, and the
 sign of `J` is measured (`tc_sign.jl`), with a check in `root_rho`.

@@ -27,3 +27,6 @@ benchmark/results/
 # Primary sources read for the roadmap and the ledger. Local copies of
 # published papers -- never redistributed with the package.
 ExtRef/
+
+# Reviews of the research notes stay local
+research/review.md
