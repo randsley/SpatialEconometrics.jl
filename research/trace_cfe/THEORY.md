@@ -911,6 +911,23 @@ With GCV's own choice, coverage is **0.888** (a = 1) and **0.320**
   default is to undersmooth: take λ at the small end of the range where
   `V̂` is still stable, and report `sd(ρ̂)` across λ as a sensitivity
   check. The same holds for K with a projection (`tc_approx.jl`).
+- **Removing the bias from the moment removes the gain too** (`tc_rbc.jl`).
+  With the projection as pilot, `C_λ = A_λ − P_BA_λP_B + M₀D₀M₀`, with `D₀`
+  chosen so that `diag C_λ = 0`, has `f′C_λf = 0` for every `f` in span(B)
+  and every λ, and `C_0` is the projection moment. So λ can be chosen by
+  `V̂/g′²` alone, and coverage holds: 0.952 and 0.956 at the chosen λ, and
+  0.94–0.97 in every cell, with an exact `|c|` ≤ 0.044 although `f` is not
+  in span(B). But the sd is 0.110–0.138 at every λ, against 0.127 and
+  0.114 for the projection. The best member gains 3–4% over the projection
+  (0.122 against 0.127 at a = 1, 0.110 against 0.114 at a = 4). The
+  smoother's own sd falls to 0.058 and 0.044 at λ = 1. Power check: the
+  same rule on the plain smoother picks λ = 100 in all 500 draws and
+  covers 0.418 and 0.000. So among moments that are unbiased for every `f`
+  in span(B), smoothing gains almost nothing here. The smoother's
+  efficiency is bought with its bias. A λ with a coverage guarantee and a
+  real gain therefore needs a restriction on `f` beyond `f ∈ span(B)`, such
+  as a bound on `θ′Ωθ`. This is the usual finding that an adaptive interval
+  cannot be honest without a smoothness bound.
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -1719,9 +1736,12 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
-   too noisy (sd 0.8–2.9) to choose λ. Still open: a data-driven λ (or K)
-   with a coverage guarantee, for example one targeting `c_β` rather than the
-   fit of `f`.
+   too noisy (sd 0.8–2.9) to choose λ. Bias-corrected moments
+   (`tc_rbc.jl`) give the guarantee but gain only 3–4% over the projection.
+   Still open: a λ with a coverage guarantee and a real gain. This needs a
+   bound on the roughness of `f`, for example a worst-case bias over
+   `{f = Bθ : θ′Ωθ ≤ M²}` added to the critical value, and the cross term
+   that the unpenalised part of `f` makes in `f′A_λf`.
 5. Reading: de Jong (1987), Bhansali, Giraitis & Kokoszka (2007), Kelejian &
    Prucha (2001) and Hall & Heyde's §3.2 are read. Cattaneo, Jansson & Newey
    (2018) §3 and Kline, Saggio & Sølvsten (2020) §4.2 have been read via
