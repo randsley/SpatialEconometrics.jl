@@ -81,14 +81,16 @@ function run(; n = 900, kh = 15, amp = 1.0, R = 500, ρ0 = 0.4, seed = 5,
         β = dot(f, A * f); vf = T * f
         Rn = Diagonal(1 ./ sqrt.(ω)) * (U' * (T * Pb)); colsq = vec(sum(abs2, Rn; dims = 1))
         objs[j] = (; A, As2 = As .^ 2, H, H2 = H .^ 2, M, m2 = diag(M * M), T, μbar, colsq,
-                     β, V, J, lin = sqrt(dot(vf, Ωplus * vf)))
+                     τ = opnorm(Rn), φ = norm(Rn), β, V, J, lin = sqrt(dot(vf, Ωplus * vf)))
     end
-    println("  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|")
+    println("  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|;")
+    println("      Proposition 7's plug-in sizes, Γ = Ω^{+1/2}TP_B: P1 = M*τ/√V, P2 = M*φ/√V, P3 = M*τ√K/√V")
     for j in 1:L
-        o = objs[j]; bb = Mstar * o.lin + Mstar^2 * o.μbar
-        @printf("    λ %8.4f | c %+8.3f  b̄/√V %8.3f (linear %7.3f, quadratic %7.3f) | %s | sd* %.4f\n",
-                λs[j], o.β / sqrt(o.V), bb / sqrt(o.V), Mstar * o.lin / sqrt(o.V),
-                Mstar^2 * o.μbar / sqrt(o.V), abs(o.β) <= bb ? "holds  " : "exceeds", sqrt(o.V) / abs(o.J))
+        o = objs[j]; bb = Mstar * o.lin + Mstar^2 * o.μbar; sV = sqrt(o.V)
+        @printf("    λ %8.4f | c %+8.3f  b̄/√V %8.3f (linear %7.3f, quadratic %7.3f) | %s | sd* %.4f | P1 %.4f P2 %.3f P3 %.3f\n",
+                λs[j], o.β / sV, bb / sV, Mstar * o.lin / sV, Mstar^2 * o.μbar / sV,
+                abs(o.β) <= bb ? "holds  " : "exceeds", sV / abs(o.J),
+                Mstar * o.τ / sV, Mstar * o.φ / sV, Mstar * o.τ * sqrt(size(Q, 2)) / sV)
     end
     Fac = lu(sparse(I - ρ0 * W)); nm = length(mults)
     cov = zeros(R, L, nm); len = fill(Inf, R, L, nm); ρh = fill(NaN, R, L)

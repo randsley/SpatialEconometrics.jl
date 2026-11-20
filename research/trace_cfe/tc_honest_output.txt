@@ -1,7 +1,8 @@
 amp 1, n = 900, K = 226, R = 3; M* = √(θ*′Ωθ*) = 1.598; ‖f − Bθ*‖/‖f‖ = 0.0028
-  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|
-    λ   0.0000 | c   +0.003  b̄/√V    0.000 (linear   0.000, quadratic   0.000) | exceeds | sd* 0.1267
-    λ   1.0000 | c   +0.096  b̄/√V    0.342 (linear   0.339, quadratic   0.003) | holds   | sd* 0.0581
+  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|;
+      Proposition 7's plug-in sizes, Γ = Ω^{+1/2}TP_B: P1 = M*τ/√V, P2 = M*φ/√V, P3 = M*τ√K/√V
+    λ   0.0000 | c   +0.003  b̄/√V    0.000 (linear   0.000, quadratic   0.000) | exceeds | sd* 0.1267 | P1 0.0000 P2 0.000 P3 0.000
+    λ   1.0000 | c   +0.096  b̄/√V    0.342 (linear   0.339, quadratic   0.003) | holds   | sd* 0.0581 | P1 0.0376 P2 0.263 P3 0.566
   (2) honest coverage / mean half-length per λ, by M/M*; plug-in lin / oracle lin: mean (sd) debiased, mean raw
     λ         |    M/M* = 0.0        M/M* = 0.5        M/M* = 1.0        M/M* = 2.0        M/M* = 4.0    | lin ratio
       0.0000 | 1.000 / 0.2562 | 1.000 / 0.2562 | 1.000 / 0.2562 | 1.000 / 0.2562 | 1.000 / 0.2562 | 1.139 (0.335), raw 1.272
@@ -17,19 +18,20 @@ amp 1, n = 900, K = 226, R = 3; M* = √(θ*′Ωθ*) = 1.598; ‖f − Bθ*‖/
 (warm-up above)
 
 amp 1, n = 900, K = 226, R = 500; M* = √(θ*′Ωθ*) = 1.598; ‖f − Bθ*‖/‖f‖ = 0.0028
-  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|
-    λ   0.0000 | c   +0.003  b̄/√V    0.000 (linear   0.000, quadratic   0.000) | exceeds | sd* 0.1267
-    λ   0.0010 | c   +0.003  b̄/√V    0.004 (linear   0.004, quadratic   0.000) | holds   | sd* 0.1216
-    λ   0.0032 | c   +0.003  b̄/√V    0.011 (linear   0.011, quadratic   0.000) | holds   | sd* 0.1160
-    λ   0.0100 | c   +0.004  b̄/√V    0.030 (linear   0.030, quadratic   0.000) | holds   | sd* 0.1054
-    λ   0.0316 | c   +0.006  b̄/√V    0.071 (linear   0.070, quadratic   0.001) | holds   | sd* 0.0900
-    λ   0.1000 | c   +0.014  b̄/√V    0.138 (linear   0.137, quadratic   0.001) | holds   | sd* 0.0751
-    λ   0.3162 | c   +0.035  b̄/√V    0.225 (linear   0.224, quadratic   0.002) | holds   | sd* 0.0647
-    λ   1.0000 | c   +0.096  b̄/√V    0.342 (linear   0.339, quadratic   0.003) | holds   | sd* 0.0581
-    λ   3.1623 | c   +0.261  b̄/√V    0.536 (linear   0.529, quadratic   0.007) | holds   | sd* 0.0534
-    λ  10.0000 | c   +0.659  b̄/√V    0.926 (linear   0.912, quadratic   0.014) | holds   | sd* 0.0491
-    λ  31.6228 | c   +1.331  b̄/√V    1.617 (linear   1.591, quadratic   0.026) | holds   | sd* 0.0455
-    λ 100.0000 | c   +1.949  b̄/√V    2.367 (linear   2.317, quadratic   0.050) | holds   | sd* 0.0436
+  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|;
+      Proposition 7's plug-in sizes, Γ = Ω^{+1/2}TP_B: P1 = M*τ/√V, P2 = M*φ/√V, P3 = M*τ√K/√V
+    λ   0.0000 | c   +0.003  b̄/√V    0.000 (linear   0.000, quadratic   0.000) | exceeds | sd* 0.1267 | P1 0.0000 P2 0.000 P3 0.000
+    λ   0.0010 | c   +0.003  b̄/√V    0.004 (linear   0.004, quadratic   0.000) | holds   | sd* 0.1216 | P1 0.0003 P2 0.002 P3 0.005
+    λ   0.0032 | c   +0.003  b̄/√V    0.011 (linear   0.011, quadratic   0.000) | holds   | sd* 0.1160 | P1 0.0010 P2 0.007 P3 0.014
+    λ   0.0100 | c   +0.004  b̄/√V    0.030 (linear   0.030, quadratic   0.000) | holds   | sd* 0.1054 | P1 0.0027 P2 0.019 P3 0.040
+    λ   0.0316 | c   +0.006  b̄/√V    0.071 (linear   0.070, quadratic   0.001) | holds   | sd* 0.0900 | P1 0.0067 P2 0.048 P3 0.100
+    λ   0.1000 | c   +0.014  b̄/√V    0.138 (linear   0.137, quadratic   0.001) | holds   | sd* 0.0751 | P1 0.0134 P2 0.100 P3 0.202
+    λ   0.3162 | c   +0.035  b̄/√V    0.225 (linear   0.224, quadratic   0.002) | holds   | sd* 0.0647 | P1 0.0231 P2 0.172 P3 0.347
+    λ   1.0000 | c   +0.096  b̄/√V    0.342 (linear   0.339, quadratic   0.003) | holds   | sd* 0.0581 | P1 0.0376 P2 0.263 P3 0.566
+    λ   3.1623 | c   +0.261  b̄/√V    0.536 (linear   0.529, quadratic   0.007) | holds   | sd* 0.0534 | P1 0.0603 P2 0.381 P3 0.907
+    λ  10.0000 | c   +0.659  b̄/√V    0.926 (linear   0.912, quadratic   0.014) | holds   | sd* 0.0491 | P1 0.0981 P2 0.533 P3 1.475
+    λ  31.6228 | c   +1.331  b̄/√V    1.617 (linear   1.591, quadratic   0.026) | holds   | sd* 0.0455 | P1 0.1595 P2 0.716 P3 2.397
+    λ 100.0000 | c   +1.949  b̄/√V    2.367 (linear   2.317, quadratic   0.050) | holds   | sd* 0.0436 | P1 0.2486 P2 0.936 P3 3.737
   (2) honest coverage / mean half-length per λ, by M/M*; plug-in lin / oracle lin: mean (sd) debiased, mean raw
     λ         |    M/M* = 0.0        M/M* = 0.5        M/M* = 1.0        M/M* = 2.0        M/M* = 4.0    | lin ratio
       0.0000 | 0.966 / 0.2501 | 0.966 / 0.2501 | 0.966 / 0.2501 | 0.966 / 0.2501 | 0.966 / 0.2501 | 0.928 (0.378), raw 1.124
@@ -53,19 +55,20 @@ amp 1, n = 900, K = 226, R = 500; M* = √(θ*′Ωθ*) = 1.598; ‖f − Bθ*�
     reference: the projection's Wald half-length 0.2501
 
 amp 4, n = 900, K = 226, R = 500; M* = √(θ*′Ωθ*) = 6.393; ‖f − Bθ*‖/‖f‖ = 0.0056
-  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|
-    λ   0.0000 | c   +0.029  b̄/√V    0.000 (linear   0.000, quadratic   0.000) | exceeds | sd* 0.1142
-    λ   0.0010 | c   +0.031  b̄/√V    0.017 (linear   0.016, quadratic   0.001) | exceeds | sd* 0.1097
-    λ   0.0032 | c   +0.036  b̄/√V    0.049 (linear   0.047, quadratic   0.002) | holds   | sd* 0.1046
-    λ   0.0100 | c   +0.050  b̄/√V    0.130 (linear   0.125, quadratic   0.005) | holds   | sd* 0.0950
-    λ   0.0316 | c   +0.097  b̄/√V    0.306 (linear   0.295, quadratic   0.010) | holds   | sd* 0.0810
-    λ   0.1000 | c   +0.232  b̄/√V    0.616 (linear   0.599, quadratic   0.017) | holds   | sd* 0.0668
-    λ   0.3162 | c   +0.598  b̄/√V    1.121 (linear   1.096, quadratic   0.024) | holds   | sd* 0.0549
-    λ   1.0000 | c   +1.594  b̄/√V    2.186 (linear   2.137, quadratic   0.049) | holds   | sd* 0.0438
-    λ   3.1623 | c   +4.139  b̄/√V    4.814 (linear   4.710, quadratic   0.104) | holds   | sd* 0.0320
-    λ  10.0000 | c   +8.878  b̄/√V    9.734 (linear   9.556, quadratic   0.178) | holds   | sd* 0.0227
-    λ  31.6228 | c  +13.070  b̄/√V   14.118 (linear  13.870, quadratic   0.247) | holds   | sd* 0.0190
-    λ 100.0000 | c  +14.821  b̄/√V   16.154 (linear  15.780, quadratic   0.374) | holds   | sd* 0.0181
+  (1) the bound with the true f, M = M*: c = β/√V, b̄/√V = (M*·lin + M*²·μ̄)/√V, sd* = √V/|J|;
+      Proposition 7's plug-in sizes, Γ = Ω^{+1/2}TP_B: P1 = M*τ/√V, P2 = M*φ/√V, P3 = M*τ√K/√V
+    λ   0.0000 | c   +0.029  b̄/√V    0.000 (linear   0.000, quadratic   0.000) | exceeds | sd* 0.1142 | P1 0.0000 P2 0.000 P3 0.000
+    λ   0.0010 | c   +0.031  b̄/√V    0.017 (linear   0.016, quadratic   0.001) | exceeds | sd* 0.1097 | P1 0.0013 P2 0.009 P3 0.020
+    λ   0.0032 | c   +0.036  b̄/√V    0.049 (linear   0.047, quadratic   0.002) | holds   | sd* 0.1046 | P1 0.0037 P2 0.026 P3 0.055
+    λ   0.0100 | c   +0.050  b̄/√V    0.130 (linear   0.125, quadratic   0.005) | holds   | sd* 0.0950 | P1 0.0102 P2 0.073 P3 0.153
+    λ   0.0316 | c   +0.097  b̄/√V    0.306 (linear   0.295, quadratic   0.010) | holds   | sd* 0.0810 | P1 0.0255 P2 0.183 P3 0.384
+    λ   0.1000 | c   +0.232  b̄/√V    0.616 (linear   0.599, quadratic   0.017) | holds   | sd* 0.0668 | P1 0.0517 P2 0.384 P3 0.777
+    λ   0.3162 | c   +0.598  b̄/√V    1.121 (linear   1.096, quadratic   0.024) | holds   | sd* 0.0549 | P1 0.0891 P2 0.665 P3 1.339
+    λ   1.0000 | c   +1.594  b̄/√V    2.186 (linear   2.137, quadratic   0.049) | holds   | sd* 0.0438 | P1 0.1451 P2 1.016 P3 2.181
+    λ   3.1623 | c   +4.139  b̄/√V    4.814 (linear   4.710, quadratic   0.104) | holds   | sd* 0.0320 | P1 0.2257 P2 1.425 P3 3.394
+    λ  10.0000 | c   +8.878  b̄/√V    9.734 (linear   9.556, quadratic   0.178) | holds   | sd* 0.0227 | P1 0.3177 P2 1.725 P3 4.776
+    λ  31.6228 | c  +13.070  b̄/√V   14.118 (linear  13.870, quadratic   0.247) | holds   | sd* 0.0190 | P1 0.3805 P2 1.708 P3 5.720
+    λ 100.0000 | c  +14.821  b̄/√V   16.154 (linear  15.780, quadratic   0.374) | holds   | sd* 0.0181 | P1 0.4625 P2 1.741 P3 6.953
   (2) honest coverage / mean half-length per λ, by M/M*; plug-in lin / oracle lin: mean (sd) debiased, mean raw
     λ         |    M/M* = 0.0        M/M* = 0.5        M/M* = 1.0        M/M* = 2.0        M/M* = 4.0    | lin ratio
       0.0000 | 0.968 / 0.2271 | 0.968 / 0.2271 | 0.968 / 0.2271 | 0.968 / 0.2271 | 0.968 / 0.2271 | 0.978 (0.203), raw 0.998

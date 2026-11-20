@@ -18,7 +18,10 @@ Remark 3, and Proposition 5 gives a primitive condition for A5.
 Revised on 2026-11-20 after a review: a gap in
 Proposition 2, step 3, is closed (the `ζ` part of `b̂`), the steps it
 asked to be explicit are written out, the meaning of `H` is fixed, and the
-sign of `J` is measured (`tc_sign.jl`), with a check in `root_rho`.
+sign of `J` is measured (`tc_sign.jl`), with a check in `root_rho`. Later
+the same day: Lemma 4 bounds the smoother's bias over a roughness class, and
+Proposition 7 proves the coverage of a bias-aware interval and of a λ chosen
+by its length (`tc_rbc.jl`, `tc_honest.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -72,6 +75,8 @@ line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, 
 | `sᵢ`, `Σ̂`, `νᵢ`, `ϑᵢ` | the plug-in variance; `Diag(s)`; its remainder `sᵢ − εᵢ²`; the leverage noise in `ûᵢ` |
 | `û`, `û₀`, `û₁` | `My₀(ρ̂)`; `My`; `MWy` |
 | `r = Mf`, `r_W`, `β`, `c_β` | the approximation (or shrinkage) remainder; its lagged part; the bias `f′Cf`; its size `β/√V` |
+| `Π`, `ψ`, `ℛ`, `F(ℛ)` | Lemma 4 and Proposition 7: a smoother's penalty; the coefficients of `f = Bψ`; a roughness bound; the class `{Bψ : ψ′Πψ ≤ ℛ²}` |
+| `v`, `T_λ`, `χ̄_λ`, `b̄`, `t̄`, `cv(t)`, `Υ_λ`, `𝒢` | `B′M_λWf`; `B′M_λW`; the quadratic part's bound; the bias bound; `b̄/√V`; the `1 − α` quantile of `\|N(t, 1)\|`; `Π^{+1/2}T_λP_B`; the grid of λ |
 | `θ` | the limit of `K/n` |
 | `κ_W`, `n_W`, `X`, `ωⱼ`, `φⱼ`, `πⱼ` | Proposition 5: `‖W‖_F² ≥ κ_W n`; neighbours per row; `Ws + D`; its eigenvalues and eigenvectors; their overlaps with `B` |
 | `Y` | a generic matrix (Lemmas 2 and 3, and the bound after Lemma 3) |
@@ -929,36 +934,213 @@ With GCV's own choice, coverage is **0.888** (a = 1) and **0.320**
   as a bound on `θ′Ωθ`. This is the usual finding that an adaptive interval
   cannot be honest without a smoothness bound.
 - **A bias-aware interval under a roughness bound** (`tc_honest.jl`;
-  measured, the bound derived but no proof of coverage yet). Take
-  `F(M) = {f = Bθ : θ′Ωθ ≤ M²}` and split `θ = θ₀ + θ₁` with `Ωθ₀ = 0`,
-  `θ₁ ⊥ null(Ω)`. Then `S_λBθ₀ = Bθ₀`, so `M_λf₀ = 0`, and
-  `β(λ) = f′A_λf = f₁′M_λWf + f₁′M_λD_λM_λf₁`. The linear term is `v′θ₁`
-  with `v = B′M_λWf`, whose worst case over `θ′Ωθ ≤ M²` is exactly
-  `M√(v′Ω⁺v)`. The quadratic term is at most `M²μ̄`, with `μ̄` the largest
-  `|μ|` of `(M_λB)′D_λ(M_λB)` against `Ω` on `range(Ω)`. So
-  `|β| ≤ b̄ = M√(v′Ω⁺v) + M²μ̄`. `f` enters only through `v`. It is plugged in
-  as `T P_B y₀(ρ̂₀)`, with `T = B′M_λW` and `ρ̂₀` the projection's root,
-  debiased by `tr(Ω⁺TP_BΣ̂P_BT′)`. The interval is
+  Proposition 7 below proves its coverage). Over the class
+  `F(ℛ) = {f = Bψ : ψ′Πψ ≤ ℛ²}`, with `Π` the penalty, the smoother's bias
+  `β(λ) = f′A_λf` is at most `b̄ = ℛ√(v′Π⁺v) + ℛ²χ̄` (Lemma 4 below). Here
+  `v = B′M_λWf`, and `χ̄` bounds the quadratic part. `v` is plugged in as
+  `T P_B y₀(ρ̂₀)`, with `T = B′M_λW` and `ρ̂₀` the projection's root, and
+  debiased by `tr(Π⁺TP_BΣ̂P_BT′)`. The interval is
   `ρ̂ ± cv(b̄/√V̂)·√V̂/|g′(ρ̂)|`, with `cv(t)` the 0.95 quantile of `|N(t, 1)|`,
-  and λ̂ minimises its length. On tc_lambda's design (R = 500, `M*` the
-  roughness of the least-squares fit of `f` on `B`):
+  and λ̂ minimises its length. On tc_lambda's design (R = 500; `ℛ*` is the
+  roughness `√(ψ*′Πψ*)` of the least-squares fit `Bψ*` of `f`; the script
+  writes `Ω`, `θ` and `M` for `Π`, `ψ` and `ℛ`):
   - **The bound holds** at every λ > 0.001. At λ ≤ 0.001 it is 0, and the
     small `c` (0.003–0.031) comes from the part of `f` outside span(B).
-    The linear term is 97–98% of `b̄`.
-  - **The plug-in** averages 0.96–0.99 of the oracle `√(v′Ω⁺v)` when
+    The linear term is 94–99% of `b̄`.
+  - **The plug-in** averages 0.96–0.99 of the oracle `√(v′Π⁺v)` when
     debiased (raw: 1.06–1.26). Evaluated at each λ's own `ρ̂` instead of
     `ρ̂₀`, it fell to 0.39 at a = 4, λ = 100, and coverage to 0.006.
-  - **With `M = M*`, coverage is 0.950–0.996 at every λ.** At λ̂ it is
+  - **With `ℛ = ℛ*`, coverage is 0.950–0.996 at every λ.** At λ̂ it is
     0.954 (a = 1) and 0.964 (a = 4), with a half-length of 0.117 and 0.152
     against the projection's 0.250 and 0.227: 53% and 33% shorter.
-  - **Over-stating `M` costs length, not coverage:** at `2M*`, 0.974 and
-    0.982 with half-lengths 0.134 and 0.185; at `4M*`, 0.982 and 0.970 with
+  - **Over-stating `ℛ` costs length, not coverage:** at `2ℛ*`, 0.974 and
+    0.982 with half-lengths 0.134 and 0.185; at `4ℛ*`, 0.982 and 0.970 with
     0.162 and 0.210, still shorter than the projection.
-  - **Power checks:** with `M = 0`, the rule picks λ = 100 every time and
-    covers 0.418 and 0.000; with `M = M*/2`, it covers 0.908 and 0.902.
-  So the guarantee holds over `F(M)` for the `M` given, and the gain is
-  real. `M` is the user's assumption: it cannot be estimated without losing
+  - **Power checks:** with `ℛ = 0`, the rule picks λ = 100 every time and
+    covers 0.418 and 0.000; with `ℛ = ℛ*/2`, it covers 0.908 and 0.902.
+  So the guarantee holds over `F(ℛ)` for the `ℛ` given, and the gain is
+  real. `ℛ` is the user's assumption: it cannot be estimated without losing
   the guarantee, which is the price of honesty.
+
+**Lemma 4 (the smoother's bias over a roughness class; proved).** Let
+`S_λ = B(B′B + λΠ)⁻¹B′`, with `Π` symmetric positive semi-definite and
+`B′B + λΠ` invertible; `M_λ = I − S_λ`; and `A_λ = M_λW + M_λD_λM_λ` as in
+Proposition 4. Let `f = Bψ`, and split `ψ = ψ₀ + ψ₁`, with `ψ₀` the
+orthogonal projection of `ψ` on `null(Π)` and `ψ₁ ∈ range(Π)`; write
+`fₖ = Bψₖ`. Then:
+
+(a) `M_λf₀ = 0`, so `β(λ) = f′A_λf = f₁′M_λWf + f₁′M_λD_λM_λf₁`.
+
+(b) With `v = B′M_λWf`, `v ∈ range(Π)` and
+`|f₁′M_λWf| = |ψ₁′v| ≤ √(ψ′Πψ) · √(v′Π⁺v)`. For a fixed `v`, equality holds
+at `ψ₁ ∝ Π⁺v`.
+
+(c) With `Q_λ = (M_λB)′D_λ(M_λB)` and `χ̄_λ` the largest `|eigenvalue|` of
+`Π^{+1/2}Q_λΠ^{+1/2}`, `|f₁′M_λD_λM_λf₁| ≤ χ̄_λ ψ′Πψ`.
+
+So for `f ∈ F(ℛ) = {Bψ : ψ′Πψ ≤ ℛ²}`,
+`|β(λ)| ≤ b̄(λ) = ℛ√(v′Π⁺v) + ℛ²χ̄_λ`.
+
+*Proof.* (a) `Πψ₀ = 0`, so `(B′B + λΠ)ψ₀ = B′Bψ₀`, and
+`S_λf₀ = B(B′B + λΠ)⁻¹B′Bψ₀ = Bψ₀ = f₀`. `M_λ` is symmetric, so
+`f′M_λ = f₁′M_λ`, and `M_λD_λM_λf = M_λD_λM_λf₁`.
+(b) For any `ψ̃₀ ∈ null(Π)`, `ψ̃₀′v = (M_λBψ̃₀)′Wf = 0` by (a). So
+`v ⊥ null(Π)`, that is `v ∈ range(Π) = range(Π^{1/2})`. As `ψ₁` is in the
+same range, `ψ₁′v = (Π^{1/2}ψ₁)′(Π^{+1/2}v)`, and Cauchy–Schwarz gives the
+bound, with `ψ₁′Πψ₁ = ψ′Πψ`. Equality holds when `Π^{1/2}ψ₁ ∝ Π^{+1/2}v`.
+(c) `Q_λψ₀ = 0` by (a). With `z = Π^{1/2}ψ₁`, `ψ₁ = Π^{+1/2}z` and
+`‖z‖² = ψ′Πψ`, so `ψ₁′Q_λψ₁ = z′Π^{+1/2}Q_λΠ^{+1/2}z` and `|ψ₁′Q_λψ₁| ≤ χ̄_λ‖z‖²`. ∎
+
+**`b̄` is a bound for each `f`, not the worst case over `F(ℛ)`.** `v`
+depends on `f`, including on `f₀`, whose size the class leaves free. The
+linear term grows with `‖f₀‖`, so `sup over F(ℛ) of |β|` is infinite in
+general. The bound depends on `f` only through `v`, which the data
+estimate. At λ = 0, `M₀B = 0`, so `v = 0`, `Q₀ = 0` and `b̄ = 0`.
+
+**Proposition 7 (a bias-aware interval for the smoother; proved, given
+Propositions 3, 4 and 4(c), Proposition 2's proof and the Corollary).** Fix
+a level `α`, a finite grid `𝒢` of values `λ ≥ 0` that contains 0 (the
+projection), and a roughness bound `ℛ`. For `λ ∈ 𝒢`, let
+
+    I_λ = ρ̂_λ ± cv(t̂_λ) √V̂_λ / |g′_λ(ρ̂_λ)|,    t̂_λ = (ℛ q̂_λ^{1/2} + ℛ²χ̄_λ) / √V̂_λ,
+
+where `ρ̂_λ`, `V̂_λ` and `g′_λ` are those of `A_λ` (Proposition 4, the sign
+rule), and `cv(t)` is the `1 − α` quantile of `|N(t, 1)|`. Here
+`v̂ = T_λP_By₀(ρ̂₀)`, `T_λ = B′M_λW`, `ρ̂₀` is the projection's root, and
+`Υ_λ = Π^{+1/2}T_λP_B`. `q̂_λ` is either the raw `v̂′Π⁺v̂`, or the debiased
+`max(v̂′Π⁺v̂ − Σᵢ ŝ₀ᵢ‖Υ_λeᵢ‖², 0)`, with `ŝ₀` the projection's HC2 plug-in at
+`ρ̂₀`. Assume, along a sequence `f = f_n ∈ F(ℛ)`:
+- (i) the conditions of the Corollary and Proposition 2 for the projection
+  (A4 holds, since `f ∈ span(B)`);
+- (ii) for each `λ ∈ 𝒢`, the conditions of Proposition 4(c), and those of
+  the Corollary for `A_λ` with `J_λ = −E g′_λ(ρ₀)` (Proposition 3);
+- (iii) `t̄_λ = b̄(λ)/√V_λ = O(1)` for each `λ`;
+- (iv) `ℛ‖Υ_λ‖_op/√V_λ → 0` and `ℛ‖Υ_λ‖_F/√V_λ = O(1)`; for the debiased
+  `q̂_λ`, also `ℛ‖Υ_λ‖_op √K/√V_λ → 0`.
+
+Then:
+- (a) for each `λ ∈ 𝒢`, with either `q̂_λ`, `liminf P(ρ₀ ∈ I_λ) ≥ 1 − α`;
+- (b) let `ℓ_λ = cv(t̄_λ)√V_λ/J_λ`, and `λ̂` minimise the half-length of
+  `I_λ` over `𝒢`. If, for some `η > 0` and all large `n`, the minimiser
+  `λ*_n` of `ℓ` is unique with `ℓ_λ ≥ (1 + η)ℓ_{λ*_n}` for every
+  `λ ≠ λ*_n`, then with the debiased `q̂`, `P(λ̂ = λ*_n) → 1` and
+  `liminf P(ρ₀ ∈ I_λ̂) ≥ 1 − α`;
+- (c) without that separation, the intervals at level `α/|𝒢|` give
+  `liminf P(ρ₀ ∈ I_λ̂) ≥ 1 − α` for any choice `λ̂`, data-driven or not;
+- (d) if (i)–(iv) hold uniformly over `F(ℛ)` (no constant or rate in them
+  depends on `f`), then (a) and (c) hold with the infimum over
+  `f ∈ F(ℛ)` inside the `liminf`, and so does (b) if its separation is
+  uniform too.
+
+*Proof.* Write `Z` for a standard normal variable.
+1. **The critical value.** `cv` is defined by
+   `Φ(cv − t) − Φ(−cv − t) = 1 − α`. Implicit differentiation gives
+   `cv′(t) = (φ(cv − t) − φ(cv + t))/(φ(cv − t) + φ(cv + t)) ∈ [0, 1)` for
+   `t ≥ 0`, so `cv` is increasing and 1-Lipschitz. For a fixed `c₀ > 0`,
+   `d/dc P(|Z + c| ≤ c₀) = φ(c₀ + c) − φ(c₀ − c) ≤ 0` for `c ≥ 0`, so
+   `P(|Z + c| ≤ c₀)` falls as `|c|` grows.
+2. **The plug-in (fixed λ; drop the subscript).** Since `f ∈ span(B)`,
+   `P_Bf = f` and `Π^{+1/2}v = Υf`, so `q := v′Π⁺v = ‖Υf‖²`. Let
+   `t₀ = ρ̂₀ − ρ₀ = O_p(n^{−1/2})` (Corollary, by (i)) and `η = f + ε`. Then
+   `y₀(ρ̂₀) = η − t₀Gη`, and `Π^{+1/2}v̂ = Υf + Υε − t₀ΥGη`, with
+   `‖t₀ΥGη‖ ≤ |t₀|‖Υ‖_op‖G‖_op‖η‖ = O_p(‖Υ‖_op)`, since `‖η‖ = O_p(√n)`.
+   Expanding the square,
+
+       v̂′Π⁺v̂ = q + 2f′Υ′Υε + ‖Υε‖² + R,   |R| ≤ O_p(‖Υ‖_op)(2√q + 2‖Υε‖ + O_p(‖Υ‖_op)).
+
+   Write `a = ℛ√q/√V`, which is at most `t̄ = O(1)`; `u = ℛ‖Υ‖_op/√V → 0`;
+   and `w = ℛ‖Υ‖_F/√V = O(1)`. All terms are scaled by `ℛ²/V`.
+   - `2f′Υ′Υε` has mean 0 and variance at most `4σ̄²‖Υ‖_op²q`, so the scaled
+     term has variance at most `4σ̄²u²a² → 0`.
+   - `E‖Υε‖² = Σᵢ σᵢ²cᵢ ≤ σ̄²‖Υ‖_F²`, with `cᵢ = ‖Υeᵢ‖²`, so
+     `ℛ‖Υε‖/√V = O_p(w)`, and the scaled `R` is `O_p(u)(2a + O_p(w) + O_p(u)) → 0`.
+
+   So `ℛ²(v̂′Π⁺v̂ − q − ‖Υε‖²)/V → 0` in probability. As `‖Υε‖² ≥ 0`, the
+   raw `q̂` satisfies `ℛ²(q − q̂)₊/V → 0`. For the debiased `q̂`, it
+   remains to show `ℛ²(‖Υε‖² − Σᵢ ŝ₀ᵢcᵢ)/V → 0`. Split it into three parts.
+   - `‖Υε‖² − Σᵢσᵢ²cᵢ = Σ_{i≠j}(Υ′Υ)ᵢⱼεᵢεⱼ + Σᵢcᵢ(εᵢ² − σᵢ²)` has second
+     moment at most `2σ̄⁴‖Υ′Υ‖_F² + μ₄Σᵢcᵢ² ≤ c‖Υ‖_op²‖Υ‖_F²`, since
+     `‖Υ′Υ‖_F ≤ ‖Υ‖_op‖Υ‖_F` and `Σcᵢ² ≤ maxᵢcᵢ · Σcᵢ ≤ ‖Υ‖_op²‖Υ‖_F²`. Scaled,
+     it is `O_p(uw)`. The same bound holds for `Σᵢcᵢ(εᵢ² − σᵢ²)` alone.
+   - At `ρ₀`, `ŝ₀ᵢ = εᵢ² + ν₀ᵢ` with `E ν₀ᵢ² ≤ c hᵢᵢ` (Proposition 2's proof,
+     with four moments), so `E|Σᵢcᵢν₀ᵢ| ≤ (Σcᵢ²)^{1/2}(cK)^{1/2} ≤
+     c‖Υ‖_op‖Υ‖_F√K`. Scaled, this is `O(uw√K) → 0` by (iv).
+   - Moving from `ρ₀` to `ρ̂₀` changes `ûᵢ` by `−t₀(M₀Wy)ᵢ`. With
+     `Mᵢᵢ ≥ 1 − h̄` (A3), `Σᵢ ûᵢ⁴ = O_p(n)` (Proposition 2, step 3) and
+     `Σᵢ(M₀Wy)ᵢ⁴ = O_p(n)` (the same argument: each `(M₀Gη)ᵢ` is a linear
+     form with bounded coefficients, under four moments), the change in `Σᵢcᵢŝ₀ᵢ` is at most
+     `c|t₀|(Σcᵢ²)^{1/2}(Σᵢûᵢ²(M₀Wy)ᵢ²)^{1/2} + ct₀² maxᵢcᵢ‖M₀Wy‖² =
+     O_p(‖Υ‖_op‖Υ‖_F + ‖Υ‖_op²)`. Scaled, this is `O_p(uw + u²) → 0`.
+
+   The floor at 0 only moves `q̂` towards `q ≥ 0`. Since
+   `|√x − √y| ≤ √|x − y|`, `ℛ(q^{1/2} − q̂^{1/2})₊/√V → 0` for the raw
+   `q̂`, and `ℛ|q̂^{1/2} − q^{1/2}|/√V → 0` for the debiased one. With
+   `V̂/V → 1` (Proposition 4(c)) and `t̄ = O(1)`, this gives
+   `t̂ ≥ t̄ − o_p(1)` for the raw `q̂`, and `t̂ − t̄ → 0` for the debiased one.
+3. **Coverage at a fixed λ.** Let `c_n = β/√V`. By Lemma 4, `|c_n| ≤ t̄_n`.
+   Take any subsequence, and within it a further one along which
+   `c_n → c` and `t̄_n → t̄`, so that `|c| ≤ t̄`. Along it, Proposition 3
+   (with Proposition 4's `r = M_λf`) gives `J(ρ̂ − ρ₀)/√V → N(c, 1)`; its
+   condition `β = O(√n)` holds because `|β| ≤ t̄_n√V` and `V = O(n)`. The
+   Corollary gives `|g′(ρ̂)|/J → 1`. `ρ₀ ∈ I_λ` is the event
+
+       |J(ρ̂ − ρ₀)/√V| ≤ cv(t̂) · √(V̂/V) · J/|g′(ρ̂)|,
+
+   and by steps 1 and 2 the right side is at least `cv(t̄_n) − o_p(1)`. The
+   limit law is continuous, so `liminf P(ρ₀ ∈ I_λ) ≥ P(|Z + c| ≤ cv(t̄))`,
+   which is at least `P(|Z + t̄| ≤ cv(t̄)) = 1 − α` by step 1. Every
+   subsequence has a further subsequence along which this holds, which
+   proves (a).
+4. **The choice of λ.** (b) With the debiased `q̂`, step 2 and
+   Proposition 4(c) give `ĥ_λ/ℓ_λ → 1` for each `λ`, where `ĥ_λ` is the
+   half-length of `I_λ`, since `cv(t̄_λ) ≥ z_{1−α/2} > 0`. The grid is finite
+   and the separation is `η > 0`, so `P(λ̂ = λ*_n) → 1`. Then
+   `P(ρ₀ ∈ I_λ̂) ≥ P(ρ₀ ∈ I_{λ*_n}) − P(λ̂ ≠ λ*_n)`. Along any subsequence
+   on which `λ*_n` is constant, (a) applies, and the grid is finite.
+   (c) `P(ρ₀ ∉ I_λ̂) ≤ Σ_{λ∈𝒢} P(ρ₀ ∉ I_λ^{(α/|𝒢|)})`, and each term has
+   `limsup ≤ α/|𝒢|` by (a).
+   (d) If the uniform statement failed, there would be `ε₀ > 0` and
+   `f_n ∈ F(ℛ)` with `P_{f_n}(ρ₀ ∈ I) < 1 − α − ε₀` infinitely often. Along
+   that sequence (i)–(iv) hold by assumption, so (a)–(c) contradict it. ∎
+
+**What is new against Proposition 3.** Proposition 3's interval is valid
+only if `c_β → 0`. Here `c_β` may stay away from zero. The price is
+`cv(t̄) > z_{1−α/2}` and the assumption `ℛ`. At λ = 0, `b̄ = 0` and `I_0`
+is the projection's Wald interval, so the rule never does worse than
+choosing the projection, up to the noise in the choice.
+
+**The raw plug-in needs fewer conditions** than the debiased one: (a) and
+(c) hold with it under (iv)'s first two conditions alone, because its
+upward bias `‖Υε‖²` makes it conservative. Only (b) needs the debiased one.
+
+**The conditions in `tc_honest.jl`** (`ℛ = ℛ*`, n = 900, K = 226, printed
+for each λ):
+- `ℛ‖Υ‖_op/√V` is at most 0.25 (a = 1) and 0.46 (a = 4);
+- `ℛ‖Υ‖_F/√V` is at most 0.94 and 1.74;
+- the debiased condition `ℛ‖Υ‖_op√K/√V` is at most 0.57 and 2.18 for
+  λ ≤ 1, where λ̂ falls, and reaches 3.7 and 7.0 at λ = 100.
+
+Yet the debiased plug-in averages 0.96–0.98 of the oracle at λ = 100. So
+(iv)'s third condition is sufficient but loose: the Cauchy–Schwarz step for
+`Σcᵢν₀ᵢ` gives away the sign structure of `ν₀`.
+
+**What is not covered.**
+- **`f ∉ span(B)`.** A remainder `f − P_Bf` adds to `β` a part that `b̄`
+  does not bound, and it moves `v̂`. Proposition 3's condition, that this
+  part of `β` is `o(√n)`, is what should be needed, but that is not proved
+  here. In `tc_honest.jl`, `c` at λ ≤ 0.001 (where `b̄ ≈ 0`) is 0.003–0.031.
+- **The separation in (b)** fails near ties. In `tc_honest.jl`, λ̂ spreads
+  over 4–5 grid values, most of them on two or three (198, 258 and 39 of
+  500 draws at λ = 1, 3.16 and 10, a = 1). So (b) does not literally apply at n = 900,
+  but the selected interval still covered 0.954 and 0.964 without the
+  Bonferroni step of (c). With 12 grid values, (c) would raise `z` from
+  1.96 to 2.86: 46% longer where `b̄ = 0`, and less where `b̄` dominates.
+- **Choosing `ℛ`** is the user's assumption. It cannot be estimated without
+  losing the guarantee.
+
+The construction is that of the bias-aware ("honest") intervals of the
+nonparametric-regression literature. This note has not read those papers;
+the argument above does not rely on them.
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -1769,13 +1951,15 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
    too noisy (sd 0.8–2.9) to choose λ. Bias-corrected moments
    (`tc_rbc.jl`) give the guarantee but gain only 3–4% over the projection.
-   A bias-aware interval over `F(M) = {f = Bθ : θ′Ωθ ≤ M²}`
-   (`tc_honest.jl`) covers 0.954 and 0.964 at its chosen λ with `M` true,
-   and is 33–53% shorter than the projection's. Still open: a proof of its
-   coverage (Theorem 1, the bound `b̄`, and the plug-in's consistency); the
-   exact joint worst case of the linear and quadratic terms (a trust-region
-   problem) in place of their sum; the part of `f` outside span(B); and how
-   a user should choose `M`, with a sensitivity report.
+   A bias-aware interval over `F(ℛ) = {Bψ : ψ′Πψ ≤ ℛ²}` (`tc_honest.jl`)
+   covers 0.954 and 0.964 at its chosen λ with `ℛ` true, and is 33–53%
+   shorter than the projection's. Proposition 7 proves its coverage at each
+   λ, at a chosen λ (under a separation condition, or with Bonferroni), and
+   uniformly over `F(ℛ)`. Still open: the joint bound of the linear and
+   quadratic terms (a trust-region problem) in place of their sum; the
+   part of `f` outside span(B); a sharper form of (iv)'s third condition;
+   how a user should choose `ℛ`, with a sensitivity report; and reading the
+   bias-aware-interval literature (Armstrong & Kolesár) to compare.
 5. Reading: de Jong (1987), Bhansali, Giraitis & Kokoszka (2007), Kelejian &
    Prucha (2001) and Hall & Heyde's §3.2 are read. Cattaneo, Jansson & Newey
    (2018) §3 and Kline, Saggio & Sølvsten (2020) §4.2 have been read via
