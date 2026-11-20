@@ -21,7 +21,8 @@ asked to be explicit are written out, the meaning of `H` is fixed, and the
 sign of `J` is measured (`tc_sign.jl`), with a check in `root_rho`. Later
 the same day: Lemma 4 bounds the smoother's bias over a roughness class, and
 Proposition 7 proves the coverage of a bias-aware interval and of a λ chosen
-by its length (`tc_rbc.jl`, `tc_honest.jl`).
+by its length (`tc_rbc.jl`, `tc_honest.jl`); "Choosing ℛ" says how to set
+its bound and why the data cannot (`tc_rchoice.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -1136,11 +1137,103 @@ Yet the debiased plug-in averages 0.96–0.98 of the oracle at λ = 100. So
   Bonferroni step of (c). With 12 grid values, (c) would raise `z` from
   1.96 to 2.86: 46% longer where `b̄ = 0`, and less where `b̄` dominates.
 - **Choosing `ℛ`** is the user's assumption. It cannot be estimated without
-  losing the guarantee.
+  losing the guarantee ("Choosing ℛ", next).
 
 The construction is that of the bias-aware ("honest") intervals of the
 nonparametric-regression literature. This note has not read those papers;
 the argument above does not rely on them.
+
+**Choosing ℛ (measured, with one remark proved).** Proposition 7 needs `ℛ`
+to bound the roughness `ψ′Πψ` of `f` from above. The data cannot supply
+such a bound, so `ℛ` has to be an assumption. What follows says why, and
+how to state the assumption so that it costs little (`tc_rchoice.jl`, on
+tc_honest's design, R = 500).
+
+*Remark (the data cannot certify an upper bound; proved).* Let
+`g = Bψ_g` with `g′Σ⁻¹g ≤ δ²`. Under normal errors, `y` has the law
+`N((I − ρ₀W)⁻¹(f + g), (I − ρ₀W)⁻¹Σ(I − ρ₀W)⁻′)`, so the Kullback–Leibler
+divergence between the laws under `f` and `f + g` is `g′Σ⁻¹g/2 ≤ δ²/2`, and by
+Pinsker's inequality their total variation distance is at most `δ/2`. So any
+statistic `ℛ̂` has `|P_f(ℛ̂ ≥ x) − P_{f+g}(ℛ̂ ≥ x)| ≤ δ/2` for every `x`. If
+`ℛ̂` is a valid upper bound, with `P_h(ℛ̂ ≥ ℛ(h)) ≥ 1 − α` for every `h`, then
+under `f` it must also exceed `ℛ(f + g)` with probability at least
+`1 − α − δ/2`, for every such `g`. The largest `ψ_g′Πψ_g` under the
+constraint is `δ²ν_Σ`, with `ν_Σ` the largest eigenvalue of `Π` against
+`B′Σ⁻¹B`. In tc_rchoice's design, with `δ = 0.2` (total variation at most
+0.1), that roughness is 5.39: 3.4ℛ* at a = 1 and 0.84ℛ* at a = 4. With the
+sign of `g` chosen so that `ψ_f′Πψ_g ≥ 0`,
+`ℛ(f + g) ≥ √(ℛ(f)² + ℛ(g)²)`. So when `f` has roughness `ℛ*`, a valid
+data-based bound must exceed `√(ℛ*² + 5.39²)` with probability at least
+0.85: that is 5.62 = 3.5ℛ* at a = 1, and 8.36 = 1.31ℛ* at a = 4. `ν_Σ` grows as the knots get finer, so
+the gap grows with K. ∎
+
+The remark is about certifying `ℛ`. It does not say that a perturbation
+of that size destroys coverage: by the same total-variation bound, it
+changes any coverage probability by at most `δ/2`.
+
+**What the data can do, measured:**
+- **The debiased estimate is useless.** `ℛ̂² = ψ̂′Πψ̂ − tr(noise)`, from
+  the projection's coefficients at `ρ̂₀`, has an sd of 666ℛ*² (a = 1) and
+  42ℛ*² (a = 4), and is ≤ 0 in 55% and 53% of draws. The noise term is
+  the projection noise seen through `Π`, summed over 226 coefficients, and
+  it dwarfs the signal.
+- **Shrunk coefficients are biased, and still noisy.** From a pilot at
+  λ = 1, `ℛ̂²` averages 1.39ℛ*² (sd 3.5) and 0.89ℛ*² (sd 0.46). At λ = 0.1,
+  it averages 4.07ℛ*² (sd 39) and 1.09ℛ*² (sd 2.5).
+- **The lower bound is uninformative.** `ℛ_L² = ℛ̂² − 1.645·se` is at most
+  `ℛ*²` in 99% of draws, as it should be, but it is positive in only 1%.
+- **Plug-in rules under-cover.** With λ̂ chosen as in Proposition 7, the
+  coverage is:
+
+  | ℛ from the data | coverage, a = 1 | coverage, a = 4 |
+  |---|---|---|
+  | `ℛ̂`, from the projection | 0.662 | 0.448 |
+  | `2ℛ̂`, from the projection | 0.660 | 0.450 |
+  | `ℛ̂`, pilot λ = 0.1 | 0.714 | 0.626 |
+  | `ℛ̂`, pilot λ = 1 | 0.774 | 0.912 |
+  | `2ℛ̂`, pilot λ = 1 | 0.772 | 0.952 |
+  | `ℛ_L` | 0.424 | 0.006 |
+
+  The projection's `ℛ̂` averages 9.4ℛ* at a = 1 and still under-covers. It
+  is ≤ 0 (so `ℛ = 0`) in half the draws, and it is small exactly in the
+  draws where a small bound hurts. Only `2ℛ̂` from the heavy pilot at
+  a = 4 reaches 0.95, and the same rule gives 0.772 at a = 1.
+
+**What a user can do:**
+1. **State `ℛ` through a reference surface.** Choose a surface `f_ref`, in
+   the same coordinates, that is at least as rough as `f` is believed to be.
+   Set `ℛ = √(ψ_ref′Πψ_ref)` with `ψ_ref = B \ f_ref`. For a tensor hat
+   basis with knot spacing `h` and a second-difference penalty,
+   `ψ′Πψ ≈ h²∫(f_uu² + f_vv²)`: in tc_rchoice's design,
+   `ℛ* = 1.10 · h√∫(f_uu² + f_vv²)` at both amplitudes. So a bound on the
+   mean squared curvature over the study area is the same statement.
+   (`f_ref` need not be in span(B); the least-squares fit is what enters.)
+2. **Err on the large side.** The loss is asymmetric. λ = 0 is always in
+   the grid with `b̄ = 0`, so a large `ℛ` sends λ̂ towards the projection
+   and costs at most the gain. A small `ℛ` costs coverage. Measured at λ̂
+   (projection half-lengths 0.250 at a = 1, 0.227 at a = 4):
+
+   | ℛ/ℛ* | 0.25 | 0.5 | 0.75 | 1 | 2 | 4 | 8 | 16 |
+   |---|---|---|---|---|---|---|---|---|
+   | coverage, a = 1 | 0.734 | 0.908 | 0.936 | 0.954 | 0.974 | 0.982 | 0.978 | 0.970 |
+   | half-length, a = 1 | 0.099 | 0.107 | 0.113 | 0.117 | 0.134 | 0.162 | 0.200 | 0.230 |
+   | coverage, a = 4 | 0.648 | 0.902 | 0.950 | 0.964 | 0.982 | 0.970 | 0.972 | 0.968 |
+   | half-length, a = 4 | 0.106 | 0.125 | 0.140 | 0.152 | 0.185 | 0.210 | 0.220 | 0.226 |
+
+   With `ℛ` over-stated fourfold, the interval is still 35% shorter than
+   the projection's at a = 1, and 7% shorter at a = 4. At 16-fold it is no
+   longer than the projection's.
+3. **Report the result across `ℛ`.** Give the interval on a grid of `ℛ`,
+   and for each conclusion the largest `ℛ` at which it still holds (its
+   breakdown value). In tc_rchoice's design, the projection's interval
+   excludes ρ = 0.2 in 36% (a = 1) and 43% (a = 4) of draws. The bias-aware
+   interval excludes it for every `ℛ` up to 64ℛ* in 29% and 39% of draws.
+   Its breakdown value lies between ℛ* and 64ℛ* in another 64% and 45%,
+   and below ℛ* in 7% and 16%. So a reader can see which conclusions need
+   a small `ℛ`.
+4. **Do not estimate `ℛ` from the data.** The remark shows that a valid
+   data bound must be loose. The table above shows that plug-in rules,
+   including doubled ones, under-cover.
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -1958,8 +2051,11 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    uniformly over `F(ℛ)`. Still open: the joint bound of the linear and
    quadratic terms (a trust-region problem) in place of their sum; the
    part of `f` outside span(B); a sharper form of (iv)'s third condition;
-   how a user should choose `ℛ`, with a sensitivity report; and reading the
-   bias-aware-interval literature (Armstrong & Kolesár) to compare.
+   and reading the bias-aware-interval literature (Armstrong & Kolesár) to
+   compare. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
+   it through a reference surface or a curvature bound, err large, and
+   report the result across `ℛ`. The data cannot certify it (a remark,
+   proved), and every plug-in rule tried under-covers.
 5. Reading: de Jong (1987), Bhansali, Giraitis & Kokoszka (2007), Kelejian &
    Prucha (2001) and Hall & Heyde's §3.2 are read. Cattaneo, Jansson & Newey
    (2018) §3 and Kline, Saggio & Sølvsten (2020) §4.2 have been read via

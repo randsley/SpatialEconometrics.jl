@@ -1,0 +1,96 @@
+amp 1, n = 900, K = 226, R = 3
+  (1) ℛ* = √(ψ*′Πψ*) = 1.598; the curvature formula h·√∫(f_uu² + f_vv²) = 1.453 (ratio 1.100)
+      max ψ′Πψ over g = Bψ with g′Σ⁻¹g ≤ 0.2² (KL ≤ 0.02, total variation ≤ 0.1 under normal errors):
+      roughness 0.2·√ν = 5.39, that is 3.38 ℛ*: such a g is nearly invisible, whatever its roughness says
+  (2) roughness estimates, as multiples of ℛ*² = 2.554:
+      pilot λ = 0   : ℛ̂²/ℛ*² mean -281.700 sd  363.249; share ≤ 0 1.000
+      pilot λ = 0.1 : ℛ̂²/ℛ*² mean   36.436 sd   11.709; share ≤ 0 0.000
+      pilot λ = 1   : ℛ̂²/ℛ*² mean    3.717 sd    2.737; share ≤ 0 0.000
+      projection: se/ℛ*² mean 709.686; lower bound ℛ_L² = ℛ̂² − 1.645 se: share ≤ ℛ*² 1.000, share > 0 0.000
+  (3) coverage / mean half-length at λ̂; the projection's half-length is 0.2562
+      ℛ =  0.00 ℛ*: 0.667 / 0.0810
+      ℛ =  0.25 ℛ*: 1.000 / 0.0977
+      ℛ =  0.50 ℛ*: 1.000 / 0.1066
+      ℛ =  0.75 ℛ*: 1.000 / 0.1127
+      ℛ =  1.00 ℛ*: 1.000 / 0.1193
+      ℛ =  1.50 ℛ*: 1.000 / 0.1288
+      ℛ =  2.00 ℛ*: 1.000 / 0.1394
+      ℛ =  3.00 ℛ*: 1.000 / 0.1562
+      ℛ =  4.00 ℛ*: 1.000 / 0.1718
+      ℛ =  8.00 ℛ*: 1.000 / 0.2130
+      ℛ = 16.00 ℛ*: 1.000 / 0.2407
+      ℛ̂ (projection)             mean ℛ/ℛ*   0.00: 0.667 / 0.0810
+      2ℛ̂ (projection)            mean ℛ/ℛ*   0.00: 0.667 / 0.0810
+      ℛ_L                        mean ℛ/ℛ*   0.00: 0.667 / 0.0810
+      ℛ̂ (pilot λ = 0.1)          mean ℛ/ℛ*   5.99: 1.000 / 0.1973
+      ℛ̂ (pilot λ = 1.0)          mean ℛ/ℛ*   1.84: 1.000 / 0.1375
+      2ℛ̂ (pilot λ = 0.1)         mean ℛ/ℛ*  11.97: 1.000 / 0.2318
+      2ℛ̂ (pilot λ = 1.0)         mean ℛ/ℛ*   3.67: 1.000 / 0.1681
+  (4) excluding ρ = 0.2: the projection's interval does in 0.000 of draws; the largest k = ℛ/ℛ* at which
+      the bias-aware interval still does: none 0.000, below 1 0.000, 1–4 0.667, above 4 (finite) 0.333, always 0.000
+
+(warm-up above)
+
+amp 1, n = 900, K = 226, R = 500
+  (1) ℛ* = √(ψ*′Πψ*) = 1.598; the curvature formula h·√∫(f_uu² + f_vv²) = 1.453 (ratio 1.100)
+      max ψ′Πψ over g = Bψ with g′Σ⁻¹g ≤ 0.2² (KL ≤ 0.02, total variation ≤ 0.1 under normal errors):
+      roughness 0.2·√ν = 5.39, that is 3.38 ℛ*: such a g is nearly invisible, whatever its roughness says
+  (2) roughness estimates, as multiples of ℛ*² = 2.554:
+      pilot λ = 0   : ℛ̂²/ℛ*² mean  -12.514 sd  665.939; share ≤ 0 0.552
+      pilot λ = 0.1 : ℛ̂²/ℛ*² mean    4.070 sd   39.122; share ≤ 0 0.480
+      pilot λ = 1   : ℛ̂²/ℛ*² mean    1.387 sd    3.532; share ≤ 0 0.354
+      projection: se/ℛ*² mean 1118.444; lower bound ℛ_L² = ℛ̂² − 1.645 se: share ≤ ℛ*² 0.990, share > 0 0.010
+  (3) coverage / mean half-length at λ̂; the projection's half-length is 0.2501
+      ℛ =  0.00 ℛ*: 0.418 / 0.0861
+      ℛ =  0.25 ℛ*: 0.734 / 0.0986
+      ℛ =  0.50 ℛ*: 0.908 / 0.1070
+      ℛ =  0.75 ℛ*: 0.936 / 0.1125
+      ℛ =  1.00 ℛ*: 0.954 / 0.1174
+      ℛ =  1.50 ℛ*: 0.970 / 0.1260
+      ℛ =  2.00 ℛ*: 0.974 / 0.1341
+      ℛ =  3.00 ℛ*: 0.982 / 0.1485
+      ℛ =  4.00 ℛ*: 0.982 / 0.1615
+      ℛ =  8.00 ℛ*: 0.978 / 0.1995
+      ℛ = 16.00 ℛ*: 0.970 / 0.2298
+      ℛ̂ (projection)             mean ℛ/ℛ*   9.39: 0.662 / 0.1476
+      2ℛ̂ (projection)            mean ℛ/ℛ*  18.79: 0.660 / 0.1529
+      ℛ_L                        mean ℛ/ℛ*   0.16: 0.424 / 0.0873
+      ℛ̂ (pilot λ = 0.1)          mean ℛ/ℛ*   2.79: 0.714 / 0.1324
+      ℛ̂ (pilot λ = 1.0)          mean ℛ/ℛ*   1.08: 0.774 / 0.1154
+      2ℛ̂ (pilot λ = 0.1)         mean ℛ/ℛ*   5.58: 0.708 / 0.1474
+      2ℛ̂ (pilot λ = 1.0)         mean ℛ/ℛ*   2.15: 0.772 / 0.1309
+  (4) excluding ρ = 0.2: the projection's interval does in 0.356 of draws; the largest k = ℛ/ℛ* at which
+      the bias-aware interval still does: none 0.000, below 1 0.072, 1–4 0.290, above 4 (finite) 0.352, always 0.286
+
+amp 4, n = 900, K = 226, R = 500
+  (1) ℛ* = √(ψ*′Πψ*) = 6.393; the curvature formula h·√∫(f_uu² + f_vv²) = 5.813 (ratio 1.100)
+      max ψ′Πψ over g = Bψ with g′Σ⁻¹g ≤ 0.2² (KL ≤ 0.02, total variation ≤ 0.1 under normal errors):
+      roughness 0.2·√ν = 5.39, that is 0.84 ℛ*: such a g is nearly invisible, whatever its roughness says
+  (2) roughness estimates, as multiples of ℛ*² = 40.865:
+      pilot λ = 0   : ℛ̂²/ℛ*² mean    0.177 sd   41.522; share ≤ 0 0.534
+      pilot λ = 0.1 : ℛ̂²/ℛ*² mean    1.087 sd    2.533; share ≤ 0 0.332
+      pilot λ = 1   : ℛ̂²/ℛ*² mean    0.893 sd    0.456; share ≤ 0 0.010
+      projection: se/ℛ*² mean 69.955; lower bound ℛ_L² = ℛ̂² − 1.645 se: share ≤ ℛ*² 0.992, share > 0 0.008
+  (3) coverage / mean half-length at λ̂; the projection's half-length is 0.2271
+      ℛ =  0.00 ℛ*: 0.000 / 0.0403
+      ℛ =  0.25 ℛ*: 0.648 / 0.1055
+      ℛ =  0.50 ℛ*: 0.902 / 0.1251
+      ℛ =  0.75 ℛ*: 0.950 / 0.1396
+      ℛ =  1.00 ℛ*: 0.964 / 0.1515
+      ℛ =  1.50 ℛ*: 0.984 / 0.1706
+      ℛ =  2.00 ℛ*: 0.982 / 0.1845
+      ℛ =  3.00 ℛ*: 0.980 / 0.2013
+      ℛ =  4.00 ℛ*: 0.970 / 0.2098
+      ℛ =  8.00 ℛ*: 0.972 / 0.2200
+      ℛ = 16.00 ℛ*: 0.968 / 0.2259
+      ℛ̂ (projection)             mean ℛ/ℛ*   2.40: 0.448 / 0.1152
+      2ℛ̂ (projection)            mean ℛ/ℛ*   4.81: 0.450 / 0.1202
+      ℛ_L                        mean ℛ/ℛ*   0.04: 0.006 / 0.0415
+      ℛ̂ (pilot λ = 0.1)          mean ℛ/ℛ*   0.96: 0.626 / 0.1223
+      ℛ̂ (pilot λ = 1.0)          mean ℛ/ℛ*   0.91: 0.912 / 0.1456
+      2ℛ̂ (pilot λ = 0.1)         mean ℛ/ℛ*   1.92: 0.642 / 0.1386
+      2ℛ̂ (pilot λ = 1.0)         mean ℛ/ℛ*   1.81: 0.952 / 0.1749
+  (4) excluding ρ = 0.2: the projection's interval does in 0.432 of draws; the largest k = ℛ/ℛ* at which
+      the bias-aware interval still does: none 0.000, below 1 0.156, 1–4 0.378, above 4 (finite) 0.072, always 0.394
+
+total 0.4 min
