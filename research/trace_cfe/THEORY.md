@@ -928,6 +928,37 @@ With GCV's own choice, coverage is **0.888** (a = 1) and **0.320**
   real gain therefore needs a restriction on `f` beyond `f ∈ span(B)`, such
   as a bound on `θ′Ωθ`. This is the usual finding that an adaptive interval
   cannot be honest without a smoothness bound.
+- **A bias-aware interval under a roughness bound** (`tc_honest.jl`;
+  measured, the bound derived but no proof of coverage yet). Take
+  `F(M) = {f = Bθ : θ′Ωθ ≤ M²}` and split `θ = θ₀ + θ₁` with `Ωθ₀ = 0`,
+  `θ₁ ⊥ null(Ω)`. Then `S_λBθ₀ = Bθ₀`, so `M_λf₀ = 0`, and
+  `β(λ) = f′A_λf = f₁′M_λWf + f₁′M_λD_λM_λf₁`. The linear term is `v′θ₁`
+  with `v = B′M_λWf`, whose worst case over `θ′Ωθ ≤ M²` is exactly
+  `M√(v′Ω⁺v)`. The quadratic term is at most `M²μ̄`, with `μ̄` the largest
+  `|μ|` of `(M_λB)′D_λ(M_λB)` against `Ω` on `range(Ω)`. So
+  `|β| ≤ b̄ = M√(v′Ω⁺v) + M²μ̄`. `f` enters only through `v`. It is plugged in
+  as `T P_B y₀(ρ̂₀)`, with `T = B′M_λW` and `ρ̂₀` the projection's root,
+  debiased by `tr(Ω⁺TP_BΣ̂P_BT′)`. The interval is
+  `ρ̂ ± cv(b̄/√V̂)·√V̂/|g′(ρ̂)|`, with `cv(t)` the 0.95 quantile of `|N(t, 1)|`,
+  and λ̂ minimises its length. On tc_lambda's design (R = 500, `M*` the
+  roughness of the least-squares fit of `f` on `B`):
+  - **The bound holds** at every λ > 0.001. At λ ≤ 0.001 it is 0, and the
+    small `c` (0.003–0.031) comes from the part of `f` outside span(B).
+    The linear term is 97–98% of `b̄`.
+  - **The plug-in** averages 0.96–0.99 of the oracle `√(v′Ω⁺v)` when
+    debiased (raw: 1.06–1.26). Evaluated at each λ's own `ρ̂` instead of
+    `ρ̂₀`, it fell to 0.39 at a = 4, λ = 100, and coverage to 0.006.
+  - **With `M = M*`, coverage is 0.950–0.996 at every λ.** At λ̂ it is
+    0.954 (a = 1) and 0.964 (a = 4), with a half-length of 0.117 and 0.152
+    against the projection's 0.250 and 0.227: 53% and 33% shorter.
+  - **Over-stating `M` costs length, not coverage:** at `2M*`, 0.974 and
+    0.982 with half-lengths 0.134 and 0.185; at `4M*`, 0.982 and 0.970 with
+    0.162 and 0.210, still shorter than the projection.
+  - **Power checks:** with `M = 0`, the rule picks λ = 100 every time and
+    covers 0.418 and 0.000; with `M = M*/2`, it covers 0.908 and 0.902.
+  So the guarantee holds over `F(M)` for the `M` given, and the gain is
+  real. `M` is the user's assumption: it cannot be estimated without losing
+  the guarantee, which is the price of honesty.
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -1738,10 +1769,13 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
    too noisy (sd 0.8–2.9) to choose λ. Bias-corrected moments
    (`tc_rbc.jl`) give the guarantee but gain only 3–4% over the projection.
-   Still open: a λ with a coverage guarantee and a real gain. This needs a
-   bound on the roughness of `f`, for example a worst-case bias over
-   `{f = Bθ : θ′Ωθ ≤ M²}` added to the critical value, and the cross term
-   that the unpenalised part of `f` makes in `f′A_λf`.
+   A bias-aware interval over `F(M) = {f = Bθ : θ′Ωθ ≤ M²}`
+   (`tc_honest.jl`) covers 0.954 and 0.964 at its chosen λ with `M` true,
+   and is 33–53% shorter than the projection's. Still open: a proof of its
+   coverage (Theorem 1, the bound `b̄`, and the plug-in's consistency); the
+   exact joint worst case of the linear and quadratic terms (a trust-region
+   problem) in place of their sum; the part of `f` outside span(B); and how
+   a user should choose `M`, with a sensitivity report.
 5. Reading: de Jong (1987), Bhansali, Giraitis & Kokoszka (2007), Kelejian &
    Prucha (2001) and Hall & Heyde's §3.2 are read. Cattaneo, Jansson & Newey
    (2018) §3 and Kline, Saggio & Sølvsten (2020) §4.2 have been read via
