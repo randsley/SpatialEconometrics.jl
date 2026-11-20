@@ -5623,3 +5623,58 @@ warning on the testset's kNN design.
 **Also from the review:** Proposition 2, step 3 used `Σ bᵢ²(û₁)ᵢ²` where
 `Σ b̂ᵢ²(û₁)ᵢ²` was needed. The noise part `ζ` of `b̂` is now bounded
 (`maxᵢ ζᵢ² = O_p(√n)`), and the result stands with no new condition.
+
+## `root_rho`: the bias-aware interval for the smoother, with `λ` chosen by its length
+
+Added on 2026-11-20. With a penalised smoother, the moment's mean at `ρ₀` is
+`β = f′Af ≠ 0`, and the Wald interval and `CS` ignore it. Given a roughness
+bound `roughness = ℛ` on `f = [X, basis]ψ` (`ψ′Πψ ≤ ℛ²`), `root_rho` now
+reports `ci_bias_aware = ρ̂ ± cv(b̄/√V̂)·se`, with `b̄ = ℛ√(v′Π⁺v) + ℛ²χ̄`
+(THEORY.md, Lemma 4) and `cv(t)` the `level` quantile of `|N(t, 1)|`
+(Proposition 7). `v` is estimated from the projection at Jin & Lee's
+first-step root and debiased. With a vector `lambda`, every value is fitted,
+the projection (REsd) is added as `λ = 0` with `b̄ = 0`, and the shortest
+interval is returned; `bonferroni = true` divides `α` among the candidates.
+`basis_roughness(f_ref, basis, penalty; X)` states `ℛ` through a reference
+surface. `ℛ` is the user's assumption: no rule that estimated it held its
+coverage (`research/trace_cfe/tc_rchoice.jl`).
+
+**Testset 48** (39 assertions):
+- `b̄` and the interval against an independent dense reimplementation
+  (Jin & Lee's first step, the debiased plug-in, `cv` from Distributions):
+  `b̄` to 1e-8 relative, the endpoints to 1e-6.
+- Lemma 4 against the exact `β` for `f ∈ span(Z)` at `λ` = 0.1, 1, 10: the
+  bound holds (smallest margin oracle/|β| = 1.05 on 1.13, 1.08 on 1.10; the
+  bound is deterministic). Power: the quadratic term alone is below `|β|`
+  by a factor 5.6 or more.
+- `ℛ = 0` gives the Wald interval; the width rises with `ℛ`; `ρ̂` and the
+  Wald interval do not change.
+- The grid: the result is the candidate with the smallest half-length and
+  equals the single-`λ` fit there; at `ℛ` × 10⁴ the projection is chosen;
+  Bonferroni lengthens every candidate (by a factor 1.14 or more).
+- The guards, and `basis_roughness`: exact for `f = Zψ`; a plane plus `X`
+  gives 0.0 on 1.13 and 4.8e-8 on 1.10 (bound 1e-6; the first draft's 1e-8
+  failed on 1.10, a square root of rounding error); power: the curved
+  surface gives more than 1.
+
+**Monte Carlo** (`validation/mc_root_rho_bias_aware.jl`, output committed):
+tc_honest's design (`n` = 900, kNN-6, 15 × 15 hat basis, `f = x +
+a·sin(2πu)cos(πv)`, heteroskedastic normal errors, `ρ₀ = 0.4`), the 12-value
+grid `10^(-3:0.5:2)` plus the projection, R = 300 per cell, through the
+released function. Criterion set before the run: coverage 0.93–0.99 at
+`ℛ = ℛ*` and `4ℛ*`; power: below 0.90 at `ℛ = 0`.
+
+| a | `ℛ/ℛ*` | coverage | half-length | projection's |
+|---|---|---|---|---|
+| 1 | 0 | 0.490 | 0.078 | 0.181 |
+| 1 | 1 | 0.957 | 0.102 | 0.181 |
+| 1 | 4 | 0.987 | 0.134 | 0.181 |
+| 4 | 0 | 0.000 | 0.039 | 0.176 |
+| 4 | 1 | 0.973 | 0.130 | 0.176 |
+| 4 | 4 | 0.960 | 0.172 | 0.176 |
+
+Both met. The projection here is REsd, whose interval is shorter than the
+exact-diagonal projection tc_honest used (0.250 and 0.227), so the gain
+over it is smaller: 44% and 26% at `ℛ*`, 26% and 2% at `4ℛ*`. At `a = 4`,
+`4ℛ*` chose the projection in 115 of 300 draws. Not measured: other `W`,
+`n` or error laws, and the Bonferroni option's coverage.

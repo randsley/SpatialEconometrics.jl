@@ -9,7 +9,8 @@
 # uses Jin & Lee's (2012) moment, whose mean is exactly zero for any K, and
 # reports two intervals: the Wald interval and the test-inversion set.
 #
-# Section 4 fits a penalised smoother (tensor_pspline) in place of the projection.
+# Section 4 fits a penalised smoother (tensor_pspline) in place of the projection,
+# and section 5 its bias-aware interval, with λ chosen by the interval's length.
 #
 # Run: julia --project=. examples/34_root_rho.jl
 # ---------------------------------------------------------------------------
@@ -74,4 +75,27 @@ for λ in (0.01, 0.1, 1.0)
     rλ = root_rho(y, X, W; ps..., lambda = λ)
     cs = join((@sprintf("[%.3f, %.3f]", a, b) for (a, b) in rλ.cs), " ∪ ")
     @printf("%6.2f  %6.1f  %.3f   %.3f (%.3f)    %s\n", λ, rλ.df, rλ.df / n, rλ.rho, rλ.se, cs)
+end
+
+# ── 5. The bias-aware interval, with λ chosen by its length ────────────────
+#
+# Given a bound ℛ on the roughness of f, root_rho widens the critical value by
+# a bound on the shrinkage bias, so a larger λ stays valid (THEORY.md,
+# Proposition 7). ℛ is an assumption, not an estimate: state it through a
+# reference surface at least as rough as f is believed to be. Here the belief
+# is "no rougher than 2·sin(2πu)cos(πv)", which is the truth in this
+# simulation; in practice err on the large side, and report a few multiples.
+# With a vector of λ, the projection is a candidate too (λ = 0, bias bound 0),
+# and the shortest interval is returned.
+
+f_ref = 2 .* sin.(2π .* u) .* cos.(π .* v)
+ℛ = basis_roughness(f_ref, ps.basis, ps.penalty; X)
+rp = root_rho(y, X, W; basis = ps.basis)
+@printf("\nℛ = %.3f from the reference surface; the projection's Wald half-length %.3f\n",
+        ℛ, (rp.ci_wald[2] - rp.ci_wald[1]) / 2)
+println("  ℛ/ref    λ chosen   bias-aware interval   half-length")
+for m in (1.0, 2.0, 4.0)
+    rb = root_rho(y, X, W; ps..., lambda = 10.0 .^ (-2:0.5:1), roughness = m * ℛ)
+    @printf("  %4.0f    %8.3g    [%.3f, %.3f]       %.3f\n", m, rb.lambda, rb.ci_bias_aware...,
+            (rb.ci_bias_aware[2] - rb.ci_bias_aware[1]) / 2)
 end

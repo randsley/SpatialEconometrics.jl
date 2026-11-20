@@ -1,0 +1,18 @@
+root_rho's bias-aware interval, λ chosen by length (Proposition 7); Julia 1.13.4
+n = 900, kNN-6, 15 × 15 hat basis + x, λ grid 10^(-3:0.5:2) plus the projection, R = 300
+
+a = 1, ℛ = 0 ℛ* (ℛ* = 1.598): coverage 0.490 (300 fits), half-length 0.0783 (projection 0.1813), bias +0.0761, sd 0.0411 | ok | 7.6 min
+    picks (λ: count) 100.0:300
+a = 1, ℛ = 1 ℛ* (ℛ* = 1.598): coverage 0.957 (300 fits), half-length 0.1017 (projection 0.1813), bias +0.0088, sd 0.0515 | ok | 7.4 min
+    picks (λ: count) 1.0:94 3.16:201 10.0:5
+a = 1, ℛ = 4 ℛ* (ℛ* = 1.598): coverage 0.987 (300 fits), half-length 0.1339 (projection 0.1813), bias -0.0017, sd 0.0599 | ok | 7.4 min
+    picks (λ: count) 0.0316:2 0.1:163 0.316:122 1.0:10 3.16:3
+a = 4, ℛ = 0 ℛ* (ℛ* = 6.393): coverage 0.000 (300 fits), half-length 0.0392 (projection 0.1763), bias +0.3521, sd 0.0165 | ok | 7.8 min
+    picks (λ: count) 100.0:300
+a = 4, ℛ = 1 ℛ* (ℛ* = 6.393): coverage 0.973 (300 fits), half-length 0.1299 (projection 0.1763), bias +0.0145, sd 0.0584 | ok | 7.5 min
+    picks (λ: count) 0.0316:6 0.1:220 0.316:72 1.0:2
+a = 4, ℛ = 4 ℛ* (ℛ* = 6.393): coverage 0.960 (300 fits), half-length 0.1719 (projection 0.1763), bias -0.0046, sd 0.0845 | ok | 7.5 min
+    picks (λ: count) 0:115 0.001:5 0.00316:128 0.01:47 0.0316:5
+
+Pass criterion (ℛ = ℛ* and 4ℛ* within 0.93–0.99): met
+Power check (ℛ = 0 below 0.90): met

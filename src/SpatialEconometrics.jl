@@ -108,7 +108,7 @@ import .SpatialNetworks: network_weights, group_weights, PeerIdentification, pee
 import .SpatialCommonFactors: CDTestResult, pesaran_cd, AlphaExponentResult, alpha_exponent, DependenceVerdict, dependence_verdict, SpCCEModel, fit_sp_cce
 import .SpatioTemporalModels: STARModel, fit_star, InteractiveFEModel, fit_interactive_fe, factor_projection, IRFResult, space_time_irf, spatial_forecast
 import .SemiparametricSpatial: local_polynomial_smoother, SpectralOverlapResult, spectral_overlap, PartiallyLinearSARModel, fit_partially_linear_sar, ClosedFormRhoResult, closed_form_rho, TVCoefSARModel, fit_tv_coef_sar
-import .RootRho: RootRhoResult, root_rho, tensor_pspline
+import .RootRho: RootRhoResult, root_rho, tensor_pspline, basis_roughness
 import .CREDynamicSpatialPanel: CREDynamicSpatialPanelModel, fit_cre_dynamic_spatial_panel
 import .CommonShockDynamicPanel: CommonShockDynamicPanelModel, fit_common_shock_dynamic_panel
 import .SpatialGARCH: SpatialLogGARCHModel, fit_spatial_log_garch
@@ -592,7 +592,7 @@ export
     ClosedFormRhoResult, closed_form_rho,
     TVCoefSARModel, fit_tv_coef_sar,
     # Root estimator with a growing basis (Jin & Lee 2012, REsd)
-    RootRhoResult, root_rho, tensor_pspline,
+    RootRhoResult, root_rho, tensor_pspline, basis_roughness,
     # Short-T dynamic spatial panel with correlated random effects (Li & Yang 2021)
     CREDynamicSpatialPanelModel, fit_cre_dynamic_spatial_panel,
     # Short-T dynamic spatial panel with common shocks (Bai & Chen 2026)

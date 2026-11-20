@@ -165,6 +165,7 @@ const _TESTSET_FILES = [
     "45_the_claude_skill_s_function.jl",
     "46_root_rho_jin_lee_resd.jl",
     "47_root_rho_penalised_smoother.jl",
+    "48_root_rho_bias_aware_interval.jl",
 ]
 
 @testset "SpatialEconometrics.jl Full Suite Verification" begin

@@ -144,8 +144,51 @@ not zero. It grows with `λ`, and both intervals under-cover once
 needs. GCV and the RMSE-optimal `λ` were too large for valid inference in
 `research/trace_cfe/tc_lambda.jl`, which is why `lambda` has no default.
 Report `ρ̂` across a few `λ`, as section 4 of `examples/34_root_rho.jl`
-does. `df/n` above 0.30 gives a warning, and a unit with `Sᵢᵢ` above 0.99
+does. Or use the bias-aware interval below, which stays valid at a
+larger `λ`. `df/n` above 0.30 gives a warning, and a unit with `Sᵢᵢ` above 0.99
 is refused.
+
+## The bias-aware interval
+
+Choosing `λ` small trades precision for validity. The bias-aware interval
+avoids that trade under one assumption: a bound `ℛ` on the roughness of `f`.
+Over the class `{f = [X, B]ψ : ψ′Πψ ≤ ℛ²}`, with `Π` the penalty, the
+shrinkage bias satisfies `|f′Af| ≤ b̄ = ℛ√(v′Π⁺v) + ℛ²χ̄`, where
+`v = (MZ)′Wf` is estimated from the projection and `χ̄` bounds the quadratic
+part (THEORY.md, Lemma 4). The interval widens the critical value by that
+bound:
+
+```julia
+ℛ = basis_roughness(f_ref, ps.basis, ps.penalty; X)   # a surface at least as rough as f
+r = root_rho(y, X, W; ps..., lambda = 1.0, roughness = ℛ)
+r.ci_bias_aware                                       # ρ̂ ± cv(b̄/√V̂)·se
+r = root_rho(y, X, W; ps..., lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ)
+r.lambda, r.lambda_grid, r.halflength_grid            # λ chosen by the interval's length
+```
+
+`cv(t)` is the `level` quantile of `|N(t, 1)|`. Its coverage holds uniformly
+over the class, at any `λ` (THEORY.md, Proposition 7). With a vector of
+`lambda`s, the projection is added as `λ = 0` (bias bound 0), and the
+shortest candidate is returned. Proposition 7 covers that choice when one
+candidate is clearly the shortest. `bonferroni = true` covers any choice, at
+the price of a larger critical value.
+
+**`ℛ` is the user's assumption.** The data cannot certify an upper bound on
+the roughness: a perturbation the data can barely see can be very rough.
+Every rule that estimated `ℛ` under-covered (0.45–0.77) in
+`research/trace_cfe/tc_rchoice.jl`. The loss is asymmetric, so err on the
+large side. A large `ℛ` moves the choice towards the projection and costs
+at most the gain; a small one costs coverage. In that design
+(`n = 900`, two amplitudes `a` of the surface; projection half-lengths 0.250
+and 0.227):
+
+| `ℛ / ℛ*` | 0.5 | 1 | 4 | 16 |
+|---|---|---|---|---|
+| coverage, a = 1 / a = 4 | 0.908 / 0.902 | 0.954 / 0.964 | 0.982 / 0.970 | 0.970 / 0.968 |
+| half-length, a = 1 / a = 4 | 0.107 / 0.125 | 0.117 / 0.152 | 0.162 / 0.210 | 0.230 / 0.226 |
+
+Here `ℛ*` is the true roughness. Report the result across a few `ℛ`, with,
+for each conclusion, the largest `ℛ` at which it holds.
 
 ## Cost
 

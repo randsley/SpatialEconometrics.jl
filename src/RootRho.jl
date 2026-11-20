@@ -44,8 +44,9 @@ intervals, so smooth **less** than a good fit of `f` would.
 
 The growing-basis results (a CLT for the moment with a dense `M`, the
 consistency of the HC2 `V̂`, the validity of `CS`, and the penalised
-smoother) are proved in `research/trace_cfe/THEORY.md` (Theorem 1 and
-Propositions 1, 2, 4 and 6). They have not been checked by anyone else.
+smoother, and its bias-aware interval) are proved in
+`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 2, 4, 6 and 7,
+and Lemma 4). They have not been checked by anyone else.
 They are measured in that directory and in `validation/mc_root_rho.jl` and
 `validation/mc_root_rho_smoother.jl`.
 
@@ -67,10 +68,10 @@ using LinearAlgebra
 using SparseArrays
 using Printf
 
-import ..SpatialUtils: check_design_rank, _check_spatial_bounds, ExactLU
+import ..SpatialUtils: check_design_rank, _check_spatial_bounds, ExactLU, _normcdf
 import ..SpatialDiscreteChoice: _norminv
 
-export RootRhoResult, root_rho, tensor_pspline
+export RootRhoResult, root_rho, tensor_pspline, basis_roughness
 
 """
     RootRhoResult
@@ -107,6 +108,15 @@ The result of [`root_rho`](@ref).
 - `root_found` — `false` when the moment has no admissible root at either
   step. Then `rho`, `se` and `ci_wald` are `NaN`, and `cs` is still valid.
 - `rho_bounds`.
+- `roughness` — the bound `ℛ` given for the bias-aware interval (`NaN`
+  when none was asked for).
+- `bias_bound` — `b̄`, the bound on the moment's bias `|E g(ρ₀)|` over the
+  roughness class (0 for a projection; `NaN` when not asked for).
+- `ci_bias_aware` — `ρ̂ ± cv(b̄/√V̂)·se`, with `cv(t)` the `level` quantile of
+  `|N(t, 1)|` (`NaN` when not asked for).
+- `lambda_grid`, `halflength_grid` — with a vector of `lambda`s, every
+  candidate (the projection as `λ = 0` first) and the half-length of its
+  bias-aware interval; the result is the shortest. Empty otherwise.
 """
 struct RootRhoResult{T<:AbstractFloat}
     rho::T
@@ -132,6 +142,21 @@ struct RootRhoResult{T<:AbstractFloat}
     vhat::T
     root_found::Bool
     rho_bounds::Tuple{T, T}
+    roughness::T
+    bias_bound::T
+    ci_bias_aware::Tuple{T, T}
+    lambda_grid::Vector{T}
+    halflength_grid::Vector{T}
+end
+
+# The fields of a result without the bias-aware interval.
+_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[])
+
+# A copy of r with the bias-aware fields replaced.
+function _with_bias(r::RootRhoResult{T}, ℛ, bbar, ci, grid, hl) where {T}
+    f = [getfield(r, k) for k in fieldnames(RootRhoResult)]
+    f[end-4:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl)]
+    return RootRhoResult{T}(f...)
 end
 
 function Base.show(io::IO, r::RootRhoResult)
@@ -156,6 +181,13 @@ function Base.show(io::IO, r::RootRhoResult)
     else
         println(io, "No admissible root: the data do not identify ρ through this moment.")
         println(io, "The test-inversion set below is still valid.")
+    end
+    if !isnan(r.roughness) && r.root_found
+        @printf(io, "Bias-aware %g%% interval:      [%.4f, %.4f]   (ℛ = %.4g, b̄/√V̂ = %.3f)\n",
+                pct, r.ci_bias_aware..., r.roughness, r.bias_bound / sqrt(r.vhat))
+        isempty(r.lambda_grid) || @printf(io,
+            "  λ chosen by the interval's length from %d candidates (λ = 0 is the projection)\n",
+            length(r.lambda_grid))
     end
     if isempty(r.cs)
         @printf(io, "Test-inversion %g%% set: empty (every ρ in [%.2f, %.2f] is rejected)\n",
@@ -286,11 +318,103 @@ end
 # symmetric M. diag A = 0 exactly: diag(MDM) = (M∘M)d needs only that M is
 # symmetric. The moment must be formed from A itself: the residual-vector
 # shortcut (My₀)′(MWy₀ + DMy₀) is y₀′(M²W + MDM)y₀, which differs when M² ≠ M.
-function _exact_diag_moment(M::Matrix{T}, W::AbstractMatrix{T}) where {T}
+_exact_diag_moment(M::Matrix{T}, W::AbstractMatrix{T}) where {T} = _exact_diag_moment_d(M, W)[1]
+function _exact_diag_moment_d(M::Matrix{T}, W::AbstractMatrix{T}) where {T}
     MW = M * W
     d = (M .* M) \ (-diag(MW))
     MW .+= M * (d .* M)
-    return MW
+    return MW, d
+end
+
+# ── The bias-aware interval (THEORY.md, Lemma 4 and Proposition 7) ──────────
+#
+# Over F(ℛ) = {f = Zψ : ψ′Πψ ≤ ℛ²}, Π the penalty on the basis block of Z, the
+# smoother's bias in the moment, β = f′Af, satisfies |β| ≤ b̄ = ℛ√(v′Π⁺v) + ℛ²χ̄,
+# with v = (MZ)′Wf and χ̄ the largest |eigenvalue| of Π^{+1/2}(MZ)′D(MZ)Π^{+1/2}.
+# v is estimated from the projection: v̂ = (MZ)′W P_Z y₀(ρ̂₀), with ρ̂₀ Jin &
+# Lee's first-step root, and v̂′Π⁺v̂ is debiased by Σᵢ ŝ₀ᵢ‖Υeᵢ‖²,
+# Υ = Π^{+1/2}(MZ)′W P_Z, ŝ₀ the projection's HC2 plug-in.
+
+# cv(t): the 1 − α quantile of |N(t, 1)|, by bisection.
+function _cv_bias(t::Real, α::Real)
+    t = abs(Float64(t)); lo, hi = 0.0, t + 10.0
+    for _ in 1:100
+        c = (lo + hi) / 2
+        _normcdf(c - t) - _normcdf(-c - t) < 1 - α ? (lo = c) : (hi = c)
+    end
+    return (lo + hi) / 2
+end
+
+# Π^{+1/2} as N = Diag(1/√ω)U′ on range(Π) (only N′N = Π⁺ and the norms matter).
+function _penalty_root_inverse(Π::Matrix{T}) where {T}
+    E = eigen(Symmetric(Π))
+    tol = 1e-10 * max(maximum(abs, E.values), floatmin(T))
+    keep = E.values .> tol
+    return Diagonal(1 ./ sqrt.(E.values[keep])) * Matrix(E.vectors[:, keep]')
+end
+
+# The projection pilot: its basis Q, Q′y₀(ρ̂₀) and the HC2 plug-in ŝ₀.
+function _bias_pilot(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
+                     bnds) where {T}
+    K = size(Z, 2)
+    Q = Matrix(qr(Z).Q)[:, 1:K]
+    Mii = 1 .- vec(sum(abs2, Q; dims = 2))
+    nbad = count(<(0.01), Mii)
+    nbad > 0 && throw(ArgumentError(
+        "root_rho: the bias-aware interval uses the projection on [X, basis] as a pilot, " *
+        "and $nbad unit(s) have leverage above 0.99 there; use fewer basis functions " *
+        "where the data are sparse"))
+    C1 = _moment_matrix(Matrix(Ws'), Q, Mii)
+    ρ0 = _sign_rule_root(_quadratic(C1, y, Wy)..., bnds)
+    ρ0 === nothing && return nothing
+    y0 = y .- ρ0 .* Wy
+    qy = Q' * y0
+    s0 = (y0 .- Q * qy) .^ 2 ./ Mii
+    return (; Q, qy, s0)
+end
+
+# b̄ / ℛ-free parts at one λ: √(debiased v̂′Π⁺v̂) and χ̄.
+function _bias_parts(M::Matrix{T}, d::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
+                     N::AbstractMatrix{T}, pilot) where {T}
+    MZ = M * Z
+    Tm = Matrix((Ws' * MZ)')                         # (MZ)′W, K × n
+    R1 = N * (Tm * pilot.Q)
+    colsq = vec(sum(abs2, R1 * pilot.Q'; dims = 1))  # ‖Υeᵢ‖²
+    nv = R1 * pilot.qy
+    lin = sqrt(max(dot(nv, nv) - dot(colsq, pilot.s0), zero(T)))
+    Qλ = MZ' * (d .* MZ)
+    χ = maximum(abs, eigvals(Symmetric(N * ((Qλ .+ Qλ') ./ 2) * N')))
+    return lin, χ
+end
+
+"""
+    basis_roughness(f_ref, basis, penalty; X = nothing) -> ℛ
+
+The roughness `√(ψ′Πψ)` of a reference surface `f_ref` (a vector over the
+`n` units) in a basis and penalty: `ψ` is the least-squares fit of `f_ref` on
+`[X, basis]`, and `Π` applies `penalty` to the basis block and leaves `X`
+unpenalised, as [`root_rho`](@ref) does. Use it to set `roughness`: choose
+an `f_ref` at least as rough as `f` is believed to be. The data cannot
+choose `ℛ` (`research/trace_cfe/THEORY.md`, "Choosing ℛ"), and too small
+an `ℛ` costs coverage, so err on the large side.
+
+For a tensor hat basis with knot spacing `h` and a second-difference
+penalty, `ψ′Πψ ≈ h²∫(f_uu² + f_vv²)`, so `ℛ` is also a bound on the mean
+squared curvature (measured ratio 1.10 in `tc_rchoice.jl`).
+"""
+function basis_roughness(f_ref::AbstractVector{<:Real}, basis::AbstractMatrix{<:Real},
+                         penalty::AbstractMatrix{<:Real}; X = nothing)
+    n, kb = size(basis)
+    length(f_ref) == n || throw(DimensionMismatch(
+        "basis_roughness: f_ref has $(length(f_ref)) entries, basis has $n rows"))
+    size(penalty) == (kb, kb) || throw(DimensionMismatch(
+        "basis_roughness: penalty is $(size(penalty)), expected ($kb, $kb)"))
+    Xm = X === nothing ? zeros(n, 0) : Matrix{Float64}(X)
+    size(Xm, 1) == n || throw(DimensionMismatch("basis_roughness: X has $(size(Xm, 1)) rows"))
+    kx = size(Xm, 2)
+    ψ = hcat(Xm, Matrix{Float64}(basis)) \ Vector{Float64}(f_ref)
+    ψb = ψ[(kx + 1):end]
+    return sqrt(max(dot(ψb, Matrix{Float64}(penalty) * ψb), 0.0))
 end
 
 # Piecewise-linear "hat" functions on k equally spaced knots over the range of x.
@@ -391,8 +515,8 @@ end
 
 """
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
-             varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
-             max_dense_n = 4000)
+             roughness = nothing, bonferroni = false, varnames = nothing,
+             level = 0.95, rho_bounds = (-0.99, 0.99), max_dense_n = 4000)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -424,6 +548,12 @@ so the set's endpoints are exact.
 - `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
   penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
   or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
+  With `roughness`, `lambda` may also be a vector (see below).
+- `roughness` — a bound `ℛ` on the roughness `√(ψ′Πψ)` of `f = [X, basis]ψ`
+  (`Π` the penalty on the basis block), for the bias-aware interval.
+  [`basis_roughness`](@ref) computes it from a reference surface.
+- `bonferroni` — with a vector of `lambda`s, use level `1 − α/L` for each of
+  the `L` candidates, so that coverage holds for any choice among them.
 
 # With a penalised smoother
 
@@ -446,6 +576,42 @@ valid inference in `research/trace_cfe/tc_lambda.jl`, so `lambda` has no
 default. Report `ρ̂` across a few values of `λ`, with `r.df = tr S`. A
 `df/n` above 0.30 gives a warning, and units with `Sᵢᵢ` above 0.99 are
 refused.
+
+# The bias-aware interval
+
+The smoother's shrinkage biases the moment by `β = f′Af`, which the Wald
+interval and the test-inversion set ignore. Given `roughness = ℛ`, the
+result also holds the interval
+
+```math
+ρ̂ ± \\mathrm{cv}(\\bar b/\\sqrt{\\hat V})\\,\\mathrm{se},\\qquad
+\\bar b = ℛ\\sqrt{v'Π^+v} + ℛ^2\\bar χ,
+```
+
+where `b̄` bounds `|β|` for every `f = [X, basis]ψ` with `ψ′Πψ ≤ ℛ²`
+(THEORY.md, Lemma 4), `v = (MZ)′Wf` is estimated from the projection (at Jin
+& Lee's first-step root, and debiased), `χ̄` bounds the quadratic part, and
+`cv(t)` is the `level` quantile of `|N(t, 1)|`. Its coverage holds uniformly
+over that class, whatever `λ` (Proposition 7), so `λ` no longer has to be
+small for the interval to be valid. With `ℛ = 0` it is the Wald interval.
+
+With a **vector** of `lambda`s, each is fitted, the projection is added as
+`λ = 0` (its bias bound is 0), and the result is the candidate with the
+shortest bias-aware interval; `lambda_grid` and `halflength_grid` record
+them all. Proposition 7 covers that choice when one candidate is clearly the
+shortest; `bonferroni = true` covers any choice, at a cost in length (about
+46% at `b̄ = 0` with 12 candidates).
+
+**`ℛ` is an assumption, not an estimate.** The data cannot certify an upper
+bound on the roughness, and every rule that estimated it under-covered
+(`research/trace_cfe/tc_rchoice.jl`). State it through a reference surface
+at least as rough as `f` is believed to be ([`basis_roughness`](@ref)), and
+err on the large side: a large `ℛ` moves the choice towards the projection
+and costs at most the gain, a small one costs coverage. In
+`tc_honest.jl`'s design (n = 900), with `ℛ` the true roughness, the chosen
+interval covered 0.954 and 0.964 and was 53% and 33% shorter than the
+projection's; with `ℛ` four times too large, it covered 0.982 and 0.970
+and was still 35% and 7% shorter. Report the result across a few `ℛ`.
 
 # Choosing the basis
 
@@ -483,14 +649,16 @@ about six and solves one dense `n × n` system for `d`.
 
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
-    consistency of `V̂`, the validity of the test-inversion set) are in
+    consistency of `V̂`, the validity of the test-inversion set, and the
+    coverage of the bias-aware interval) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
 """
 function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::AbstractMatrix{<:Real};
                   basis::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
                   penalty::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
-                  lambda::Union{Nothing, Real} = nothing,
+                  lambda::Union{Nothing, Real, AbstractVector{<:Real}} = nothing,
+                  roughness::Union{Nothing, Real} = nothing, bonferroni::Bool = false,
                   varnames = nothing, level::Real = 0.95,
                   rho_bounds = (-0.99, 0.99), max_dense_n::Integer = 4000)
     T = Float64
@@ -504,9 +672,21 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
         "root_rho: give both `penalty` and `lambda`, or neither. There is no default λ: " *
         "GCV and the RMSE-optimal λ smooth too much for valid inference"))
     penalised = penalty !== nothing
+    roughness === nothing || penalised || throw(ArgumentError(
+        "root_rho: `roughness` needs a penalty and lambda: a projection has no shrinkage " *
+        "bias, and its Wald interval is already the bias-aware one"))
+    roughness === nothing || (isfinite(roughness) && roughness >= 0) || throw(ArgumentError(
+        "root_rho: roughness must be finite and non-negative, got $roughness"))
+    lambda isa AbstractVector && roughness === nothing && throw(ArgumentError(
+        "root_rho: a vector of lambdas needs `roughness`: λ is chosen by the length of the " *
+        "bias-aware interval, and without a roughness bound there is none"))
+    bonferroni && !(lambda isa AbstractVector) && throw(ArgumentError(
+        "root_rho: `bonferroni` applies only to a vector of lambdas"))
     if penalised
         basis === nothing && throw(ArgumentError("root_rho: a penalty needs a basis"))
-        isfinite(lambda) && lambda > 0 || throw(ArgumentError(
+        lambda isa AbstractVector && isempty(lambda) && throw(ArgumentError(
+            "root_rho: the vector of lambdas is empty"))
+        all(l -> isfinite(l) && l > 0, lambda) || throw(ArgumentError(
             "root_rho: lambda must be positive and finite, got $lambda; for λ = 0 omit " *
             "penalty and lambda (the projection)"))
         kb = size(basis, 2)
@@ -541,8 +721,52 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     check_design_rank(Z, vcat(vnames, ["basis$j" for j in 1:size(Bm, 2)]), "root_rho";
         context = "A hat or B-spline basis sums to one, so it is collinear with an " *
                   "intercept in X: drop one of them.")
-    penalised && return _root_rho_penalised(Vector{T}(y), Z, Ws, kx, Pm, T(lambda), vnames,
-                                            T(level), bnds)
+    yv = Vector{T}(y)
+    penalised || return _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds)
+    roughness === nothing && return _root_rho_penalised(yv, Z, Ws, kx, Pm, T(lambda), vnames,
+                                                        T(level), bnds, nothing)
+    # The bias-aware interval: one λ, or λ chosen by length with the projection as λ = 0.
+    Πt = zeros(T, K, K)
+    Πt[(kx + 1):K, (kx + 1):K] .= Pm
+    Wy = Ws * yv
+    pilot = _bias_pilot(yv, Wy, Z, Ws, bnds)
+    pilot === nothing && throw(ArgumentError(
+        "root_rho: the projection pilot has no admissible root, so the bias bound cannot " *
+        "be estimated; the test-inversion sets of root_rho without `roughness` still apply"))
+    N = _penalty_root_inverse(Πt)
+    λs = lambda isa AbstractVector ? T.(collect(lambda)) : [T(lambda)]
+    ncand = lambda isa AbstractVector ? length(λs) + 1 : 1
+    α = (1 - T(level)) / (bonferroni ? ncand : 1)
+    bias = (; ℛ = T(roughness), N, pilot, α)
+    fits = [_root_rho_penalised(yv, Z, Ws, kx, Pm, λ, vnames, T(level), bnds, bias) for λ in λs]
+    lambda isa AbstractVector || return fits[1]
+    proj = try
+        _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds)
+    catch e
+        e isa ArgumentError || rethrow()
+        @warn "root_rho: the projection (λ = 0) is left out of the candidates: $(e.msg)"
+        nothing
+    end
+    cands = RootRhoResult{T}[]
+    if proj !== nothing
+        z = T(_norminv(1 - α / 2))
+        ci = proj.root_found ? (proj.rho - z * proj.se, proj.rho + z * proj.se) : (T(NaN), T(NaN))
+        push!(cands, _with_bias(proj, roughness, zero(T), ci, T[], T[]))
+    end
+    append!(cands, fits)
+    grid = [c.lambda for c in cands]
+    hl = [c.root_found && isfinite(c.ci_bias_aware[1]) ?
+          (c.ci_bias_aware[2] - c.ci_bias_aware[1]) / 2 : T(Inf) for c in cands]
+    all(isinf, hl) && return _with_bias(cands[end], roughness, cands[end].bias_bound,
+                                        cands[end].ci_bias_aware, grid, hl)
+    j = argmin(hl)
+    return _with_bias(cands[j], roughness, cands[j].bias_bound, cands[j].ci_bias_aware, grid, hl)
+end
+
+# The projection on Z: Jin & Lee's two steps (REsd).
+function _root_rho_projection(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T}, kx::Int,
+                              vnames::Vector{String}, level::T, bnds::Tuple{T, T}) where {T}
+    n, K = size(Z)
     Q = Matrix(qr(Z).Q)[:, 1:K]
     Mii = 1 .- vec(sum(abs2, Q; dims = 2))
     h = 1 .- Mii
@@ -554,7 +778,7 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     K / n > 0.30 && @warn "root_rho: K/n = $(round(K / n; digits = 3)) is above 0.30, " *
         "beyond the range where the intervals' coverage was measured"
 
-    yv = Vector{T}(y); Wy = Ws * yv
+    Wy = Ws * yv
     z = T(_norminv(1 - (1 - level) / 2))
     Wt = Matrix(Ws')
 
@@ -582,21 +806,21 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
         nanT = T(NaN)
         return RootRhoResult{T}(nanT, ρ1 === nothing ? nanT : ρ1, nanT, (nanT, nanT), cs,
             touches, length(cs) > 1, T(level), fill(nanT, kx), vnames, n, K, :projection,
-            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds)
+            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, _no_bias(T)...)
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : T(NaN)
     β = kx > 0 ? (Z \ (yv .- ρ .* Wy))[1:kx] : T[]
     return RootRhoResult{T}(ρ, ρ1, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, T(level), β, vnames, n, K, :projection, zero(T), T(K), maximum(h),
-        a, b, c, vp, V, true, bnds)
+        a, b, c, vp, V, true, bnds, _no_bias(T)...)
 end
 
 # The penalised smoother: S = Z(Z′Z + λΩ̃)⁻¹Z′, the exact-diagonal moment in
 # one step, and the general HC2 V̂ (THEORY.md, Proposition 4).
 function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T}, kx::Int,
                              Ω::Matrix{T}, λ::T, vnames::Vector{String}, level::T,
-                             bnds::Tuple{T, T}) where {T}
+                             bnds::Tuple{T, T}, bias) where {T}
     n, K = size(Z)
     Ωt = zeros(T, K, K)
     Ωt[(kx + 1):K, (kx + 1):K] .= Ω
@@ -615,7 +839,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
         "above 0.30, beyond the range where the intervals' coverage was measured"
     M = Matrix{T}(I, n, n) .- S
     m = vec(sum(abs2, M; dims = 1))                  # (M²)ᵢᵢ, M symmetric
-    A = _exact_diag_moment(M, Ws)
+    A, d = _exact_diag_moment_d(M, Ws)
     H = (A .+ A') * S
     Wy = Ws * y
     z = T(_norminv(1 - (1 - level) / 2))
@@ -627,16 +851,27 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     touches = !isempty(cs) && (cs[1][1] == bnds[1] || cs[end][2] == bnds[2])
     nanT = T(NaN)
     if ρ === nothing
-        return RootRhoResult{T}(nanT, nanT, nanT, (nanT, nanT), cs, touches, length(cs) > 1,
+        r = RootRhoResult{T}(nanT, nanT, nanT, (nanT, nanT), cs, touches, length(cs) > 1,
             level, fill(nanT, kx), vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
-            vp, nanT, false, bnds)
+            vp, nanT, false, bnds, _no_bias(T)...)
+        return bias === nothing ? r : _with_bias(r, bias.ℛ, nanT, (nanT, nanT), T[], T[])
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : nanT
     β = kx > 0 ? (F \ (Z' * (y .- ρ .* Wy)))[1:kx] : T[]
-    return RootRhoResult{T}(ρ, nanT, se, (ρ - z * se, ρ + z * se), cs, touches,
+    r = RootRhoResult{T}(ρ, nanT, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, level, β, vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
-        vp, V, true, bnds)
+        vp, V, true, bnds, _no_bias(T)...)
+    bias === nothing && return r
+    lin, χ = _bias_parts(M, d, Z, Ws, bias.N, bias.pilot)
+    bbar = bias.ℛ * lin + bias.ℛ^2 * χ
+    ci = if V > 0
+        h = T(_cv_bias(bbar / sqrt(V), bias.α)) * se
+        (ρ - h, ρ + h)
+    else
+        (nanT, nanT)
+    end
+    return _with_bias(r, bias.ℛ, bbar, ci, T[], T[])
 end
 
 end # module

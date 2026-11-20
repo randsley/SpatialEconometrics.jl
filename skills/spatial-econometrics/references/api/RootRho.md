@@ -38,12 +38,37 @@ The result of [`root_rho`](@ref).
 - `root_found` — `false` when the moment has no admissible root at either
   step. Then `rho`, `se` and `ci_wald` are `NaN`, and `cs` is still valid.
 - `rho_bounds`.
+- `roughness` — the bound `ℛ` given for the bias-aware interval (`NaN`
+  when none was asked for).
+- `bias_bound` — `b̄`, the bound on the moment's bias `|E g(ρ₀)|` over the
+  roughness class (0 for a projection; `NaN` when not asked for).
+- `ci_bias_aware` — `ρ̂ ± cv(b̄/√V̂)·se`, with `cv(t)` the `level` quantile of
+  `|N(t, 1)|` (`NaN` when not asked for).
+- `lambda_grid`, `halflength_grid` — with a vector of `lambda`s, every
+  candidate (the projection as `λ = 0` first) and the half-length of its
+  bias-aware interval; the result is the shortest. Empty otherwise.
+
+## `basis_roughness`
+
+    basis_roughness(f_ref, basis, penalty; X = nothing) -> ℛ
+
+The roughness `√(ψ′Πψ)` of a reference surface `f_ref` (a vector over the
+`n` units) in a basis and penalty: `ψ` is the least-squares fit of `f_ref` on
+`[X, basis]`, and `Π` applies `penalty` to the basis block and leaves `X`
+unpenalised, as [`root_rho`](@ref) does. Use it to set `roughness`: choose
+an `f_ref` at least as rough as `f` is believed to be. The data cannot
+choose `ℛ` (`research/trace_cfe/THEORY.md`, "Choosing ℛ"), and too small
+an `ℛ` costs coverage, so err on the large side.
+
+For a tensor hat basis with knot spacing `h` and a second-difference
+penalty, `ψ′Πψ ≈ h²∫(f_uu² + f_vv²)`, so `ℛ` is also a bound on the mean
+squared curvature (measured ratio 1.10 in `tc_rchoice.jl`).
 
 ## `root_rho`
 
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
-             varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
-             max_dense_n = 4000)
+             roughness = nothing, bonferroni = false, varnames = nothing,
+             level = 0.95, rho_bounds = (-0.99, 0.99), max_dense_n = 4000)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -75,6 +100,12 @@ so the set's endpoints are exact.
 - `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
   penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
   or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
+  With `roughness`, `lambda` may also be a vector (see below).
+- `roughness` — a bound `ℛ` on the roughness `√(ψ′Πψ)` of `f = [X, basis]ψ`
+  (`Π` the penalty on the basis block), for the bias-aware interval.
+  [`basis_roughness`](@ref) computes it from a reference surface.
+- `bonferroni` — with a vector of `lambda`s, use level `1 − α/L` for each of
+  the `L` candidates, so that coverage holds for any choice among them.
 
 ### With a penalised smoother
 
@@ -97,6 +128,42 @@ valid inference in `research/trace_cfe/tc_lambda.jl`, so `lambda` has no
 default. Report `ρ̂` across a few values of `λ`, with `r.df = tr S`. A
 `df/n` above 0.30 gives a warning, and units with `Sᵢᵢ` above 0.99 are
 refused.
+
+### The bias-aware interval
+
+The smoother's shrinkage biases the moment by `β = f′Af`, which the Wald
+interval and the test-inversion set ignore. Given `roughness = ℛ`, the
+result also holds the interval
+
+```math
+ρ̂ ± \mathrm{cv}(\bar b/\sqrt{\hat V})\,\mathrm{se},\qquad
+\bar b = ℛ\sqrt{v'Π^+v} + ℛ^2\bar χ,
+```
+
+where `b̄` bounds `|β|` for every `f = [X, basis]ψ` with `ψ′Πψ ≤ ℛ²`
+(THEORY.md, Lemma 4), `v = (MZ)′Wf` is estimated from the projection (at Jin
+& Lee's first-step root, and debiased), `χ̄` bounds the quadratic part, and
+`cv(t)` is the `level` quantile of `|N(t, 1)|`. Its coverage holds uniformly
+over that class, whatever `λ` (Proposition 7), so `λ` no longer has to be
+small for the interval to be valid. With `ℛ = 0` it is the Wald interval.
+
+With a **vector** of `lambda`s, each is fitted, the projection is added as
+`λ = 0` (its bias bound is 0), and the result is the candidate with the
+shortest bias-aware interval; `lambda_grid` and `halflength_grid` record
+them all. Proposition 7 covers that choice when one candidate is clearly the
+shortest; `bonferroni = true` covers any choice, at a cost in length (about
+46% at `b̄ = 0` with 12 candidates).
+
+**`ℛ` is an assumption, not an estimate.** The data cannot certify an upper
+bound on the roughness, and every rule that estimated it under-covered
+(`research/trace_cfe/tc_rchoice.jl`). State it through a reference surface
+at least as rough as `f` is believed to be ([`basis_roughness`](@ref)), and
+err on the large side: a large `ℛ` moves the choice towards the projection
+and costs at most the gain, a small one costs coverage. In
+`tc_honest.jl`'s design (n = 900), with `ℛ` the true roughness, the chosen
+interval covered 0.954 and 0.964 and was 53% and 33% shorter than the
+projection's; with `ℛ` four times too large, it covered 0.982 and 0.970
+and was still 35% and 7% shorter. Report the result across a few `ℛ`.
 
 ### Choosing the basis
 
@@ -134,7 +201,8 @@ about six and solves one dense `n × n` system for `d`.
 
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
-    consistency of `V̂`, the validity of the test-inversion set) are in
+    consistency of `V̂`, the validity of the test-inversion set, and the
+    coverage of the bias-aware interval) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
 

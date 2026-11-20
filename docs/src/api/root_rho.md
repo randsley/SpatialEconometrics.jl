@@ -21,4 +21,5 @@ root_rho
 
 ```@docs
 tensor_pspline
+basis_roughness
 ```
