@@ -12,9 +12,9 @@ semiparametric spatial models, short-panel dynamic models with correlated
 random effects or common shocks, spatial log-GARCH for the variance, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.6.0** — 4,139 test assertions across 62 top-level testsets
+> **Version 0.6.0** — 4,182 test assertions across 63 top-level testsets
 > with both package extensions installed, measured on Julia 1.13.4. Without
-> them, 4,104 pass and two broken markers stand in for the extension testsets,
+> them, 4,147 pass and two broken markers stand in for the extension testsets,
 > measured on Julia 1.10.13. See [Validation Status](#validation-status) for
 > Monte Carlo results.
 
@@ -92,7 +92,7 @@ println(m)
 println(spatial_effects(m))
 ```
 
-Thirty-two worked examples live in [`examples/`](examples/), one per topic,
+Thirty-four worked examples live in [`examples/`](examples/), one per topic,
 each runnable on its own.
 
 ---
@@ -124,6 +124,7 @@ exported name.
 | [Common Factors & Spatio-Temporal](https://randsley.github.io/SpatialEconometrics.jl/dev/models/common_factors/) | CD and `α` tests, SP-CCE, STAR, interactive fixed effects |
 | [Spatial VAR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spvar/) | Multivariate space-time systems, STIR, the nested panel VAR |
 | [Semiparametric Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/semiparametric/) | Partially linear SAR, closed-form `ρ`, `β(τ)` |
+| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis; a test-inversion set valid under weak identification |
 | [Spatial log-GARCH](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spatial_garch/) | Spatial dependence in the conditional variance; covariate-distance `W` for unknown locations |
 | [GWR & MGWR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gwr/) | Coefficient surfaces, multiscale backfitting |
 | [Gravity Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gravity/) | PPML and negative binomial with high-dimensional FE |
@@ -183,6 +184,7 @@ want an internal helper:
 | `CREDynamicSpatialPanel` | Short-`T` dynamic spatial panel with correlated random effects | Li & Yang (2021) |
 | `CommonShockDynamicPanel` | Short-`T` dynamic spatial panel with common shocks | Bai & Chen (2026) |
 | `SpatialGARCH` | Spatial log-GARCH: two-step QML with a derived sandwich | Sato & Matsuda (2021) |
+| `RootRho` | Root estimator of `ρ` with a growing basis: REsd, HC2 variance, test-inversion set | Jin & Lee (2012) |
 | `SpatialGS2SLSPanel` | SARAR panels with endogenous regressors | Kelejian & Prucha (1998, 2010) |
 | `DynamicPanelSystemGMM` | Arellano-Bond & Blundell-Bond GMM | Roodman (2009) |
 | `StructuralMacroCalibration` | GRAS & cross-entropy SAM/MRIO balancing | Junius & Oosterhaven (2003) |
@@ -244,11 +246,11 @@ our own because:
 
 ```text
 SpatialEconometrics/
-├── src/            # 33 modules: the umbrella plus 32 submodules
+├── src/            # 34 modules: the umbrella plus 33 submodules
 ├── ext/            # Makie and Turing package extensions (see ext/README.md)
-├── test/           # runtests.jl + testsets/: 62 top-level testsets, one file each (see test/README.md)
+├── test/           # runtests.jl + testsets/: 63 top-level testsets, one file each (see test/README.md)
 ├── skills/         # a Claude Code skill for the package (see skills/README.md)
-├── examples/       # 33 runnable examples, one per topic
+├── examples/       # 34 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
 ├── validation/     # Monte Carlo studies and their output (see validation/README.md)
 └── benchmark/      # BenchmarkTools suite; see benchmark/README.md
@@ -289,6 +291,7 @@ SpatialEconometrics/
 | Short-T CRE Dynamic Panel | ✓ | **Yes** (Li & Yang's Table 1 replicated, 4,500/4,500 fits; sandwich coverage 0.92–0.97 for `β`, `ρ`, `λ`) |
 | Short-T Common-Shock Panel | ✓ | **Yes** (`validation/mc_serl_sdpd_output.txt`: at `L = 1` coverage of `ρ` 0.93–0.96 to `N = 4000`, at `L = 0` it falls to 0.40; the default `Q` biases `β` at large `N` when regressors are serially correlated with the loadings, and every period of `X` as `Q` removes it) |
 | Spatial log-GARCH | ✓ | **Yes** (`validation/mc_spatial_log_garch_output.txt`: Sato & Matsuda's Table 1 reproduced at `n = 400`, where the derived sandwich covers 0.93–0.96 except near `λ = 1`; the quasi-likelihood is unbounded as `λ → 1`, so 36–39% of `n = 100` samples at `λ = 0.9` have no interior maximum and the fit throws; a proxy `W` biases `ρ̂` more as `n` grows) |
+| Root Estimator of ρ | ✓ | **Yes** (`validation/mc_root_rho_output.txt`: 108 cells, 3 `W`, `n` 400–1600, `K/n` up to 0.19; the test-inversion set covers 0.935–0.975 and the Wald interval 0.931–0.975, with `|bias|` at most 0.06, while the plain closed form is biased by −0.05 to −1.76 on the same draws; the growing-basis theory has not been checked by anyone else) |
 
 **Cross-sectional SDM Monte Carlo results** (`validation/mc_sdm_output.txt`):
 ρ̂ mean = 0.595 (true 0.600); mean SE = 0.0324, empirical SD = 0.0328; 95%

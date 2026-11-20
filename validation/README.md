@@ -21,6 +21,7 @@ of `docs/AUDIT.md`, or the README's Validation Status table.
 | `mc_spatial_did_channels_diagnostics.jl` | Why the OLS intervals under-cover there: pooled against split, correlated against uncorrelated errors, five `vcov`s including wide Conley cutoffs | `mc_spatial_did_channels_diagnostics_output.txt` | same section |
 | `mc_spatial_did_gmm.jl` | The heteroskedasticity-robust spatial error (Kelejian & Prucha 2010) against ML: the DiD on a lattice under three variance patterns, Chagas et al.'s staggered design (the panel extension), and a cross-section SEM with variance tied to the neighbour count | `mc_spatial_did_gmm_output.txt` | AUDIT, finding 35 |
 | `mc_gs2sls_het.jl` | The heteroskedasticity-robust GS2SLS (Kelejian & Prucha 2010, endogenous regressors) against the default path: cross-sections of 300 and 1,200 units and six-period panels with unit and two-way effects, error sd constant or proportional to the neighbour count | `mc_gs2sls_het_output.txt` | AUDIT, finding 36 |
+| `mc_root_rho.jl` | `root_rho` (Jin & Lee's REsd, projection on a growing basis): coverage of the Wald interval and of the test-inversion set over 108 cells (3 `W`, `n` 400–1600, `K/n` 0.05–0.19, two variance patterns, normal and `χ²₃` errors), agreement with the research code, and the plain closed form's bias on the same draws | `mc_root_rho_output.txt` | AUDIT, "`root_rho`" |
 
 ## Running them
 

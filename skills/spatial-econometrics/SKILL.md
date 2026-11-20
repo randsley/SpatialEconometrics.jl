@@ -5,7 +5,7 @@ description: Fit and interpret spatial econometric models in Julia with SpatialE
 
 # SpatialEconometrics.jl
 
-A Julia package for spatial and structural econometrics: 32 submodules, one
+A Julia package for spatial and structural econometrics: 33 submodules, one
 umbrella `using SpatialEconometrics`. Its docstrings are careful about what
 each estimator does and does not support, and this skill is built to get
 that care into your analysis rather than leave it in the docs.

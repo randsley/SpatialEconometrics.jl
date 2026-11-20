@@ -7,11 +7,11 @@
 > the default GS2SLS's panel inference (AUDIT 34–36); the Claude Code skill
 > (#14); and the notebooks on Google Colab. No tag is registered.
 >
-> 32 submodules, 4,139 test assertions in 62 top-level testsets with both
-> package extensions installed and 4,104 (plus 2 broken markers) without
-> them, measured on 2026-11-18 on Julia 1.13.4, and without them on 1.10.13.
-> 33 examples, 20 notebooks, 2 package extensions, CI/CD and
-> 64 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
+> 33 submodules, 4,182 test assertions in 63 top-level testsets with both
+> package extensions installed and 4,147 (plus 2 broken markers) without
+> them, measured on 2026-11-20 on Julia 1.13.4, and without them on 1.10.13.
+> 34 examples, 20 notebooks, 2 package extensions, CI/CD and
+> 66 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
 > compact local design, is delivered. **Phase 7A closed on 2026-11-01:**
 > item #15's exposure mapping and spatial difference-in-differences landed
@@ -20,7 +20,7 @@
 > and mostly done:** items #1 (common factors) and #12 (spatio-temporal)
 > closed together on 2026-11-04, and row 22's **SpVAR** closed the same day
 > in a second pass, with time-varying `ρ` re-filed under #13 where its
-> published method belongs; #13 remains (pass 2 on hold since 2026-11-18; a research item on a projection-corrected closed-form `ρ` was opened the same day), and #16 (spatial log-GARCH) was
+> published method belongs; #13 remains (pass 2 on hold since 2026-11-18; a research item on a projection-corrected closed-form `ρ` was opened the same day and built as `root_rho` on 2026-11-20), and #16 (spatial log-GARCH) was
 > built on 2026-11-16. Tier 3 is otherwise untouched,
 > and the correctness audit in `docs/AUDIT.md` is closed — findings 1–25,
 > with 29–32 added afterwards from the benchmark suite and Phase 6C, and 33–36 since.
@@ -1086,8 +1086,9 @@ Not built, and why:
 - Quantile, varying-coefficient, penalised and additive rows: not in pass 1.
 
 **Research: a projection-corrected closed-form `ρ` for a growing basis**
-(opened 2026-11-18; research only, not scheduled for the package). The
-scripts, their outputs and the method are in `research/trace_cfe/`.
+(opened 2026-11-18; **built 2026-11-20 as `root_rho`**, the projection
+case only: see "Built" at the end of this entry). The scripts, their outputs
+and the method are in `research/trace_cfe/`.
 - **The problem.** With a projection first stage `P_B`, the closed form's
   moment has mean `−σ² tr(P_B W)/n` at the true `ρ`. That is O(K/n), and a
   free surface makes K large. In the Monte Carlo it biases `ρ̂` by −0.07 at
@@ -1259,13 +1260,29 @@ scripts, their outputs and the method are in `research/trace_cfe/`.
   3. Whether REsd's optimality under homoskedasticity (their
      Proposition 3) survives when K grows.
 - **Checks still owed** by the null-distribution rule:
-  - a null-distribution check of the robust variance with REsd's matrix;
+  - ~~a null-distribution check of the robust variance with REsd's matrix~~:
+    done by `validation/mc_root_rho.jl` (2026-11-20; below);
   - a penalised smoother, where `M = I − S_λ` is not idempotent;
   - Geniaux's own E3 design.
 - **Outcome if the theory holds:** a note on Geniaux: one closed-form
-  correction, Jin & Lee's, removes the bias his three safeguards target. The
-  candidate package feature is a `correction = :jin_lee` option on
-  `closed_form_rho`. It is not to be built before step 1.
+  correction, Jin & Lee's, removes the bias his three safeguards target.
+- **Built (2026-11-20):** `root_rho(y, X, W; basis)` in `src/RootRho.jl`
+  (submodule 33, testset 46, `examples/34_root_rho.jl`). It is a new
+  function, not a `correction = :jin_lee` option on `closed_form_rho`,
+  because it returns a set as well as a point. It is Jin & Lee's two-step
+  REsd with a projection on `[X, basis]`, the HC2 `V̂` as an exact quartic
+  in `ρ`, the Wald interval and the test-inversion set `CS`
+  (Proposition 6), with the endpoints found as exact roots. `β` is a point
+  estimate with no SE. The guards refuse a unit with leverage above 0.99 and
+  `n > 4000`, and warn above `K/n` = 0.30.
+  `validation/mc_root_rho.jl` measured REsd's plug-in in both intervals,
+  which the research Monte Carlo had not: 108 cells (kNN-6, rook, kNN-20;
+  n = 400–1600; K/n ≈ 0.05–0.19; two variance patterns; normal and `χ²₃`
+  errors; R = 1000). `CS` covers 0.935–0.975 and the Wald interval
+  0.931–0.975 in every cell. `|bias|` is at most 0.060, against −0.05 to
+  −1.76 for `closed_form_rho` on the same draws, and the package equals the
+  research code to 2.5e-14. AUDIT, "`root_rho`". Not built: the penalised
+  smoother, and a rule for choosing K.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
@@ -1703,6 +1720,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ the heteroskedasticity-robust spatial error, `:spatial_gmm` / `estimator = :gmm`, AUDIT 35) | 32 | 4,099 ¶⁶ | 28,694 |
 | **master** (+ the heteroskedasticity-robust GS2SLS and the default path's panel fixes, AUDIT 36) | 32 | 4,139 ¶⁷ | 29,005 |
 | **v0.6.0** (tagged 2026-11-19, = the row above) | 32 | 4,139 ¶⁷ | 29,005 |
+| **master** (+ `root_rho`, the research item on a growing basis built) | 33 | 4,182 ¶⁸ | 29,391 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1819,9 +1837,17 @@ testsets rose from 61 to 62. The `src/` count rose by 311, in
 docstring's measured table); the moment helpers moved from
 `SpatialErrorModel.jl` to `SpatialUtils.jl`.
 
-Measured on master: 32 submodules plus the umbrella across 29,005 lines of
-`src/`, 11,245 lines of tests, 5,255 lines of examples across 33 scripts,
-398 lines of package extensions, 64 documentation pages and 20 notebooks
+¶⁸ Measured locally on 2026-11-20: 4,182 passed on Julia 1.13.4 with both
+extensions, and 4,147 plus 2 broken on 1.10.13 without them, both 43 above
+¶⁷: testset 46 (`root_rho`). Its smallest margin is 2.24×, for the mean of
+the standardised moment in 46d on 1.10 (0.103 against 0.231; 0.102 on
+1.13), so the smallest recorded for the suite is still 42c's 1.47×. Top-level testsets
+rose from 62 to 63. The `src/` count rose by 386: the new module's 381
+lines and the umbrella's 5.
+
+Measured on master: 33 submodules plus the umbrella across 29,391 lines of
+`src/`, 11,493 lines of tests, 5,313 lines of examples across 34 scripts,
+398 lines of package extensions, 66 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 
 The `v0.4.0` row sits 68 lines above the measured row before it, and no

@@ -12,6 +12,7 @@ Every exported name, with the file that holds its docstring. Grep this folder fo
 - **FormulaDSL** (`FormulaDSL.md`): `ParsedSpatialFormula`, `endo`, `extract_panel_permutation`, `fe`, `slag`
 - **GWREstimation** (`GWREstimation.md`): `AdaptiveBandwidth`, `BandwidthType`, `BisquareKernel`, `ExponentialKernel`, `FixedBandwidth`, `GWRModel`, `GaussianKernel`, `KernelFunction`, `MGWRModel`, `fit_gwr`, `fit_mgwr`
 - **HigherOrderSpatial** (`HigherOrderSpatial.md`): `SACModel`, `SDEMModel`, `SLXModel`, `fit_sac`, `fit_sdem`, `fit_slx`
+- **RootRho** (`RootRho.md`): `RootRhoResult`, `root_rho`
 - **SemiparametricSpatial** (`SemiparametricSpatial.md`): `ClosedFormRhoResult`, `PartiallyLinearSARModel`, `SpectralOverlapResult`, `TVCoefSARModel`, `closed_form_rho`, `fit_partially_linear_sar`, `fit_tv_coef_sar`, `local_polynomial_smoother`, `spectral_overlap`
 - **SpVAR** (`SpVAR.md`): `NestedPanelVARModel`, `OrderConditionResult`, `STIRResult`, `SpVARModel`, `fit_nested_panel_var`, `fit_spvar`, `lr_spatial_interaction`, `space_time_stir`, `spvar_forecast`, `spvar_irf`, `spvar_order_condition`
 - **SpatialCausal** (`SpatialCausal.md`): `ExposureMap`, `InterferenceReport`, `PlaceboTest`, `SpatialDiDResult`, `SpilloverGaps`, `SyntheticControlResult`, `check_interference`, `donor_weights`, `exposure`, `fit_spatial_did`, `fit_synthetic_control`, `placebo_test`, `ring_exposure`, `spillover_gaps`

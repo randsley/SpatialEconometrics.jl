@@ -52,6 +52,7 @@ makedocs(
             "Common Factors & Spatio-Temporal" => "models/common_factors.md",
             "Spatial VAR" => "models/spvar.md",
             "Semiparametric Models" => "models/semiparametric.md",
+            "Root Estimator of ρ" => "models/root_rho.md",
             "Spatial log-GARCH" => "models/spatial_garch.md",
         ],
         "Diagnostics" => [
@@ -83,6 +84,7 @@ makedocs(
                 "Common Factors & Spatio-Temporal" => "api/common_factors.md",
                 "Spatial VAR" => "api/spvar.md",
                 "Semiparametric Models" => "api/semiparametric.md",
+                "Root Estimator of ρ" => "api/root_rho.md",
                 "Spatial log-GARCH" => "api/spatial_garch.md",
                 "Geographically Weighted Regression" => "api/gwr.md",
             ],

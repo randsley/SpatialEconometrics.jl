@@ -5394,3 +5394,104 @@ and the docstring says so.
 
 **Not settled.** The panel extension has no proof. The `TwoWayFE` bias in
 `λ̂` is not removed.
+
+## `root_rho`: Jin & Lee's REsd with a growing basis, and a test-inversion set
+
+Built on 2026-11-20: `src/RootRho.jl`, submodule 33. It is Jin & Lee's
+(2012) two-step root estimator REsd, with the first stage a projection on
+`[X, basis]` whose size may grow with `n`. The research behind it is in
+`research/trace_cfe/` (ROADMAP, the research entry under #13). Four things
+are this package's own, so the standing rule applies:
+
+- **the growing basis.** Jin & Lee assume a regressor matrix of fixed
+  dimension. The CLT, the plug-in and the variance for a growing basis are
+  in `research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 2 and 6).
+  **No one else has checked these proofs;**
+- **the HC2 `V̂`,** with a noise term for the estimated `P_[X,B]y₀` in the
+  linear part, formed as an exact quartic in `ρ`;
+- **the test-inversion set** `CS = {ρ : g(ρ)² ≤ z²V̂(ρ)}`, whose endpoints
+  are the real roots of a quartic, found from its companion matrix;
+- **REsd's plug-in in both intervals.** The research Monte Carlo measured
+  coverage only for the exact-diagonal moment. `root_rho` uses `C(ρ̃)`
+  from the first step, in `ρ̂` and in `CS`, and that had not been measured.
+
+### What was verified exactly first
+
+Testset 46 (43 assertions) checks each part against an independent
+computation:
+
+- **The moment matrices.** `diag C = 0` and `C[X, B] = 0` to `1e-12` for
+  both steps, and `C` equals a dense computation from the normal equations
+  to `1e-10`.
+- **The estimator.** `ρ̃`, `ρ̂`, the quadratic's coefficients, the SE and
+  `β̂` equal a dense reimplementation to `1e-10`. The quartic `V̂(ρ)` equals
+  the direct `V̂` at three values of `ρ` to a relative `1e-10`.
+- **The set.** At each endpoint of `CS` that is not a bound,
+  `q = g² − z²V̂` is zero to `1e-8` of its scale. `q ≤ 0` inside each
+  interval and `q > 0` just outside it. The root finder returns the roots
+  of a quartic built from known roots to `1e-10`.
+- **The null test.** The design is held fixed (`n = 100`, `K = 17`, `f` in
+  the span of `[x, B]`, heteroskedastic), and `g(ρ₀)/√V` with the exact
+  `V` is drawn 300 times.
+  - Its mean is 0.102 on 1.13 and 0.103 on 1.10, against a bound of
+    0.231: a 2.24× margin, the smallest in testset 46.
+  - Its variance is within 0.116 and 0.018 of 1, against 0.327.
+  - **Power:** Smirnov's plain moment `y₀′MWMy₀` fails the same mean test,
+    with a mean of 1.78 on 1.13 and 1.95 on 1.10 (at least 7.7×).
+- **Recovery** at `n = 900`, `K = 50`: 0.66 SE from the truth on 1.13 and
+  0.47 on 1.10, against a bound of 4.
+- **The guards** each throw with their own message: a nonzero diagonal of
+  `W`, `n > max_dense_n`, a rank-deficient `[X, B]`, leverage above 0.99, a
+  bad `level` and mismatched dimensions. `K/n > 0.30` warns.
+- **The no-root path.** Pure noise with kNN-20 at `n = 100` has no
+  admissible first-step root. `ρ̂` is `NaN` and `CS` is still returned. The
+  seed is a draw, so this assertion depends on the stream. It holds on 1.13
+  (`CS` = `[−0.99, −0.22]`) and on 1.10 (`CS` = the whole interval), and if
+  a stream gives a root it fails loudly rather than disappearing.
+
+### The Monte Carlo
+
+`validation/mc_root_rho.jl` uses 108 cells, R = 1000 each, 244 minutes.
+The cells cross:
+
+- `W`: kNN-6 and kNN-20 on stratified random locations, rook on a grid;
+- `n` = 400, 900, 1600;
+- three tensor hat bases with `K/n` ≈ 0.05, 0.11, 0.19;
+- smooth or rough variances;
+- normal or standardised `χ²₃` errors.
+
+Throughout, `ρ₀ = 0.4`. The pass criterion, set before the run, was `CS`
+coverage within 0.93–0.99 in every cell.
+
+- **`CS` covers 0.935–0.975 in every cell,** so the criterion is met. The
+  lowest cell is kNN-20 at `n = 400`, `K = 82`, smooth variance and normal
+  errors. The Monte Carlo SE is 0.007.
+- **The Wald interval covers 0.931–0.975.** It is measured over the samples
+  with a root. It is lowest at kNN-20, `n = 400`, `K = 50`, rough variance:
+  0.931 and 0.934.
+- **Bias:** `|bias|` of `ρ̂` is at most 0.060. On the same draws,
+  `closed_form_rho` is biased by −0.05 to −1.76. The plain closed form's
+  bias grows with `K/n` and with the density of `W`, so the power check
+  holds in every cell.
+- **Agreement with the research code** (`tc_resd.jl`'s `moment_mats` and
+  `fitC`, copied into the script): `|Δρ̂|` is at most 2.5e-14 and `|Δse|`
+  at most 5.3e-15, on the first draw of each cell.
+- **The weak cells** (kNN-20 at `n = 400`):
+  - up to 71 of 1000 samples had no admissible root, 252 in all 108 cells;
+  - `CS` reached a bound in up to 740 of 1000 samples, and split into two
+    intervals in up to 17.
+
+  This is where `CS` matters: a wide or split set where the data say little
+  about `ρ`, and coverage held there.
+
+So REsd's plug-in does not cost coverage in these designs, in the Wald
+interval or in `CS`.
+
+**Not settled.**
+- The proofs have not been checked by anyone else.
+- There is no rule for choosing `K`: the docs say to report results across
+  a few sizes and not to use GCV.
+- The coverage is measured up to `K/n` = 0.19 in this run and 0.30 in the
+  research grid; beyond that `root_rho` warns.
+- `β` has no standard errors.
+- The penalised smoother is not built.
