@@ -47,6 +47,8 @@ The result of [`root_rho`](@ref).
 - `lambda_grid`, `halflength_grid` — with a vector of `lambda`s, every
   candidate (the projection as `λ = 0` first) and the half-length of its
   bias-aware interval; the result is the shortest. Empty otherwise.
+- `reference_K` — the number of columns of `[X, reference basis]` when the
+  roughness class is stated on a `reference` basis (Lemma 5); 0 otherwise.
 
 ## `basis_roughness`
 
@@ -64,11 +66,24 @@ For a tensor hat basis with knot spacing `h` and a second-difference
 penalty, `ψ′Πψ ≈ h²∫(f_uu² + f_vv²)`, so `ℛ` is also a bound on the mean
 squared curvature (measured ratio 1.10 in `tc_rchoice.jl`).
 
+    basis_roughness(g, u, v; k, order = 2) -> ℛ
+
+The roughness of a reference surface `g(u, v)` (a function) in
+[`tensor_pspline`](@ref)`(u, v; k, order)`: `ψ` holds `g` at the knots, in
+the basis's column order, so `Bψ` is the hat interpolant of `g`. Use this
+form for a `reference` basis in [`root_rho`](@ref): a fine reference has
+more columns than there are units, and the least-squares fit above is then
+not defined. As `k` grows, `(k − 1)·ℛ` settles (to within 2% between
+`k` = 15 and 40 in `tc_refbasis.jl`), so the class does not depend on the
+reference grid once it is fine. Unpenalised functions (bilinear surfaces,
+for `order = 2`) give 0.
+
 ## `root_rho`
 
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
-             roughness = nothing, bonferroni = false, varnames = nothing,
-             level = 0.95, rho_bounds = (-0.99, 0.99), max_dense_n = 4000)
+             roughness = nothing, bonferroni = false, reference = nothing,
+             varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
+             max_dense_n = 4000)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -106,6 +121,10 @@ so the set's endpoints are exact.
   [`basis_roughness`](@ref) computes it from a reference surface.
 - `bonferroni` — with a vector of `lambda`s, use level `1 − α/L` for each of
   the `L` candidates, so that coverage holds for any choice among them.
+- `reference` — a finer basis and penalty `(; basis, penalty)`, as
+  [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
+  so that `f` need not lie in `span(basis)` (see below). Then `roughness`
+  may be given without `penalty`, for the projection alone.
 
 ### With a penalised smoother
 
@@ -165,6 +184,39 @@ interval covered 0.954 and 0.964 and was 53% and 33% shorter than the
 projection's; with `ℛ` four times too large, it covered 0.982 and 0.970
 and was still 35% and 7% shorter. Report the result across a few `ℛ`.
 
+**With a reference basis.** The class above contains only `f ∈ span(Z)`,
+and gives the projection `b̄ = 0`. A real `f` leaves a remainder that
+biases every candidate, the projection too. `reference = (; basis = B̃,
+penalty = Π̃)` states the class on a finer basis,
+`{f = [X, B̃]ψ̃ : ψ̃′Π̃ψ̃ ≤ ℛ̃²}`, while the estimator keeps `basis`. The bound
+`b̃` then covers the remainder (THEORY.md, Lemma 5 and Proposition 7′). It
+needs the reference's unpenalised functions to be unpenalised in
+`[X, basis]` (tensor hat bases on the same coordinates, with the same
+penalty `order`), which is checked. State `ℛ̃` with
+`basis_roughness(g, u, v; k)` for a reference surface `g`:
+
+```julia
+ref = tensor_pspline(u, v; k = 30)
+ℛ̃ = basis_roughness((s, t) -> 2sin(2πs)cos(πt), u, v; k = 30)
+r = root_rho(y, X, W; ps..., lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ̃, reference = ref)
+```
+
+Use it whenever `basis` may be too coarse for `f`. In
+`research/trace_cfe/tc_refbasis.jl` (n = 900), the class without a reference
+covered 0.050, 0.717 and 0.923 with 4, 5 and 7 knots a side and a rough `f`;
+with the reference, every cell covered 0.960–1.000. The price is length,
+and it is small only for a fine `basis`: with 15 knots and `ℛ̃` true, 0% and
+8% longer than without; with `ℛ̃` four times too large, 7% and 115%; with
+coarse bases, 1.1 to 10 times. So the projection is no longer free of the
+bound, and with a reference the rule can do worse than the projection's
+Wald interval, which is then not valid. Because the class no longer depends
+on `basis`, results across bases are comparable, and the shortest interval
+was at the finest basis tried. The projection candidate is REsd, whose
+coverage here is measured, not proved (Proposition 7′ needs Proposition 1
+without `f ∈ span(Z)`). Each candidate costs two more `n × n × K̃` products
+and a `K̃ × K̃` eigenproblem: a grid of 13 took about 3.5 s at n = 900,
+K̃ = 901.
+
 ### Choosing the basis
 
 The interval is valid only if the approximation error of `f` is small
@@ -202,7 +254,7 @@ about six and solves one dense `n × n` system for `d`.
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
     consistency of `V̂`, the validity of the test-inversion set, and the
-    coverage of the bias-aware interval) are in
+    coverage of the bias-aware interval, also on a reference basis) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
 

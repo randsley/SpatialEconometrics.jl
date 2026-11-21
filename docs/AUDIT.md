@@ -5678,3 +5678,68 @@ exact-diagonal projection tc_honest used (0.250 and 0.227), so the gain
 over it is smaller: 44% and 26% at `ℛ*`, 26% and 2% at `4ℛ*`. At `a = 4`,
 `4ℛ*` chose the projection in 115 of 300 draws. Not measured: other `W`,
 `n` or error laws, and the Bonferroni option's coverage.
+
+## `root_rho`: the bias-aware interval on a reference basis
+
+Added on 2026-11-21. The class of the entry above contains only
+`f ∈ span([X, basis])`, and gives the projection `b̄ = 0`. A real `f`
+leaves a remainder outside that span, and it biases every candidate:
+`research/trace_cfe/tc_refbasis.jl` measured coverage 0.050, 0.717 and
+0.923 with 4, 5 and 7 knots a side. `reference = (; basis, penalty)` now
+states the class on a finer basis `B̃` while the estimator keeps `basis`,
+and the bound `b̃` covers the remainder (THEORY.md, Lemma 5 and
+Proposition 7′). The projection then gets `b̃ > 0` too, so
+`root_rho(...; basis, roughness, reference)` is allowed without a penalty.
+`root_rho` checks Lemma 5's condition (R), that the reference's
+unpenalised functions are unpenalised in `[X, basis]`. A new method
+`basis_roughness(g, u, v; k)` states `ℛ̃` from a surface `g` through its
+knot values, because least squares is not defined once `K̃ > n`. The
+result gains `reference_K`. The REsd candidate's coverage under this class
+is measured, not proved (Proposition 7′ needs Proposition 1 without
+`f ∈ span(Z)`).
+
+**Testset 49** (41 assertions; testset 48's design, `k = 4`, reference `k̃ = 10`):
+- `b̃` for the smoother at `λ` = 0.1 and 1 and for REsd at its own `ρ̃`,
+  against an independent dense reimplementation, to 1e-8 relative; the
+  endpoints to 1e-6.
+- Lemma 5(e): the estimation basis as its own reference gives Lemma 4's
+  `b̄`, and `b̃` = 1.4e-16 (1.13) and 3.8e-16 (1.10) for the projection.
+- Lemma 5 against the exact `β` of an `f̃` in the reference class: the
+  split identity to 1e-10, and the oracle bound holds (smallest margin
+  oracle/|β| = 1.53 on 1.13, 1.68 on 1.10). Power: Lemma 4's bound, with
+  `ℛ` from the least-squares fit on `Z`, is exceeded at all three `λ`
+  (lemma4/|β| at most 0.985 and 0.969); REsd's `|β| = 5.1` (5.5), not 0.
+- Guards: an order-3 reference fails (R) and order 2 passes; `reference`
+  without `roughness`, without `basis`, without `penalty`, and a row
+  mismatch throw.
+- `basis_roughness(g, u, v; k)`: equal to `√(ψ′Pψ)` from the knot values;
+  a bilinear `g` gives 5.7e-15 (1.13) and 6.9e-15 (1.10) against 1e-10;
+  `19ℛ₂₀/29ℛ₃₀ − 1` = 0.0099 and 0.0101 against 0.05. The first draft took
+  `√` of the quadratic form and gave 1.4e-7 on 1.10, which failed; the
+  method now sums the squared differences `‖ΨD′‖² + ‖DΨ‖²`.
+
+**Monte Carlo** (`validation/mc_root_rho_reference.jl`, output committed):
+`n` = 900 random locations, kNN-6, `f = x + a·sin(2πu)cos(πv)`,
+heteroskedastic normal errors, `ρ₀ = 0.4`, estimation basis
+`tensor_pspline(u, v; k)`, reference `tensor_pspline(u, v; k = 30)`
+(`K̃` = 901 > `n`), `ℛ̃* = basis_roughness(g, u, v; k = 30)`, the grid
+`10^(-3:0.5:2)` plus REsd, R = 300 per cell, through the released
+function. Criterion set before the run: cells 1–4 cover within 0.93–1.00,
+and the first draw's REsd `b̃` matches a dense Lemma 5(c) to 1e-8; power:
+cell 5, the rule without a reference, below 0.90.
+
+| cell | k | a | class | coverage | half-length |
+|---|---|---|---|---|---|
+| 1 | 5 | 4 | reference, `ℛ̃*` | 1.000 | 0.414 |
+| 2 | 15 | 4 | reference, `ℛ̃*` | 0.977 | 0.139 |
+| 3 | 15 | 1 | reference, `ℛ̃*` | 0.977 | 0.101 |
+| 4 | 15 | 4 | reference, `4ℛ̃*` | 1.000 | 0.352 |
+| 5 | 5 | 4 | no reference, LS `ℛ` | 0.833 | 0.082 |
+
+Both met; the first-draw gap was 0. With the reference, the coarse basis
+pays for its remainder in length (0.414 against 0.139 at `k = 15`), so the
+fine basis is the one to use. Cell 5 chose REsd in 296 of 300 draws,
+with `b̄ = 0`, and under-covered. The run used the first draft of
+`basis_roughness`; the change above alters `ℛ̃*` only by rounding.
+Not measured: other `W`, `n` or error laws, or a reference other than
+hat functions.

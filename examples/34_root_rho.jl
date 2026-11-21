@@ -10,7 +10,8 @@
 # reports two intervals: the Wald interval and the test-inversion set.
 #
 # Section 4 fits a penalised smoother (tensor_pspline) in place of the projection,
-# and section 5 its bias-aware interval, with λ chosen by the interval's length.
+# section 5 its bias-aware interval, with λ chosen by the interval's length, and
+# section 6 the same on a reference basis, for an f outside the span of the basis.
 #
 # Run: julia --project=. examples/34_root_rho.jl
 # ---------------------------------------------------------------------------
@@ -98,4 +99,27 @@ for m in (1.0, 2.0, 4.0)
     rb = root_rho(y, X, W; ps..., lambda = 10.0 .^ (-2:0.5:1), roughness = m * ℛ)
     @printf("  %4.0f    %8.3g    [%.3f, %.3f]       %.3f\n", m, rb.lambda, rb.ci_bias_aware...,
             (rb.ci_bias_aware[2] - rb.ci_bias_aware[1]) / 2)
+end
+
+# ── 6. When f may not be in the span of the basis: a reference basis ───────
+#
+# Section 5's class assumes f = [X, basis]ψ, so the projection gets no bias
+# bound. A real f leaves a remainder, which biases every candidate. With
+# `reference`, the roughness bound is stated on a finer basis (here 30 × 30,
+# more columns than units), and the bound covers the remainder (THEORY.md,
+# Lemma 5). ℛ̃ comes from the knot values of the reference surface. Compare a
+# coarse basis with a fine one: the coarse one pays for its remainder in length.
+
+ref = tensor_pspline(u, v; k = 30)
+ℛ̃ = basis_roughness((s, t) -> 2sin(2π * s) * cos(π * t), u, v; k = 30)
+@printf("\nℛ̃ = %.3f on the reference basis (K̃ = %d)\n", ℛ̃, size(ref.basis, 2) + 1)
+println("   k   reference   λ chosen   bias-aware interval   half-length")
+for k in (6, 15)
+    psk = tensor_pspline(u, v; k)
+    for (lab, kw) in (("no ", (; roughness = basis_roughness(f, psk.basis, psk.penalty; X))),
+                      ("yes", (; roughness = ℛ̃, reference = ref)))
+        rk = root_rho(y, X, W; psk..., lambda = 10.0 .^ (-2:0.5:1), kw...)
+        @printf("  %2d      %s     %8.3g    [%.3f, %.3f]       %.3f\n", k, lab, rk.lambda,
+                rk.ci_bias_aware..., (rk.ci_bias_aware[2] - rk.ci_bias_aware[1]) / 2)
+    end
 end

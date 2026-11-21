@@ -45,8 +45,8 @@ intervals, so smooth **less** than a good fit of `f` would.
 The growing-basis results (a CLT for the moment with a dense `M`, the
 consistency of the HC2 `V̂`, the validity of `CS`, and the penalised
 smoother, and its bias-aware interval) are proved in
-`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 2, 4, 6 and 7,
-and Lemma 4). They have not been checked by anyone else.
+`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 2, 4, 6, 7 and
+7′, and Lemmas 4 and 5). They have not been checked by anyone else.
 They are measured in that directory and in `validation/mc_root_rho.jl` and
 `validation/mc_root_rho_smoother.jl`.
 
@@ -117,6 +117,8 @@ The result of [`root_rho`](@ref).
 - `lambda_grid`, `halflength_grid` — with a vector of `lambda`s, every
   candidate (the projection as `λ = 0` first) and the half-length of its
   bias-aware interval; the result is the shortest. Empty otherwise.
+- `reference_K` — the number of columns of `[X, reference basis]` when the
+  roughness class is stated on a `reference` basis (Lemma 5); 0 otherwise.
 """
 struct RootRhoResult{T<:AbstractFloat}
     rho::T
@@ -147,15 +149,17 @@ struct RootRhoResult{T<:AbstractFloat}
     ci_bias_aware::Tuple{T, T}
     lambda_grid::Vector{T}
     halflength_grid::Vector{T}
+    reference_K::Int
 end
 
 # The fields of a result without the bias-aware interval.
-_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[])
+_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[], 0)
 
 # A copy of r with the bias-aware fields replaced.
-function _with_bias(r::RootRhoResult{T}, ℛ, bbar, ci, grid, hl) where {T}
+function _with_bias(r::RootRhoResult{T}, ℛ, bbar, ci, grid, hl;
+                    refK::Int = r.reference_K) where {T}
     f = [getfield(r, k) for k in fieldnames(RootRhoResult)]
-    f[end-4:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl)]
+    f[end-5:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl), refK]
     return RootRhoResult{T}(f...)
 end
 
@@ -185,6 +189,8 @@ function Base.show(io::IO, r::RootRhoResult)
     if !isnan(r.roughness) && r.root_found
         @printf(io, "Bias-aware %g%% interval:      [%.4f, %.4f]   (ℛ = %.4g, b̄/√V̂ = %.3f)\n",
                 pct, r.ci_bias_aware..., r.roughness, r.bias_bound / sqrt(r.vhat))
+        r.reference_K > 0 && @printf(io,
+            "  ℛ on a reference basis with K̃ = %d columns (Lemma 5)\n", r.reference_K)
         isempty(r.lambda_grid) || @printf(io,
             "  λ chosen by the interval's length from %d candidates (λ = 0 is the projection)\n",
             length(r.lambda_grid))
@@ -345,14 +351,6 @@ function _cv_bias(t::Real, α::Real)
     return (lo + hi) / 2
 end
 
-# Π^{+1/2} as N = Diag(1/√ω)U′ on range(Π) (only N′N = Π⁺ and the norms matter).
-function _penalty_root_inverse(Π::Matrix{T}) where {T}
-    E = eigen(Symmetric(Π))
-    tol = 1e-10 * max(maximum(abs, E.values), floatmin(T))
-    keep = E.values .> tol
-    return Diagonal(1 ./ sqrt.(E.values[keep])) * Matrix(E.vectors[:, keep]')
-end
-
 # The projection pilot: its basis Q, Q′y₀(ρ̂₀) and the HC2 plug-in ŝ₀.
 function _bias_pilot(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
                      bnds) where {T}
@@ -373,18 +371,53 @@ function _bias_pilot(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T}, Ws::SparseMatrix
     return (; Q, qy, s0)
 end
 
-# b̄ / ℛ-free parts at one λ: √(debiased v̂′Π⁺v̂) and χ̄.
-function _bias_parts(M::Matrix{T}, d::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
-                     N::AbstractMatrix{T}, pilot) where {T}
-    MZ = M * Z
-    Tm = Matrix((Ws' * MZ)')                         # (MZ)′W, K × n
+# The ℛ-free parts of the bound, for a linear coefficient ṽ = Tm·f_B and a
+# quadratic matrix Qq: √(debiased v̂′Π⁺v̂), with v̂ = Tm·P_Z y₀(ρ̂₀), and χ̄, the
+# largest |eigenvalue| of N·sym(Qq)·N′.
+function _bias_lin_chi(Tm::AbstractMatrix{T}, Qq::AbstractMatrix{T}, N::AbstractMatrix{T},
+                       pilot) where {T}
     R1 = N * (Tm * pilot.Q)
     colsq = vec(sum(abs2, R1 * pilot.Q'; dims = 1))  # ‖Υeᵢ‖²
     nv = R1 * pilot.qy
     lin = sqrt(max(dot(nv, nv) - dot(colsq, pilot.s0), zero(T)))
-    Qλ = MZ' * (d .* MZ)
-    χ = maximum(abs, eigvals(Symmetric(N * ((Qλ .+ Qλ') ./ 2) * N')))
+    χ = maximum(abs, eigvals(Symmetric(N * ((Qq .+ Qq') ./ 2) * N')))
     return lin, χ
+end
+
+# Lemma 4 (the class on [X, basis]) or Lemma 5 (on a reference basis Z̃) for the
+# smoother A = MW + MDM; M = I − S_λ.
+function _bias_parts(M::Matrix{T}, d::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
+                     bias) where {T}
+    if bias.Zt === nothing
+        MZ = M * Z
+        return _bias_lin_chi(Matrix((Ws' * MZ)'), MZ' * (d .* MZ), bias.N, bias.pilot)
+    end
+    MZt = M * bias.Zt
+    Qq = MZt' * (Ws * bias.MZZt)
+    Qq .+= MZt' * (d .* MZt)
+    return _bias_lin_chi(Matrix((Ws' * MZt)'), Qq, bias.Nt, bias.pilot)
+end
+
+# Lemma 5(c): REsd, C = EM, on a reference basis: ṽ = (CZ̃)′f_B, Q̃ = (MZ̃)′CZ̃.
+function _bias_parts_resd(C::Matrix{T}, bias) where {T}
+    CZt = C * bias.Zt
+    return _bias_lin_chi(Matrix(CZt'), bias.MZZt' * CZt, bias.Nt, bias.pilot)
+end
+
+# The bias-aware interval ρ̂ ± cv(b̄/√V̂)·se; with b̄ = 0, exactly the Wald interval.
+function _bias_ci(ρ::T, se::T, V::T, bbar::T, α::T) where {T}
+    (V > 0 && isfinite(se)) || return (T(NaN), T(NaN))
+    c = iszero(bbar) ? T(_norminv(1 - α / 2)) : T(_cv_bias(bbar / sqrt(V), α))
+    return (ρ - c * se, ρ + c * se)
+end
+
+# Π^{+1/2} on range(Π) and an orthonormal basis of null(Π).
+function _penalty_parts(Π::Matrix{T}) where {T}
+    E = eigen(Symmetric(Π))
+    tol = 1e-10 * max(maximum(abs, E.values), floatmin(T))
+    keep = E.values .> tol
+    return Diagonal(1 ./ sqrt.(E.values[keep])) * Matrix(E.vectors[:, keep]'),
+           Matrix(E.vectors[:, .!keep])
 end
 
 """
@@ -401,6 +434,18 @@ an `ℛ` costs coverage, so err on the large side.
 For a tensor hat basis with knot spacing `h` and a second-difference
 penalty, `ψ′Πψ ≈ h²∫(f_uu² + f_vv²)`, so `ℛ` is also a bound on the mean
 squared curvature (measured ratio 1.10 in `tc_rchoice.jl`).
+
+    basis_roughness(g, u, v; k, order = 2) -> ℛ
+
+The roughness of a reference surface `g(u, v)` (a function) in
+[`tensor_pspline`](@ref)`(u, v; k, order)`: `ψ` holds `g` at the knots, in
+the basis's column order, so `Bψ` is the hat interpolant of `g`. Use this
+form for a `reference` basis in [`root_rho`](@ref): a fine reference has
+more columns than there are units, and the least-squares fit above is then
+not defined. As `k` grows, `(k − 1)·ℛ` settles (to within 2% between
+`k` = 15 and 40 in `tc_refbasis.jl`), so the class does not depend on the
+reference grid once it is fine. Unpenalised functions (bilinear surfaces,
+for `order = 2`) give 0.
 """
 function basis_roughness(f_ref::AbstractVector{<:Real}, basis::AbstractMatrix{<:Real},
                          penalty::AbstractMatrix{<:Real}; X = nothing)
@@ -415,6 +460,45 @@ function basis_roughness(f_ref::AbstractVector{<:Real}, basis::AbstractMatrix{<:
     ψ = hcat(Xm, Matrix{Float64}(basis)) \ Vector{Float64}(f_ref)
     ψb = ψ[(kx + 1):end]
     return sqrt(max(dot(ψb, Matrix{Float64}(penalty) * ψb), 0.0))
+end
+
+function basis_roughness(g::Function, u::AbstractVector{<:Real}, v::AbstractVector{<:Real};
+                         k::Integer, order::Integer = 2)
+    _check_tensor_args(u, v, k, order)
+    tu = range(extrema(Vector{Float64}(u))...; length = k)
+    tv = range(extrema(Vector{Float64}(v))...; length = k)
+    ψ = [Float64(g(tu[i], tv[j])) for i in 1:k for j in 1:k]
+    all(isfinite, ψ) || throw(ArgumentError("basis_roughness: g is not finite at every knot"))
+    # ψ′(P ⊗ I + I ⊗ P)ψ as ‖ΨD′‖² + ‖DΨ‖², with Ψ = reshape(ψ, k, k): the
+    # differences of an unpenalised surface are then rounding-sized, and so is
+    # their norm, where the quadratic form's √ would amplify rounding to ~1e-7.
+    D = _difference_matrix(Int(k), Int(order)); Ψ = reshape(ψ, Int(k), Int(k))
+    return sqrt(sum(abs2, Ψ * D') + sum(abs2, D * Ψ))
+end
+
+function _check_tensor_args(u, v, k, order)
+    length(u) == length(v) || throw(DimensionMismatch(
+        "tensor_pspline: u has $(length(u)) entries, v has $(length(v))"))
+    order >= 1 || throw(ArgumentError("tensor_pspline: order must be at least 1, got $order"))
+    k >= order + 2 || throw(ArgumentError(
+        "tensor_pspline: k = $k knots is too few for order $order; need k ≥ $(order + 2)"))
+    return nothing
+end
+
+# D, the order-th difference matrix on k knots.
+function _difference_matrix(k::Int, order::Int)
+    D = Matrix{Float64}(I, k, k)
+    for _ in 1:order
+        D = D[2:end, :] .- D[1:(end - 1), :]
+    end
+    return D
+end
+
+# P ⊗ I + I ⊗ P with P = D′D.
+function _tensor_penalty(k::Int, order::Int)
+    D = _difference_matrix(k, order)
+    P = D' * D; Ik = Matrix{Float64}(I, k, k)
+    return kron(P, Ik) .+ kron(Ik, P)
 end
 
 # Piecewise-linear "hat" functions on k equally spaced knots over the range of x.
@@ -450,19 +534,10 @@ projection basis of the default `root_rho`.
 """
 function tensor_pspline(u::AbstractVector{<:Real}, v::AbstractVector{<:Real};
                         k::Integer, order::Integer = 2)
-    length(u) == length(v) || throw(DimensionMismatch(
-        "tensor_pspline: u has $(length(u)) entries, v has $(length(v))"))
-    order >= 1 || throw(ArgumentError("tensor_pspline: order must be at least 1, got $order"))
-    k >= order + 2 || throw(ArgumentError(
-        "tensor_pspline: k = $k knots is too few for order $order; need k ≥ $(order + 2)"))
+    _check_tensor_args(u, v, k, order)
     Hu = _hat_basis(Vector{Float64}(u), Int(k)); Hv = _hat_basis(Vector{Float64}(v), Int(k))
     B = hcat([Hu[:, i] .* Hv[:, j] for i in 1:k for j in 1:k]...)
-    D = Matrix{Float64}(I, k, k)
-    for _ in 1:order
-        D = D[2:end, :] .- D[1:(end - 1), :]
-    end
-    P = D' * D; Ik = Matrix{Float64}(I, k, k)
-    return (; basis = B, penalty = kron(P, Ik) .+ kron(Ik, P))
+    return (; basis = B, penalty = _tensor_penalty(Int(k), Int(order)))
 end
 
 _polyval(p, t) = foldr((ck, acc) -> ck + t * acc, p; init = zero(t))
@@ -515,8 +590,9 @@ end
 
 """
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
-             roughness = nothing, bonferroni = false, varnames = nothing,
-             level = 0.95, rho_bounds = (-0.99, 0.99), max_dense_n = 4000)
+             roughness = nothing, bonferroni = false, reference = nothing,
+             varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
+             max_dense_n = 4000)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -554,6 +630,10 @@ so the set's endpoints are exact.
   [`basis_roughness`](@ref) computes it from a reference surface.
 - `bonferroni` — with a vector of `lambda`s, use level `1 − α/L` for each of
   the `L` candidates, so that coverage holds for any choice among them.
+- `reference` — a finer basis and penalty `(; basis, penalty)`, as
+  [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
+  so that `f` need not lie in `span(basis)` (see below). Then `roughness`
+  may be given without `penalty`, for the projection alone.
 
 # With a penalised smoother
 
@@ -613,6 +693,39 @@ interval covered 0.954 and 0.964 and was 53% and 33% shorter than the
 projection's; with `ℛ` four times too large, it covered 0.982 and 0.970
 and was still 35% and 7% shorter. Report the result across a few `ℛ`.
 
+**With a reference basis.** The class above contains only `f ∈ span(Z)`,
+and gives the projection `b̄ = 0`. A real `f` leaves a remainder that
+biases every candidate, the projection too. `reference = (; basis = B̃,
+penalty = Π̃)` states the class on a finer basis,
+`{f = [X, B̃]ψ̃ : ψ̃′Π̃ψ̃ ≤ ℛ̃²}`, while the estimator keeps `basis`. The bound
+`b̃` then covers the remainder (THEORY.md, Lemma 5 and Proposition 7′). It
+needs the reference's unpenalised functions to be unpenalised in
+`[X, basis]` (tensor hat bases on the same coordinates, with the same
+penalty `order`), which is checked. State `ℛ̃` with
+`basis_roughness(g, u, v; k)` for a reference surface `g`:
+
+```julia
+ref = tensor_pspline(u, v; k = 30)
+ℛ̃ = basis_roughness((s, t) -> 2sin(2πs)cos(πt), u, v; k = 30)
+r = root_rho(y, X, W; ps..., lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ̃, reference = ref)
+```
+
+Use it whenever `basis` may be too coarse for `f`. In
+`research/trace_cfe/tc_refbasis.jl` (n = 900), the class without a reference
+covered 0.050, 0.717 and 0.923 with 4, 5 and 7 knots a side and a rough `f`;
+with the reference, every cell covered 0.960–1.000. The price is length,
+and it is small only for a fine `basis`: with 15 knots and `ℛ̃` true, 0% and
+8% longer than without; with `ℛ̃` four times too large, 7% and 115%; with
+coarse bases, 1.1 to 10 times. So the projection is no longer free of the
+bound, and with a reference the rule can do worse than the projection's
+Wald interval, which is then not valid. Because the class no longer depends
+on `basis`, results across bases are comparable, and the shortest interval
+was at the finest basis tried. The projection candidate is REsd, whose
+coverage here is measured, not proved (Proposition 7′ needs Proposition 1
+without `f ∈ span(Z)`). Each candidate costs two more `n × n × K̃` products
+and a `K̃ × K̃` eigenproblem: a grid of 13 took about 3.5 s at n = 900,
+K̃ = 901.
+
 # Choosing the basis
 
 The interval is valid only if the approximation error of `f` is small
@@ -650,7 +763,7 @@ about six and solves one dense `n × n` system for `d`.
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
     consistency of `V̂`, the validity of the test-inversion set, and the
-    coverage of the bias-aware interval) are in
+    coverage of the bias-aware interval, also on a reference basis) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
 """
@@ -659,7 +772,7 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
                   penalty::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
                   lambda::Union{Nothing, Real, AbstractVector{<:Real}} = nothing,
                   roughness::Union{Nothing, Real} = nothing, bonferroni::Bool = false,
-                  varnames = nothing, level::Real = 0.95,
+                  reference = nothing, varnames = nothing, level::Real = 0.95,
                   rho_bounds = (-0.99, 0.99), max_dense_n::Integer = 4000)
     T = Float64
     n = length(y)
@@ -672,9 +785,14 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
         "root_rho: give both `penalty` and `lambda`, or neither. There is no default λ: " *
         "GCV and the RMSE-optimal λ smooth too much for valid inference"))
     penalised = penalty !== nothing
-    roughness === nothing || penalised || throw(ArgumentError(
-        "root_rho: `roughness` needs a penalty and lambda: a projection has no shrinkage " *
-        "bias, and its Wald interval is already the bias-aware one"))
+    roughness === nothing || penalised || reference !== nothing || throw(ArgumentError(
+        "root_rho: `roughness` needs a penalty and lambda, or a `reference` basis: with f in " *
+        "span(basis), a projection has no bias, and its Wald interval is the bias-aware one"))
+    reference === nothing || roughness !== nothing || throw(ArgumentError(
+        "root_rho: `reference` states the roughness class of `roughness`; give both"))
+    reference === nothing || basis !== nothing || throw(ArgumentError(
+        "root_rho: `reference` needs a `basis` for the estimator"))
+    Pref = reference === nothing ? nothing : _check_reference(reference, n)
     roughness === nothing || (isfinite(roughness) && roughness >= 0) || throw(ArgumentError(
         "root_rho: roughness must be finite and non-negative, got $roughness"))
     lambda isa AbstractVector && roughness === nothing && throw(ArgumentError(
@@ -722,37 +840,57 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
         context = "A hat or B-spline basis sums to one, so it is collinear with an " *
                   "intercept in X: drop one of them.")
     yv = Vector{T}(y)
-    penalised || return _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds)
+    penalised || roughness !== nothing ||
+        return _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds)
     roughness === nothing && return _root_rho_penalised(yv, Z, Ws, kx, Pm, T(lambda), vnames,
                                                         T(level), bnds, nothing)
     # The bias-aware interval: one λ, or λ chosen by length with the projection as λ = 0.
-    Πt = zeros(T, K, K)
-    Πt[(kx + 1):K, (kx + 1):K] .= Pm
     Wy = Ws * yv
     pilot = _bias_pilot(yv, Wy, Z, Ws, bnds)
     pilot === nothing && throw(ArgumentError(
         "root_rho: the projection pilot has no admissible root, so the bias bound cannot " *
         "be estimated; the test-inversion sets of root_rho without `roughness` still apply"))
-    N = _penalty_root_inverse(Πt)
+    N, N0 = if penalised
+        Πt = zeros(T, K, K)
+        Πt[(kx + 1):K, (kx + 1):K] .= Pm
+        _penalty_parts(Πt)
+    else
+        zeros(T, 0, K), Matrix{T}(I, K, K)           # a projection: everything is free
+    end
+    refK = 0
+    Zt = Nt = MZZt = nothing
+    if reference !== nothing
+        Zt = hcat(Xm, Matrix{T}(reference.basis))
+        refK = size(Zt, 2)
+        Πtt = zeros(T, refK, refK)
+        Πtt[(kx + 1):refK, (kx + 1):refK] .= Pref
+        Nt, N0t = _penalty_parts(Πtt)
+        _check_reference_null(Zt * N0t, Z * N0)
+        refK > 2n && @warn "root_rho: the reference basis has $refK columns for n = $n; " *
+            "each candidate costs O(n²K̃ + K̃³)"
+        MZZt = Zt .- pilot.Q * (pilot.Q' * Zt)
+    end
+    α0 = 1 - T(level)
+    if !penalised                                   # the projection alone, with a reference
+        proj, C = _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds)
+        bias = (; ℛ = T(roughness), N, pilot, α = α0, Zt, Nt, MZZt, refK)
+        return _projection_with_bias(proj, C, bias)
+    end
     λs = lambda isa AbstractVector ? T.(collect(lambda)) : [T(lambda)]
     ncand = lambda isa AbstractVector ? length(λs) + 1 : 1
-    α = (1 - T(level)) / (bonferroni ? ncand : 1)
-    bias = (; ℛ = T(roughness), N, pilot, α)
+    α = α0 / (bonferroni ? ncand : 1)
+    bias = (; ℛ = T(roughness), N, pilot, α, Zt, Nt, MZZt, refK)
     fits = [_root_rho_penalised(yv, Z, Ws, kx, Pm, λ, vnames, T(level), bnds, bias) for λ in λs]
     lambda isa AbstractVector || return fits[1]
     proj = try
-        _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds)
+        _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds)
     catch e
         e isa ArgumentError || rethrow()
         @warn "root_rho: the projection (λ = 0) is left out of the candidates: $(e.msg)"
         nothing
     end
     cands = RootRhoResult{T}[]
-    if proj !== nothing
-        z = T(_norminv(1 - α / 2))
-        ci = proj.root_found ? (proj.rho - z * proj.se, proj.rho + z * proj.se) : (T(NaN), T(NaN))
-        push!(cands, _with_bias(proj, roughness, zero(T), ci, T[], T[]))
-    end
+    proj === nothing || push!(cands, _projection_with_bias(proj..., bias))
     append!(cands, fits)
     grid = [c.lambda for c in cands]
     hl = [c.root_found && isfinite(c.ci_bias_aware[1]) ?
@@ -763,9 +901,59 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     return _with_bias(cands[j], roughness, cands[j].bias_bound, cands[j].ci_bias_aware, grid, hl)
 end
 
+# The projection (REsd) as a bias-aware candidate: b̄ = 0 when f ∈ span(Z) is
+# assumed (Lemma 4's class), Lemma 5(c) on a reference basis.
+function _projection_with_bias(proj::RootRhoResult{T}, C::Matrix{T}, bias) where {T}
+    proj.root_found || return _with_bias(proj, bias.ℛ, T(NaN), (T(NaN), T(NaN)), T[], T[];
+                                         refK = bias.refK)
+    bbar = if bias.Zt === nothing
+        zero(T)
+    else
+        lin, χ = _bias_parts_resd(C, bias)
+        bias.ℛ * lin + bias.ℛ^2 * χ
+    end
+    return _with_bias(proj, bias.ℛ, bbar, _bias_ci(proj.rho, proj.se, proj.vhat, bbar, bias.α),
+                      T[], T[]; refK = bias.refK)
+end
+
+# `reference = (; basis, penalty)`: the checks applied to `penalty`, and its matrix.
+function _check_reference(reference, n::Int)
+    (hasproperty(reference, :basis) && hasproperty(reference, :penalty)) || throw(ArgumentError(
+        "root_rho: `reference` must have fields `basis` and `penalty`, as tensor_pspline returns"))
+    Bt = reference.basis; Pt = reference.penalty
+    size(Bt, 1) == n || throw(DimensionMismatch(
+        "root_rho: y has $n rows, reference.basis has $(size(Bt, 1))"))
+    kt = size(Bt, 2)
+    size(Pt) == (kt, kt) || throw(DimensionMismatch(
+        "root_rho: reference.penalty is $(size(Pt)), expected ($kt, $kt)"))
+    P = Matrix{Float64}(Pt)
+    sc = max(maximum(abs, P), floatmin(Float64))
+    maximum(abs, P .- P') <= 1e-10 * sc || throw(ArgumentError(
+        "root_rho: reference.penalty must be symmetric"))
+    eigmin(Symmetric(P)) >= -1e-10 * sc || throw(ArgumentError(
+        "root_rho: reference.penalty must be positive semi-definite"))
+    return P
+end
+
+# Lemma 5's condition (R): the reference's unpenalised functions must be
+# unpenalised functions of [X, basis] (all of span[X, basis] for a projection).
+function _check_reference_null(Yt::Matrix{T}, Y::Matrix{T}) where {T}
+    size(Yt, 2) == 0 && return nothing
+    res = Yt .- Y * (Y \ Yt)
+    rel = norm(res) / max(norm(Yt), floatmin(T))
+    rel <= 1e-8 || throw(ArgumentError(
+        "root_rho: the reference basis leaves unpenalised functions that [X, basis] penalises " *
+        "or cannot represent (relative residual $(round(rel; sigdigits = 3))), so Lemma 5's " *
+        "condition B̃·null(Π̃) ⊂ B·null(Π) fails; use the same box and penalty order for both"))
+    return nothing
+end
+
 # The projection on Z: Jin & Lee's two steps (REsd).
-function _root_rho_projection(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T}, kx::Int,
-                              vnames::Vector{String}, level::T, bnds::Tuple{T, T}) where {T}
+_root_rho_projection(args...) = first(_root_rho_projection_C(args...))
+
+# The same, with the final moment matrix C, for the bias bound (Lemma 5(c)).
+function _root_rho_projection_C(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T}, kx::Int,
+                                vnames::Vector{String}, level::T, bnds::Tuple{T, T}) where {T}
     n, K = size(Z)
     Q = Matrix(qr(Z).Q)[:, 1:K]
     Mii = 1 .- vec(sum(abs2, Q; dims = 2))
@@ -806,14 +994,14 @@ function _root_rho_projection(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T
         nanT = T(NaN)
         return RootRhoResult{T}(nanT, ρ1 === nothing ? nanT : ρ1, nanT, (nanT, nanT), cs,
             touches, length(cs) > 1, T(level), fill(nanT, kx), vnames, n, K, :projection,
-            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, _no_bias(T)...)
+            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, _no_bias(T)...), C
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : T(NaN)
     β = kx > 0 ? (Z \ (yv .- ρ .* Wy))[1:kx] : T[]
     return RootRhoResult{T}(ρ, ρ1, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, T(level), β, vnames, n, K, :projection, zero(T), T(K), maximum(h),
-        a, b, c, vp, V, true, bnds, _no_bias(T)...)
+        a, b, c, vp, V, true, bnds, _no_bias(T)...), C
 end
 
 # The penalised smoother: S = Z(Z′Z + λΩ̃)⁻¹Z′, the exact-diagonal moment in
@@ -854,7 +1042,8 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
         r = RootRhoResult{T}(nanT, nanT, nanT, (nanT, nanT), cs, touches, length(cs) > 1,
             level, fill(nanT, kx), vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
             vp, nanT, false, bnds, _no_bias(T)...)
-        return bias === nothing ? r : _with_bias(r, bias.ℛ, nanT, (nanT, nanT), T[], T[])
+        return bias === nothing ? r : _with_bias(r, bias.ℛ, nanT, (nanT, nanT), T[], T[];
+                                                 refK = bias.refK)
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : nanT
@@ -863,15 +1052,10 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
         length(cs) > 1, level, β, vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
         vp, V, true, bnds, _no_bias(T)...)
     bias === nothing && return r
-    lin, χ = _bias_parts(M, d, Z, Ws, bias.N, bias.pilot)
+    lin, χ = _bias_parts(M, d, Z, Ws, bias)
     bbar = bias.ℛ * lin + bias.ℛ^2 * χ
-    ci = if V > 0
-        h = T(_cv_bias(bbar / sqrt(V), bias.α)) * se
-        (ρ - h, ρ + h)
-    else
-        (nanT, nanT)
-    end
-    return _with_bias(r, bias.ℛ, bbar, ci, T[], T[])
+    return _with_bias(r, bias.ℛ, bbar, _bias_ci(ρ, se, V, bbar, bias.α), T[], T[];
+                      refK = bias.refK)
 end
 
 end # module

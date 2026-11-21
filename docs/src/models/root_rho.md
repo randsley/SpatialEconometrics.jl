@@ -190,6 +190,41 @@ and 0.227):
 Here `ℛ*` is the true roughness. Report the result across a few `ℛ`, with,
 for each conclusion, the largest `ℛ` at which it holds.
 
+### When `f` is not in the span of the basis
+
+The class above assumes `f = [X, B]ψ`, so the projection gets `b̄ = 0`.
+A real `f` leaves a remainder outside `span(B)`, and that biases every
+candidate, the projection included. `reference` states the roughness class
+on a finer basis, while the estimator keeps `B` (THEORY.md, Lemma 5 and
+Proposition 7′):
+
+```julia
+ref = tensor_pspline(u, v; k = 30)                    # the class; K̃ may exceed n
+ℛ̃ = basis_roughness((s, t) -> 2sin(2πs)cos(πt), u, v; k = 30)   # knot values, not least squares
+r = root_rho(y, X, W; ps..., lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ̃, reference = ref)
+r = root_rho(y, X, W; basis = ps.basis, roughness = ℛ̃, reference = ref)   # the projection alone
+```
+
+The reference's unpenalised functions must be unpenalised in `[X, B]`:
+the same coordinates and the same penalty order. `root_rho` checks this.
+As the reference grid is refined, `(k̃ − 1)·ℛ̃` settles, so the class is in
+effect a bound on the curvature of `f`.
+
+In `research/trace_cfe/tc_refbasis.jl` (`n = 900`, `f = x + a·sin(2πu)cos(πv)`):
+
+| knots in `B` | without `reference` (a = 4) | with `reference`, `ℛ̃*` (a = 1 / a = 4) | length against without (a = 1 / a = 4) |
+|---|---|---|---|
+| 4 | 0.050 | 1.000 / 1.000 | 1.8× / 10× |
+| 5 | 0.717 | 0.990 / 1.000 | 1.4× / 5.7× |
+| 7 | 0.923 | 0.983 / 1.000 | 1.1× / 2.6× |
+| 15 | 0.973 | 0.960 / 0.980 | 1.00× / 1.08× |
+
+With `ℛ̃` four times too large and 15 knots, the cost is 1.07× and 2.1×.
+So: use a fine `B`, and the reference to check that it is fine enough.
+Results across bases are comparable once the class is on the reference, and
+the shortest interval was at the finest `B` tried. The projection candidate
+(REsd) is measured, not proved, under this class.
+
 ## Cost
 
 Everything is dense: about four `n × n` matrices. `n` is capped at
