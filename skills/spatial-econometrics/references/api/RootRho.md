@@ -49,6 +49,9 @@ The result of [`root_rho`](@ref).
   bias-aware interval; the result is the shortest. Empty otherwise.
 - `reference_K` — the number of columns of `[X, reference basis]` when the
   roughness class is stated on a `reference` basis (Lemma 5); 0 otherwise.
+- `basis_grid`, `basis_index` — with a vector of bases, the basis of each
+  candidate in `lambda_grid` (an index into the vector), and the index of
+  the chosen one. Empty and 0 otherwise.
 
 ## `basis_roughness`
 
@@ -111,16 +114,21 @@ so the set's endpoints are exact.
   or B-spline basis already sums to one.
 - `W` — a spatial weights matrix with a zero diagonal, row-standardised so
   that `rho_bounds` lies inside `(−1, 1)`.
-- `basis` — the `n × K_B` basis for `f`.
+- `basis` — the `n × K_B` basis for `f`. With `reference` and `roughness`,
+  also a vector of bases, among which the shortest interval chooses (see
+  "Choosing the basis").
 - `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
   penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
   or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
-  With `roughness`, `lambda` may also be a vector (see below).
+  With `roughness`, `lambda` may also be a vector (see below). With a
+  vector of bases, `penalty` is a vector too, one per basis, and `lambda`
+  applies to each.
 - `roughness` — a bound `ℛ` on the roughness `√(ψ′Πψ)` of `f = [X, basis]ψ`
   (`Π` the penalty on the basis block), for the bias-aware interval.
   [`basis_roughness`](@ref) computes it from a reference surface.
-- `bonferroni` — with a vector of `lambda`s, use level `1 − α/L` for each of
-  the `L` candidates, so that coverage holds for any choice among them.
+- `bonferroni` — with a vector of `lambda`s or of bases, use level `1 − α/L`
+  for each of the `L` candidates, so that coverage holds for any choice
+  among them.
 - `reference` — a finer basis and penalty `(; basis, penalty)`, as
   [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
   so that `f` need not lie in `span(basis)` (see below). Then `roughness`
@@ -211,9 +219,9 @@ coarse bases, 1.1 to 10 times. So the projection is no longer free of the
 bound, and with a reference the rule can do worse than the projection's
 Wald interval, which is then not valid. Because the class no longer depends
 on `basis`, results across bases are comparable, and the shortest interval
-was at the finest basis tried. The projection candidate is REsd, whose
-coverage here is measured, not proved (Proposition 7′ needs Proposition 1
-without `f ∈ span(Z)`). Each candidate costs two more `n × n × K̃` products
+was at the finest basis tried. The projection candidate is REsd, which
+THEORY.md's Proposition 1′ covers when the largest remainder `‖Mf‖` in the
+class is small against `√n` (Proposition 7′(vi)). Each candidate costs two more `n × n × K̃` products
 and a `K̃ × K̃` eigenproblem: a grid of 13 took about 3.5 s at n = 900,
 K̃ = 901.
 
@@ -227,6 +235,25 @@ RMSE-optimal size over-smooth for inference (`research/trace_cfe/`,
 intervals was measured for `K/n` up to 0.30; a larger `K` gives a warning.
 Units with leverage above 0.99 make the correction ill-posed and are
 refused.
+
+**Chosen by the data, with a reference basis.** Once the class is stated
+on `reference`, it does not depend on `basis`, and the bias-aware intervals
+of different bases bound the same thing. So `basis` may be a vector, and
+the shortest interval over every (basis, λ) pair is returned (THEORY.md,
+Corollary 7′); `basis_grid` and `basis_index` record the choice, and
+`bonferroni = true` counts every pair. Each basis needs Lemma 5's
+condition (R), and costs one fit per `λ`:
+
+```julia
+ref = tensor_pspline(u, v; k = 30)
+pss = [tensor_pspline(u, v; k) for k in (5, 10, 15)]
+r = root_rho(y, X, W; basis = [p.basis for p in pss], penalty = [p.penalty for p in pss],
+             lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ̃, reference = ref)
+```
+
+Without a reference this is refused: the class `F(ℛ)` then depends on the
+basis, and a coarse basis would look short only because its class is
+small.
 
 ### The root rule
 
@@ -254,7 +281,8 @@ about six and solves one dense `n × n` system for `d`.
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
     consistency of `V̂`, the validity of the test-inversion set, and the
-    coverage of the bias-aware interval, also on a reference basis) are in
+    coverage of the bias-aware interval, also on a reference basis and with
+    the basis chosen by the data) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
 

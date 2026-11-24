@@ -1,0 +1,18 @@
+root_rho with the basis chosen by the interval's length (Corollary 7′); Julia 1.13.4
+n = 900, kNN-6, bases k = 5, 10, 15, λ grid 10^(-3:0.5:2) plus REsd for each, reference k̃ = 30, R = 200
+
+one fit over the three bases with a reference: 20.9 s (with compilation)
+
+1. a = 4, reference, 1 ℛ̃* (ℛ̃ = 2.864): coverage 0.995 (200 fits), half-length 0.1387, bias +0.0210, sd 0.0575 | ok | 29.6 min
+    basis chosen (k: count) 5:0 10:1 15:199
+2. a = 1, reference, 1 ℛ̃* (ℛ̃ = 0.716): coverage 0.945 (200 fits), half-length 0.0992, bias +0.0103, sd 0.0495 | ok | 28.7 min
+    basis chosen (k: count) 5:0 10:85 15:115
+3. a = 4, reference, 4 ℛ̃* (ℛ̃ = 11.455): coverage 1.000 (200 fits), half-length 0.3558, bias +0.0073, sd 0.0527 | ok | 30.6 min
+    basis chosen (k: count) 5:0 10:0 15:200
+4. a = 4, reference, 1 ℛ̃* (ℛ̃ = 2.864), Bonferroni over 39: coverage 1.000 (200 fits), half-length 0.2071, bias +0.0287, sd 0.0531 | ok | 33.0 min
+    basis chosen (k: count) 5:0 10:4 15:196
+5. a = 4, no reference, LS ℛ_k = 23.88/9.94/6.35: coverage 0.770 (200 fits), half-length 0.0819, bias +0.0478, sd 0.0445 | ok | 10.4 min
+    basis chosen (k: count) 5:200 10:0 15:0
+
+Pass criterion (cells 1–4 within 0.93–1.00): met
+Power check (cell 5 below 0.90): met

@@ -45,8 +45,8 @@ intervals, so smooth **less** than a good fit of `f` would.
 The growing-basis results (a CLT for the moment with a dense `M`, the
 consistency of the HC2 `V̂`, the validity of `CS`, and the penalised
 smoother, and its bias-aware interval) are proved in
-`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 2, 4, 6, 7 and
-7′, and Lemmas 4 and 5). They have not been checked by anyone else.
+`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 1′, 2, 4, 6, 7
+and 7′, and Lemmas 4 and 5). They have not been checked by anyone else.
 They are measured in that directory and in `validation/mc_root_rho.jl` and
 `validation/mc_root_rho_smoother.jl`.
 
@@ -119,6 +119,9 @@ The result of [`root_rho`](@ref).
   bias-aware interval; the result is the shortest. Empty otherwise.
 - `reference_K` — the number of columns of `[X, reference basis]` when the
   roughness class is stated on a `reference` basis (Lemma 5); 0 otherwise.
+- `basis_grid`, `basis_index` — with a vector of bases, the basis of each
+  candidate in `lambda_grid` (an index into the vector), and the index of
+  the chosen one. Empty and 0 otherwise.
 """
 struct RootRhoResult{T<:AbstractFloat}
     rho::T
@@ -150,16 +153,20 @@ struct RootRhoResult{T<:AbstractFloat}
     lambda_grid::Vector{T}
     halflength_grid::Vector{T}
     reference_K::Int
+    basis_grid::Vector{Int}
+    basis_index::Int
 end
 
 # The fields of a result without the bias-aware interval.
-_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[], 0)
+_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[], 0, Int[], 0)
 
 # A copy of r with the bias-aware fields replaced.
 function _with_bias(r::RootRhoResult{T}, ℛ, bbar, ci, grid, hl;
-                    refK::Int = r.reference_K) where {T}
+                    refK::Int = r.reference_K, bgrid::Vector{Int} = r.basis_grid,
+                    bidx::Int = r.basis_index) where {T}
     f = [getfield(r, k) for k in fieldnames(RootRhoResult)]
-    f[end-5:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl), refK]
+    f[end-7:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl), refK,
+                       bgrid, bidx]
     return RootRhoResult{T}(f...)
 end
 
@@ -191,9 +198,13 @@ function Base.show(io::IO, r::RootRhoResult)
                 pct, r.ci_bias_aware..., r.roughness, r.bias_bound / sqrt(r.vhat))
         r.reference_K > 0 && @printf(io,
             "  ℛ on a reference basis with K̃ = %d columns (Lemma 5)\n", r.reference_K)
-        isempty(r.lambda_grid) || @printf(io,
-            "  λ chosen by the interval's length from %d candidates (λ = 0 is the projection)\n",
-            length(r.lambda_grid))
+        if r.basis_index > 0
+            @printf(io, "  basis %d of %d (K = %d) and λ chosen by the interval's length from %d candidates\n",
+                    r.basis_index, maximum(r.basis_grid), r.K, length(r.lambda_grid))
+        elseif !isempty(r.lambda_grid)
+            @printf(io, "  λ chosen by the interval's length from %d candidates (λ = 0 is the projection)\n",
+                    length(r.lambda_grid))
+        end
     end
     if isempty(r.cs)
         @printf(io, "Test-inversion %g%% set: empty (every ρ in [%.2f, %.2f] is rejected)\n",
@@ -620,16 +631,21 @@ so the set's endpoints are exact.
   or B-spline basis already sums to one.
 - `W` — a spatial weights matrix with a zero diagonal, row-standardised so
   that `rho_bounds` lies inside `(−1, 1)`.
-- `basis` — the `n × K_B` basis for `f`.
+- `basis` — the `n × K_B` basis for `f`. With `reference` and `roughness`,
+  also a vector of bases, among which the shortest interval chooses (see
+  "Choosing the basis").
 - `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
   penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
   or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
-  With `roughness`, `lambda` may also be a vector (see below).
+  With `roughness`, `lambda` may also be a vector (see below). With a
+  vector of bases, `penalty` is a vector too, one per basis, and `lambda`
+  applies to each.
 - `roughness` — a bound `ℛ` on the roughness `√(ψ′Πψ)` of `f = [X, basis]ψ`
   (`Π` the penalty on the basis block), for the bias-aware interval.
   [`basis_roughness`](@ref) computes it from a reference surface.
-- `bonferroni` — with a vector of `lambda`s, use level `1 − α/L` for each of
-  the `L` candidates, so that coverage holds for any choice among them.
+- `bonferroni` — with a vector of `lambda`s or of bases, use level `1 − α/L`
+  for each of the `L` candidates, so that coverage holds for any choice
+  among them.
 - `reference` — a finer basis and penalty `(; basis, penalty)`, as
   [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
   so that `f` need not lie in `span(basis)` (see below). Then `roughness`
@@ -720,9 +736,9 @@ coarse bases, 1.1 to 10 times. So the projection is no longer free of the
 bound, and with a reference the rule can do worse than the projection's
 Wald interval, which is then not valid. Because the class no longer depends
 on `basis`, results across bases are comparable, and the shortest interval
-was at the finest basis tried. The projection candidate is REsd, whose
-coverage here is measured, not proved (Proposition 7′ needs Proposition 1
-without `f ∈ span(Z)`). Each candidate costs two more `n × n × K̃` products
+was at the finest basis tried. The projection candidate is REsd, which
+THEORY.md's Proposition 1′ covers when the largest remainder `‖Mf‖` in the
+class is small against `√n` (Proposition 7′(vi)). Each candidate costs two more `n × n × K̃` products
 and a `K̃ × K̃` eigenproblem: a grid of 13 took about 3.5 s at n = 900,
 K̃ = 901.
 
@@ -736,6 +752,25 @@ RMSE-optimal size over-smooth for inference (`research/trace_cfe/`,
 intervals was measured for `K/n` up to 0.30; a larger `K` gives a warning.
 Units with leverage above 0.99 make the correction ill-posed and are
 refused.
+
+**Chosen by the data, with a reference basis.** Once the class is stated
+on `reference`, it does not depend on `basis`, and the bias-aware intervals
+of different bases bound the same thing. So `basis` may be a vector, and
+the shortest interval over every (basis, λ) pair is returned (THEORY.md,
+Corollary 7′); `basis_grid` and `basis_index` record the choice, and
+`bonferroni = true` counts every pair. Each basis needs Lemma 5's
+condition (R), and costs one fit per `λ`:
+
+```julia
+ref = tensor_pspline(u, v; k = 30)
+pss = [tensor_pspline(u, v; k) for k in (5, 10, 15)]
+r = root_rho(y, X, W; basis = [p.basis for p in pss], penalty = [p.penalty for p in pss],
+             lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ̃, reference = ref)
+```
+
+Without a reference this is refused: the class `F(ℛ)` then depends on the
+basis, and a coarse basis would look short only because its class is
+small.
 
 # The root rule
 
@@ -763,17 +798,72 @@ about six and solves one dense `n × n` system for `d`.
 !!! note "Proved, but not checked by anyone else"
     The results for a basis that grows with `n` (a CLT for the moment, the
     consistency of `V̂`, the validity of the test-inversion set, and the
-    coverage of the bias-aware interval, also on a reference basis) are in
+    coverage of the bias-aware interval, also on a reference basis and with
+    the basis chosen by the data) are in
     `research/trace_cfe/THEORY.md`. The published theory (Jin & Lee 2012)
     assumes a design of fixed dimension.
 """
 function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::AbstractMatrix{<:Real};
-                  basis::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
-                  penalty::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
+                  basis::Union{Nothing, AbstractMatrix{<:Real},
+                               AbstractVector{<:AbstractMatrix{<:Real}}} = nothing,
+                  penalty::Union{Nothing, AbstractMatrix{<:Real},
+                                 AbstractVector{<:AbstractMatrix{<:Real}}} = nothing,
                   lambda::Union{Nothing, Real, AbstractVector{<:Real}} = nothing,
                   roughness::Union{Nothing, Real} = nothing, bonferroni::Bool = false,
-                  reference = nothing, varnames = nothing, level::Real = 0.95,
-                  rho_bounds = (-0.99, 0.99), max_dense_n::Integer = 4000)
+                  reference = nothing, kw...)
+    basis isa AbstractVector || penalty isa AbstractVector{<:AbstractMatrix} && throw(ArgumentError(
+        "root_rho: a vector of penalties needs a vector of bases, one per penalty"))
+    basis isa AbstractVector ||
+        return _root_rho_one(y, X, W; basis, penalty, lambda, roughness, bonferroni, reference, kw...)
+    # A grid of bases (THEORY.md, Corollary 7′): the class is stated on `reference`, so it
+    # does not depend on the basis, and the intervals of all bases can be compared.
+    J = length(basis)
+    J > 0 || throw(ArgumentError("root_rho: the vector of bases is empty"))
+    (reference !== nothing && roughness !== nothing) || throw(ArgumentError(
+        "root_rho: a vector of bases needs `reference` and `roughness`. Without a reference " *
+        "the roughness class depends on the basis, so the intervals of different bases " *
+        "bound different things and cannot be compared"))
+    pens = if penalty === nothing
+        fill(nothing, J)
+    elseif penalty isa AbstractVector{<:AbstractMatrix}
+        length(penalty) == J || throw(DimensionMismatch(
+            "root_rho: $(length(penalty)) penalties for $J bases"))
+        penalty
+    else
+        throw(ArgumentError("root_rho: with a vector of bases, give a vector of penalties, one per basis"))
+    end
+    per = penalty === nothing ? 1 : lambda isa AbstractVector ? length(lambda) + 1 : 1
+    nb = bonferroni ? J * per : 0
+    fits = [_root_rho_one(y, X, W; basis = basis[j], penalty = pens[j], lambda, roughness,
+                          reference, nbonf = nb, kw...) for j in 1:J]
+    T = Float64
+    grid = T[]; hl = T[]; bg = Int[]
+    for (j, r) in enumerate(fits)
+        if isempty(r.lambda_grid)
+            push!(grid, r.lambda)
+            push!(hl, r.root_found && isfinite(r.ci_bias_aware[1]) ?
+                      (r.ci_bias_aware[2] - r.ci_bias_aware[1]) / 2 : T(Inf))
+            push!(bg, j)
+        else
+            append!(grid, r.lambda_grid); append!(hl, r.halflength_grid)
+            append!(bg, fill(j, length(r.lambda_grid)))
+        end
+    end
+    best = [minimum(hl[bg .== j]) for j in 1:J]
+    j = all(isinf, best) ? J : argmin(best)
+    r = fits[j]
+    return _with_bias(r, roughness, r.bias_bound, r.ci_bias_aware, grid, hl; bgrid = bg, bidx = j)
+end
+
+# One basis. `nbonf > 0` splits α among that many candidates (a grid of bases).
+function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::AbstractMatrix{<:Real};
+                       basis::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
+                       penalty::Union{Nothing, AbstractMatrix{<:Real}} = nothing,
+                       lambda::Union{Nothing, Real, AbstractVector{<:Real}} = nothing,
+                       roughness::Union{Nothing, Real} = nothing, bonferroni::Bool = false,
+                       nbonf::Int = 0, reference = nothing, varnames = nothing,
+                       level::Real = 0.95, rho_bounds = (-0.99, 0.99),
+                       max_dense_n::Integer = 4000)
     T = Float64
     n = length(y)
     size(X, 1) == n || throw(DimensionMismatch("root_rho: y has $n rows, X has $(size(X, 1))"))
@@ -873,12 +963,12 @@ function root_rho(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::Abstr
     α0 = 1 - T(level)
     if !penalised                                   # the projection alone, with a reference
         proj, C = _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds)
-        bias = (; ℛ = T(roughness), N, pilot, α = α0, Zt, Nt, MZZt, refK)
+        bias = (; ℛ = T(roughness), N, pilot, α = α0 / max(nbonf, 1), Zt, Nt, MZZt, refK)
         return _projection_with_bias(proj, C, bias)
     end
     λs = lambda isa AbstractVector ? T.(collect(lambda)) : [T(lambda)]
     ncand = lambda isa AbstractVector ? length(λs) + 1 : 1
-    α = α0 / (bonferroni ? ncand : 1)
+    α = α0 / (nbonf > 0 ? nbonf : bonferroni ? ncand : 1)
     bias = (; ℛ = T(roughness), N, pilot, α, Zt, Nt, MZZt, refK)
     fits = [_root_rho_penalised(yv, Z, Ws, kx, Pm, λ, vnames, T(level), bnds, bias) for λ in λs]
     lambda isa AbstractVector || return fits[1]

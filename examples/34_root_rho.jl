@@ -11,7 +11,8 @@
 #
 # Section 4 fits a penalised smoother (tensor_pspline) in place of the projection,
 # section 5 its bias-aware interval, with λ chosen by the interval's length, and
-# section 6 the same on a reference basis, for an f outside the span of the basis.
+# section 6 the same on a reference basis, for an f outside the span of the basis,
+# and section 7 the basis chosen by the interval's length too.
 #
 # Run: julia --project=. examples/34_root_rho.jl
 # ---------------------------------------------------------------------------
@@ -122,4 +123,20 @@ for k in (6, 15)
         @printf("  %2d      %s     %8.3g    [%.3f, %.3f]       %.3f\n", k, lab, rk.lambda,
                 rk.ci_bias_aware..., (rk.ci_bias_aware[2] - rk.ci_bias_aware[1]) / 2)
     end
+end
+
+# ── 7. The basis chosen by the data ────────────────────────────────────────
+#
+# With the class on the reference, the intervals of different bases bound the
+# same thing, so `basis` may be a vector: the shortest interval over every
+# (basis, λ) pair is returned (THEORY.md, Corollary 7′).
+
+pss = [tensor_pspline(u, v; k) for k in (6, 10, 15)]
+rg = root_rho(y, X, W; basis = [p.basis for p in pss], penalty = [p.penalty for p in pss],
+              lambda = 10.0 .^ (-2:0.5:1), roughness = ℛ̃, reference = ref)
+@printf("\nbasis chosen: k = %d, λ = %.3g, interval [%.3f, %.3f], half-length %.3f\n",
+        (6, 10, 15)[rg.basis_index], rg.lambda, rg.ci_bias_aware...,
+        (rg.ci_bias_aware[2] - rg.ci_bias_aware[1]) / 2)
+for (j, k) in enumerate((6, 10, 15))
+    @printf("  k = %2d: shortest half-length %.3f\n", k, minimum(rg.halflength_grid[rg.basis_grid .== j]))
 end

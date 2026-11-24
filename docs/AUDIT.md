@@ -5743,3 +5743,63 @@ with `b̄ = 0`, and under-covered. The run used the first draft of
 `basis_roughness`; the change above alters `ℛ̃*` only by rounding.
 Not measured: other `W`, `n` or error laws, or a reference other than
 hat functions.
+
+## `root_rho`: the basis chosen by the interval's length
+
+Added on 2026-11-24. With a reference basis the bias-aware half-length is
+comparable across estimation bases, because the class `F̃(ℛ̃)` no longer
+depends on the basis. Without a reference, a coarse basis has a small
+class and so looks short (cell 5 below). `root_rho` now takes a vector of
+bases and penalties (`reference` and `roughness` required), searches every
+`(basis, λ)` pair and keeps the shortest interval; `bonferroni = true`
+counts every pair. THEORY.md's Corollary 7′ proves the coverage at the
+chosen pair, as Proposition 7(a)–(d) over the grid `𝒢_𝒦`. The result
+gains `basis_grid` and `basis_index` (0 for a single basis). The same
+commit adds THEORY.md's Proposition 1′, REsd's limit when `f ∉ span(B)`,
+which Proposition 7′(vi) uses: `research/trace_cfe/tc_resd_approx.jl`
+measures it, and its part 2 gives the package's REsd with a reference
+coverage 0.970–1.000 in four cells, against 0.817 for the Wald interval at
+`k = 5`, `a = 4`.
+
+**Testset 50** (27 assertions; testset 49's design, bases `k = 4, 5, 6`,
+reference `k̃ = 10`):
+- The grid is the union of the single-basis grids (half-lengths to 1e-12),
+  and the chosen fit equals the shortest single fit.
+- Bonferroni: each candidate equals a single fit at level `1 − 0.05/3`, to
+  1e-10. Power: it lengthens every candidate (smallest ratio 1.066 on 1.13,
+  1.055 on 1.10).
+- Projections alone: the coarsest basis is not the shortest (its
+  half-length over the minimum is 1.44 on 1.13, 1.33 on 1.10).
+- Guards: vectors without `reference` or `roughness`, an empty vector, a
+  penalty vector of the wrong length, a matrix penalty with vector bases
+  and the reverse throw; an order-1 basis fails (R), and power: order 2
+  passes.
+- A single basis gives `basis_index = 0`; `show` prints the chosen basis.
+
+The two versions simulate different data from the same seed: 50a picks
+basis 2 on 1.13 (best half-lengths 0.533, 0.392, 0.404) and basis 3 on
+1.10 (0.703, 0.518, 0.490). The assertions compare with the single fits on
+the same data, so they hold on both.
+
+**Monte Carlo** (`validation/mc_root_rho_basis_grid.jl`, output committed):
+the design of the entry above, with bases `tensor_pspline(u, v; k)` for
+`k` = 5, 10, 15, each with the λ grid `10^(-3:0.5:2)` plus REsd (39
+candidates), reference `k̃ = 30`, R = 200 per cell, through the released
+function. Criterion set before the run: cells 1–4 cover within 0.93–1.00;
+power: cell 5, each basis with its own class (`ℛ_k` from the least-squares
+fit) and the shortest interval across bases, below 0.90.
+
+| cell | a | class | coverage | half-length | basis chosen (k = 5/10/15) |
+|---|---|---|---|---|---|
+| 1 | 4 | reference, `ℛ̃*` | 0.995 | 0.139 | 0/1/199 |
+| 2 | 1 | reference, `ℛ̃*` | 0.945 | 0.099 | 0/85/115 |
+| 3 | 4 | reference, `4ℛ̃*` | 1.000 | 0.356 | 0/0/200 |
+| 4 | 4 | reference, `ℛ̃*`, Bonferroni over 39 | 1.000 | 0.207 | 0/4/196 |
+| 5 | 4 | no reference, LS `ℛ_k` | 0.770 | 0.082 | 200/0/0 |
+
+Both met. With the reference the rule picks the finest basis at `a = 4`,
+and splits between k = 10 and 15 at `a = 1`, where the remainder is small.
+Cell 1 matches the entry above's `k = 15` cell (0.139), so the search costs
+nothing in length; Bonferroni costs 49%. Without a reference the coarsest
+basis wins every draw and under-covers. Not measured: other `W`, `n` or
+error laws, more than three bases.

@@ -223,7 +223,26 @@ With `ℛ̃` four times too large and 15 knots, the cost is 1.07× and 2.1×.
 So: use a fine `B`, and the reference to check that it is fine enough.
 Results across bases are comparable once the class is on the reference, and
 the shortest interval was at the finest `B` tried. The projection candidate
-(REsd) is measured, not proved, under this class.
+(REsd) is covered by THEORY.md's Proposition 1′ when the largest remainder
+`‖Mf‖` in the class is small against `√n`.
+
+### Choosing the basis
+
+With the class on the reference, the intervals of different bases bound
+the same thing, so the data can choose the basis too. Give `basis` (and
+`penalty`) as vectors, and the shortest interval over every (basis, λ) pair
+is returned (THEORY.md, Corollary 7′):
+
+```julia
+pss = [tensor_pspline(u, v; k) for k in (5, 10, 15)]
+r = root_rho(y, X, W; basis = [p.basis for p in pss], penalty = [p.penalty for p in pss],
+             lambda = 10.0 .^ (-3:0.5:2), roughness = ℛ̃, reference = ref)
+r.basis_index, r.basis_grid      # the chosen basis, and the basis of each candidate
+```
+
+`bonferroni = true` counts every pair. Without `reference` this is refused:
+each basis would then have its own class, and a coarse basis would look
+short only because its class is small.
 
 ## Cost
 

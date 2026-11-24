@@ -7,9 +7,9 @@
 > the default GS2SLS's panel inference (AUDIT 34–36); the Claude Code skill
 > (#14); and the notebooks on Google Colab. No tag is registered.
 >
-> 33 submodules, 4,328 test assertions in 66 top-level testsets with both
-> package extensions installed and 4,293 (plus 2 broken markers) without
-> them, measured on 2026-11-21 on Julia 1.13.4, and without them on 1.10.13.
+> 33 submodules, 4,355 test assertions in 67 top-level testsets with both
+> package extensions installed and 4,320 (plus 2 broken markers) without
+> them, measured on 2026-11-24 on Julia 1.13.4, and without them on 1.10.13.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
 > 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
@@ -1313,8 +1313,18 @@ and the method are in `research/trace_cfe/`.
   `validation/mc_root_rho_reference.jl`: coverage 0.977–1.000 in four
   cells with `K̃` = 901 > `n`, against 0.833 for the rule without a
   reference on a coarse basis. AUDIT, "the bias-aware interval on a
-  reference basis". Not built: a rule for choosing K; REsd under this
-  class is measured, not proved.
+  reference basis". REsd under this class is proved since 2026-11-24
+  (THEORY.md, Proposition 1′, `tc_resd_approx.jl`).
+- **Built (2026-11-24): the basis chosen by the interval's length.**
+  `root_rho(...; basis = [B₁, B₂, …], penalty = [Π₁, Π₂, …], roughness = ℛ̃,
+  reference)` searches every `(basis, λ)` pair against one reference and
+  keeps the shortest interval (THEORY.md, Corollary 7′); `bonferroni`
+  counts every pair. The result gains `basis_grid` and `basis_index`
+  (testset 50, section 7 of `examples/34_root_rho.jl`).
+  `validation/mc_root_rho_basis_grid.jl`: coverage 0.945–1.000 in four
+  cells over k = 5, 10, 15, against 0.770 for the shortest interval across
+  bases without a reference. AUDIT, "the basis chosen by the interval's
+  length". Not built: the joint (trust-region) bound.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
@@ -1757,6 +1767,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ the sign rule's check in `root_rho`, after a review of THEORY.md) | 33 | 4,248 ¶¹⁰ | 29,694 |
 | **master** (+ `root_rho`'s bias-aware interval and `basis_roughness`) | 33 | 4,287 ¶¹¹ | 29,929 |
 | **master** (+ `root_rho`'s `reference` basis, Lemma 5) | 33 | 4,328 ¶¹² | 30,113 |
+| **master** (+ `root_rho`'s basis grid, Corollary 7′, and Proposition 1′) | 33 | 4,355 ¶¹³ | 30,203 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1911,8 +1922,13 @@ extensions, and 4,293 plus 2 broken on 1.10.13 without them, both 41 above
 ¶¹¹: testset 49 (the reference basis). The `src/` count rose by 184, all in
 `RootRho.jl`.
 
-Measured on master: 33 submodules plus the umbrella across 30,113 lines of
-`src/`, 11,987 lines of tests, 5,380 lines of examples across 34 scripts,
+¶¹³ Measured locally on 2026-11-24: 4,355 passed on Julia 1.13.4 with both
+extensions, and 4,320 plus 2 broken on 1.10.13 without them, both 27 above
+¶¹²: testset 50 (the basis grid). The `src/` count rose by 90, all in
+`RootRho.jl`.
+
+Measured on master: 33 submodules plus the umbrella across 30,203 lines of
+`src/`, 12,075 lines of tests, 5,397 lines of examples across 34 scripts,
 398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 

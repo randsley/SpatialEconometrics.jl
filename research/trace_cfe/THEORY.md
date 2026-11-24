@@ -24,7 +24,10 @@ Proposition 7 proves the coverage of a bias-aware interval and of a λ chosen
 by its length (`tc_rbc.jl`, `tc_honest.jl`); "Choosing ℛ" says how to set
 its bound and why the data cannot (`tc_rchoice.jl`). Then Lemma 5 and
 Proposition 7′ extend both to `f ∉ span(B)`, with the class on a finer
-reference basis (`tc_refbasis.jl`).
+reference basis (`tc_refbasis.jl`). On 2026-11-24, Proposition 1′ proves
+REsd without A4, under `‖Mf‖ = o(√n)`, and so brings REsd into
+Proposition 7′ (`tc_resd_approx.jl`). Corollary 7′ lets the data choose
+the basis as well as λ, once the class is on the reference.
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -82,6 +85,8 @@ line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, 
 | `v`, `T_λ`, `χ̄_λ`, `b̄`, `t̄`, `cv(t)`, `Υ_λ`, `𝒢` | `B′M_λWf`; `B′M_λW`; the quadratic part's bound; the bias bound; `b̄/√V`; the `1 − α` quantile of `\|N(t, 1)\|`; `Π^{+1/2}T_λP_B`; the grid of λ |
 | `B̃`, `Π̃`, `ψ̃`, `ℛ̃`, `F̃(ℛ̃)`, `f_B` | Lemma 5: a finer reference basis and its penalty; the coefficients of `f = B̃ψ̃`; its roughness bound; the class; `P_Bf` |
 | `ṽ`, `Q̃`, `χ̃`, `b̃`, `T̃`, `Υ̃`, `E` | Lemma 5: the linear coefficient; the quadratic matrix; its bound; the bias bound; `ṽ = T̃f_B`; `Π̃^{+1/2}T̃P_B`; `G(ϱ)′ − Δ(ϱ)` |
+| `B_k`, `𝒦`, `𝒢_𝒦` | Corollary 7′: a set of bases, its index set, and the grid of (basis, λ) pairs |
+| `β(ϱ)`, `β*`, `c_β*`, `r̄` | Proposition 1′: `f′C(ϱ)f`; `β(ρ₀)`; `β*/√V*`; Proposition 7′: `ℛ̃‖MB̃Π̃^{+1/2}‖_op`, the largest `‖Mf‖` over `F̃(ℛ̃)` |
 | `θ` | the limit of `K/n` |
 | `κ_W`, `n_W`, `X`, `ωⱼ`, `φⱼ`, `πⱼ` | Proposition 5: `‖W‖_F² ≥ κ_W n`; neighbours per row; `Ws + D`; its eigenvalues and eigenvectors; their overlaps with `B` |
 | `Y` | a generic matrix (Lemmas 2 and 3, and the bound after Lemma 3) |
@@ -725,6 +730,125 @@ which checks step 2's identities.
   sign rule, and validation/mc_root_rho.jl measures its coverage
   (0.931–0.975 for the Wald interval).
 
+**Proposition 1′ (REsd when `f ∉ span(B)`; proved, given Propositions 1,
+3 and 4(c)).** Drop A4, so `r = Mf ≠ 0`. Write `β(ϱ) = f′C(ϱ)f`, so that
+`β* = β(ρ₀)` is the bias of the infeasible moment, and `c_β* = β*/√V*`.
+Assume Proposition 1's conditions other than A4, with A6 read for
+`(C + C′)f` as in Proposition 3, for both `C₁` and `C(ρ₀)`; `f′C₁f` and
+`β*` both `O(√n)`; and
+
+- (w) `‖r‖ = o(√n)`.
+
+Then:
+- (a) `ρ̂ − ρ̂* = o_p(n^{−1/2})`. So if `c_β* → c`,
+  `J*(ρ̂ − ρ₀)/√V* → N(c, 1)`, and the bias that matters is `β*`, the one
+  at `ρ₀`.
+- (b) `β(ρ̃) − β* = O_p(‖r‖)`, which is `o_p(√V*)`: the bias at the plug-in,
+  which is what `root_rho` bounds, differs from `β*` by a negligible
+  amount.
+- (c) Assume also Proposition 4(c)'s conditions with `S = P_B` (so `tr S = K`
+  and `K/n → 0`), with `maxᵢ|rᵢ| ≤ c` and `Σᵢ bᵢ²(hᵢᵢ + rᵢ²) = o(n)` for
+  `b = (C(ρ₀) + C(ρ₀)′)f`. Then the HC2 `V̂` formed with `C(ρ̃)` at `ρ̂`
+  has `V̂/V* → 1`.
+
+*Proof.* Proposition 1's step 1 does not use A4. Write `E(ϱ) = G(ϱ)′ − Δ(ϱ)`,
+so `C(ϱ) = E(ϱ)M`. Since `M` does not depend on `ϱ`, `C_ϱ = E_ϱM` and
+`C_ϱf = E_ϱr`, with `‖E_ϱ‖_op` bounded on step 1's interval.
+1. **Step 2 without `Mf = 0`.** `diag C_ϱ = 0` still, so
+   `η′C_ϱ(ρ₀)η = f′C_ϱf + f′(C_ϱ + C_ϱ′)ε + ε′C_ϱε`. The last two terms are
+   `O_p(√n)` by the same variance bounds as before (the linear one needs
+   only `‖f‖² = O(n)`). The mean is no longer 0, but
+   `|f′C_ϱf| = |f′E_ϱr| ≤ ‖E_ϱ‖_op‖f‖‖r‖ = O(√n‖r‖)`, which is `o(n)` by (w).
+2. **Step 3.** `g₀(ρ̃) − g₀(ρ₀) = (ρ̃ − ρ₀)η′C_ϱ(ρ₀)η + O_p(1)`, and the first
+   term is `O_p(n^{−1/2})·(O(√n‖r‖) + O_p(√n)) = O_p(‖r‖ + 1)`, which is
+   `o_p(√n)` by (w) and so `o_p(√V*)` by A5. `ρ̃ − ρ₀ = O_p(n^{−1/2})` holds
+   by Proposition 3 for `C₁`, because `f′C₁f = O(√n)`. The bounds on `g₁`
+   and `g₂` did not use A4.
+3. **Step 4.** `g₀(ρ₀) = β* + O_p(√V*) = O_p(√n)`, so the Corollary's steps
+   2–4 apply to both roots, as in Proposition 1, and
+   `t̂ − t̂* = [g₀(ρ̃) − g₀(ρ₀)]/J* + o_p(n^{−1/2}) = o_p(n^{−1/2})`. The limit
+   of `t̂*` is Proposition 3's for `C(ρ₀)`. This proves (a).
+4. **(b).** By Taylor's theorem, with `ρ̄` between `ρ̃` and `ρ₀`,
+   `β(ρ̃) − β* = (ρ̃ − ρ₀)f′E_ϱ(ρ̄)r`, which is at most
+   `O_p(n^{−1/2})·c‖f‖‖r‖ = O_p(‖r‖)`.
+5. **(c).** At `C(ρ₀)`, Proposition 4(c)'s proof applies with `S = P_B`,
+   `M = I − P_B` (so `mᵢ = Mᵢᵢ`) and `C(ρ₀)` in place of `A`. That proof
+   uses only `diag C = 0`, the bounds of Lemma 2 and `‖H‖_op ≤ c`, which
+   hold for `C(ρ₀)`; it gives `V̂(C(ρ₀))/V* → 1` at `ρ̂`, since
+   `ρ̂ − ρ₀ = O_p(n^{−1/2})` by (a). It remains to replace `C(ρ₀)` by
+   `C(ρ̃)`, with `‖C(ρ̃) − C(ρ₀)‖_op = O_p(n^{−1/2})` by step 1. Write `Δ_C`
+   for that difference, and note `Σᵢ sᵢ² = O_p(n)` under four moments.
+   - `Ω = Cs∘Cs`: each row sum of `|Ω(ρ̃) − Ω(ρ₀)|` is at most
+     `‖Δ_C eᵢ‖(‖Cs(ρ̃)eᵢ‖ + ‖Cs(ρ₀)eᵢ‖) ≤ c‖Δ_C‖_op`, and the matrix is
+     symmetric, so its operator norm is `O_p(n^{−1/2})` and the quadratic
+     part moves by `O_p(n^{−1/2})·Σᵢ sᵢ² = O_p(√n)`.
+   - `b̂ = (C + C′)P_By₀` moves by at most `2‖Δ_C‖_op‖P_By₀‖ = O_p(1)`, so the
+     linear part moves by `O_p(√n)·(maxᵢ sᵢ)^{1/2} + O_p(maxᵢ sᵢ) = O_p(n^{3/4})`,
+     as in Proposition 2's step 3.
+   - The noise term `s′(H∘H)s` with `H = (C + C′)P_B`: the row and column
+     sums of `|H(ρ̃)∘H(ρ̃) − H(ρ₀)∘H(ρ₀)|` are `O_p(n^{−1/2})` by the same
+     argument, so it moves by `O_p(√n)`.
+
+   All are `o_p(n)`, and `V* ≥ cn` by A5. ∎
+
+(w) is much weaker than Proposition 3's `β* = o(√n)` (the condition for
+the Wald interval) and does not imply it, or the reverse: `β*` is an
+indefinite form in `r` (Proposition 3). Proposition 4(c) already needs
+`‖r‖² = o(n)`, which is (w). **The remark after Proposition 1 is the
+reason for (w):** with `‖r‖ ≍ √n`, `f′C_ϱf` can be of order `n`, and the
+plug-in then moves `ρ̂` by the same order as its standard deviation, so
+`ρ̂ − ρ̂*` does not vanish relative to `sd(ρ̂*)`.
+
+**Numerical check (`tc_resd_approx.jl`).** Part 1 is `tc_resd.jl`'s design
+(n = 400 to 2500, kNN-6, a hat basis, smooth variances, normal errors,
+`ρ₀ = 0.4`, R = 500), with `f = 2·sin(2πu)cos(πv)` itself and not its
+projection. Arm A grows the basis (`K ≈ 2√n`), so `‖r‖/√n` falls from 0.063
+to 0.019. Arm B, the power check, keeps `k = 4` (K = 16), so `‖r‖/√n` stays
+at 0.18–0.19. `β*`, `J*`, `V*` and `f′C_ϱf` are exact; "first order" is
+`sd(ρ̃)·|d(β/J)/dϱ|/sd(ρ̂*)`, the leading plug-in term, with `β(ϱ)` and
+`J(ϱ)` those of `C(ϱ)`.
+
+| arm | n | K | ‖r‖/√n | f′C_ϱf/n | c_β* | sd(ρ̂ − ρ̂*)/sd(ρ̂*) | × √n | first order | (β(ρ̃) − β*)/√V*: mean, sd | coverage | predicted |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| A | 400 | 36 | 0.063 | 0.0063 | 0.12 | 0.107 | 2.15 | 0.012 | +0.009, 0.033 | 0.948 | 0.948 |
+| A | 900 | 64 | 0.032 | 0.0014 | 0.03 | 0.058 | 1.73 | 0.003 | +0.001, 0.006 | 0.946 | 0.950 |
+| A | 1600 | 81 | 0.024 | 0.0006 | 0.01 | 0.036 | 1.44 | 0.001 | +0.000, 0.002 | 0.952 | 0.950 |
+| A | 2500 | 100 | 0.019 | 0.0006 | 0.02 | 0.026 | 1.32 | 0.001 | +0.000, 0.002 | 0.946 | 0.950 |
+| B | 400 | 16 | 0.182 | 0.050 | 0.72 | 0.075 | 1.50 | 0.024 | +0.099, 0.140 | 0.860 | 0.890 |
+| B | 900 | 16 | 0.189 | 0.070 | 1.17 | 0.061 | 1.82 | 0.026 | +0.144, 0.146 | 0.744 | 0.785 |
+| B | 1600 | 16 | 0.181 | 0.067 | 1.44 | 0.043 | 1.72 | 0.025 | +0.165, 0.137 | 0.656 | 0.698 |
+| B | 2500 | 16 | 0.186 | 0.081 | 2.02 | 0.047 | 2.37 | 0.029 | +0.260, 0.149 | 0.386 | 0.478 |
+
+- **Arm A behaves as (a) and (b) say.** The gap falls by a factor of 4, and
+  its `×√n` column falls too, as in `tc_resd.jl` with `f ∈ span(B)`
+  (0.116 to 0.027 there). The bias at the plug-in falls to
+  0.0002 of `√V*`. Coverage is within 0.4 points of `P(|Z + c_β*| ≤ 1.96)`.
+  The simulated bias of `ρ̂` differs from `β*/J*` by −0.012 to +0.002, with
+  `z` −2.0, −3.0, −1.8 and −0.8. That is a second-order bias of about 0.1
+  sd at n = 900, which the first-order result does not describe, and it
+  shrinks with n.
+- **Arm B, where (w) fails, does not.** The first-order plug-in term stays
+  at 0.024–0.029 of `sd(ρ̂*)` at every n, and the gap's `×√n` column rises.
+  The bias at the plug-in grows with n (mean 0.10 to 0.26 of `√V*`), as
+  `O_p(‖r‖)` with `‖r‖ ≍ √n` says it should. Coverage is below the
+  prediction by 3–9 points, as in `tc_approx.jl` once `c_β ≥ 1`.
+
+Part 2 runs the package's REsd alone with a reference basis (`root_rho(...;
+basis, roughness = ℛ̃*, reference)`, Lemma 5(c) at `C(ρ̃)`) on
+`validation/mc_root_rho_reference.jl`'s design (n = 900, `k̃ = 30`,
+R = 300). Criterion, set before the run: coverage ≥ 0.93 in every cell;
+power: the Wald interval of the same fits below 0.90 at `k = 5`, `a = 4`.
+
+| k | a | bias-aware: coverage | half-length | mean `b̃/√V̂` | Wald: coverage | half-length |
+|---|---|---|---|---|---|---|
+| 5 | 4 | 1.000 | 0.512 | 10.7 | 0.817 | 0.082 |
+| 5 | 1 | 0.997 | 0.131 | 1.18 | 0.970 | 0.091 |
+| 15 | 4 | 0.987 | 0.210 | 0.68 | 0.953 | 0.177 |
+| 15 | 1 | 0.970 | 0.182 | 0.13 | 0.963 | 0.181 |
+
+Both met. At `k = 15` the bound costs 1% and 19% of length. At `k = 5` it costs
+1.4 and 6.2 times, where the Wald interval fails at `a = 4`.
+
 **Proposition 4 (a penalised smoother; proved; replaces Remark 3).** Let `M = I − S` with
 `S` symmetric, its eigenvalues in `[0, 1]` (a ridge- or difference-penalised
 spline), `maxᵢ Sᵢᵢ ≤ s̄ < 1` in place of A3, and `M∘M` invertible. `S` has
@@ -1292,8 +1416,8 @@ the limit.** With the penalty scaled by the knot spacing,
 is stated by interpolating a reference surface at the knots of `B̃`, not
 by least squares, which is not defined once `K̃ > n`.
 
-**Proposition 7′ (the bias-aware interval when `f ∉ span(B)`; proved for
-the smoother candidates, given Proposition 7's inputs).** Proposition 7(a)–(d)
+**Proposition 7′ (the bias-aware interval when `f ∉ span(B)`; proved,
+given Proposition 7's inputs and, for REsd, Proposition 1′).** Proposition 7(a)–(d)
 hold for `f ∈ F̃(ℛ̃)` in place of `F(ℛ)`, with `b̃` in place of `b̄`, at every
 `λ ∈ 𝒢`, including `λ = 0`, which now has `b̃ > 0`. The changes to its
 assumptions are:
@@ -1302,8 +1426,16 @@ assumptions are:
 - (iv) is read with `Υ̃`;
 - (v) is new: `ℛ̃‖Υ̃‖_op‖Mf‖/√V → 0`.
 
-The REsd candidate is not covered, because Proposition 1 has not been
-proved without A4 (its step 2 uses `Mf = 0`).
+The grid may also hold REsd in place of the exact-diagonal projection, with
+`b̃` from Lemma 5(c) at `ϱ = ρ̃`, as `root_rho` forms it. For that candidate,
+assume Proposition 1′'s conditions and
+
+- (vi) `r̄ = ℛ̃‖MB̃Π̃^{+1/2}‖_op = o(√V*)`.
+
+`r̄` is the largest remainder `‖Mf‖` over `F̃(ℛ̃)`, because
+`Mf = (MB̃Π̃^{+1/2})(Π̃^{1/2}ψ̃₁)` and `‖Π̃^{1/2}ψ̃₁‖ ≤ ℛ̃`. So (vi) gives
+Proposition 1′'s (w) uniformly over the class. Unlike (v), `r̄` does not
+depend on `f` and can be computed.
 
 *Proof.* Proposition 7's proof uses `f ∈ span(B)` only in step 2, for
 `Π^{+1/2}v = Υf`, and through A4 for `t₀ = O_p(n^{−1/2})`.
@@ -1317,7 +1449,27 @@ proved without A4 (its step 2 uses `Mf = 0`).
   `ℛ̃²/V`, this vanishes by (v). The term matters because it inflates
   `ŝ₀`, which deflates `q̂`.
 - Step 3 uses Lemma 5 in place of Lemma 4, and Proposition 3 with
-  `r = M_λf`. Steps 1 and 4 are unchanged. ∎
+  `r = M_λf`. Steps 1 and 4 are unchanged.
+- **REsd.** By Proposition 1′(a), `ρ̂` has the bias `β*/J*` of the
+  infeasible root, and by 1′(c) `V̂/V* → 1`. Proposition 7's step 2 at the
+  fixed `ϱ = ρ₀` gives an estimate of `b̃(ρ₀) ≥ |β*|`. The package forms
+  it at `ρ̃`, and the change is `o_p(√V*)`. With
+  `Y(ϱ) = (MB̃Π̃^{+1/2})′E(ϱ)′P_B`, which is `Υ̃` at `ϱ`, and
+  `‖E(ρ̃) − E(ρ₀)‖_op = O_p(n^{−1/2})` (Proposition 1, step 1),
+  `‖Y(ρ̃) − Y(ρ₀)‖_op ≤ (r̄/ℛ̃)·O_p(n^{−1/2})`. So, with `y_p` the
+  pilot's `y₀`:
+  - the raw linear part moves by at most
+    `ℛ̃‖Y(ρ̃) − Y(ρ₀)‖_op‖P_By_p‖ = O_p(r̄)`;
+  - the debiasing term `Σᵢ ŝᵢ‖Yeᵢ‖²` moves by at most
+    `(Σᵢ ŝᵢ²)^{1/2} · 2 sup_ϱ‖Y(ϱ)‖_op · ‖Y(ρ̃) − Y(ρ₀)‖_F`, with the
+    Frobenius norm at most `√K` times the operator norm. Scaled by `ℛ̃²/V*`,
+    this is `O_p((ℛ̃‖Υ̃‖_op√K/√V*)·(r̄/√V*))` plus a smaller term, and it
+    vanishes by (iv)'s third condition and (vi);
+  - the quadratic part moves by at most
+    `r̄²‖E(ρ̃) − E(ρ₀)‖_op = O_p(r̄²/√n) = o_p(√V*)`.
+
+  Since `|√a − √b| ≤ √|a − b|`, `t̂` moves by `o_p(1)`, and steps 3 and 4
+  apply. ∎
 
 **Measured** (`tc_refbasis.jl`). The design is tc_honest's, with the
 estimation basis coarsened to `k` = 4, 5, 7 or 15 knots a side. The
@@ -1363,7 +1515,35 @@ is Lemma 5, with `ℛ̃` from the interpolant (`ℛ̃*`, true for `f̃`, and
   the two terms would show how much is the bound.
 - **A rule for K.** The new half-length can be compared across bases, and
   its minimum over `k` is at the finest `k` tried (15) in all four
-  settings. This is a measured version of "undersmooth".
+  settings. This is a measured version of "undersmooth". Corollary 7′
+  makes it a rule, and `validation/mc_root_rho_basis_grid.jl` checks it
+  through the package (coverage 0.945–1.000 over k = 5, 10, 15).
+
+**Corollary 7′ (choosing the basis; proved, given Proposition 7′).** Let
+`B_k`, `k ∈ 𝒦`, be a finite set of bases (`|𝒦|` fixed as `n` grows), each
+with a penalty `Π_k` and a grid `𝒢_k` of λ, and each satisfying (R)
+against the same reference `(B̃, Π̃)`. Write
+`𝒢_𝒦 = {(k, λ) : k ∈ 𝒦, λ ∈ 𝒢_k}`, and let `I_{k,λ}` be Proposition 7′'s
+interval computed on `B_k`, with that basis's own pilot, `M`, `V̂` and `b̃`.
+If Proposition 7′'s conditions hold for every basis, then Proposition
+7(a)–(d) hold with `𝒢_𝒦` in place of `𝒢`. In particular, the shortest
+interval over `𝒢_𝒦` covers under the separation of (b), and any choice
+covers at level `α/|𝒢_𝒦|`.
+
+*Proof.* The class `F̃(ℛ̃)` is the same for every `k`. So for each
+`f ∈ F̃(ℛ̃)`, Proposition 7′(a) applies to every pair, and each `I_{k,λ}`
+covers. Proposition 7's step 4 uses only (a) for each candidate, the
+finiteness of the grid and, for (b), `ĥ/ℓ → 1` for each candidate. None of
+these uses a common basis. ∎
+
+**Why the reference is needed.** Without it, basis `k` has its own class
+`F_k(ℛ) = {B_kψ : ψ′Π_kψ ≤ ℛ²}`. A coarse basis has a small class, and so
+a short interval, and the interval chosen by length then covers a class
+that the data chose. That is the released rule at a coarse basis, which
+covers 0.050–0.923 in `tc_refbasis.jl` and 0.833 in
+`validation/mc_root_rho_reference.jl`. With the reference, a coarse basis
+pays for its remainder in `b̃`, and the comparison is fair. The corollary
+does not cover a set of bases that grows with `n`.
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -2127,7 +2307,7 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
 1. Theorem 1 and the Corollary are proved (2026-11-19), the Corollary
    under the sign rule for the root and the identification condition A9.
    Proposition 1 (REsd, the two-step) is proved too: the plug-in `ρ̃` costs
-   nothing in the limit. Step 1 has no sketched parts left. Proposition 3
+   nothing in the limit, and Proposition 1′ drops A4 from it. Step 1 has no sketched parts left. Proposition 3
    replaces the sketched Remark 1: the approximation-error bias is
    `β = r′(W + D)r + r′r_W`, the second term was missing, and the interval
    is valid if and only if `β = o(√n)` (`tc_approx.jl`). Proposition 4
@@ -2181,11 +2361,12 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    uniformly over `F(ℛ)`. Lemma 5 and Proposition 7′ cover `f ∉ span(B)`,
    with the class on a finer reference basis (`tc_refbasis.jl`): the
    released rule covers 0.050–0.973 at a coarse `B`, the new one
-   0.960–1.000, at a price that is small only for a fine `B`. Still open:
+   0.960–1.000, at a price that is small only for a fine `B`. Corollary 7′
+   chooses the basis by the same length over a grid of `(basis, λ)` pairs
+   against one reference (`root_rho` with a vector `basis`). Still open:
    the joint bound of the linear and quadratic terms (a trust-region
    problem) in place of their sum, which would show how much of Lemma 5's
-   looseness is the bound; REsd under Proposition 7′ (Proposition 1
-   without A4); a sharper form of (iv)'s third condition;
+   looseness is the bound; a sharper form of (iv)'s third condition;
    and reading the bias-aware-interval literature (Armstrong & Kolesár) to
    compare. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
    it through a reference surface or a curvature bound, err large, and

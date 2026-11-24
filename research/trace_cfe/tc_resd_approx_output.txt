@@ -1,0 +1,24 @@
+A n   400 K  36 | ‖Mf‖/√n 0.0626  f′C_ϱf/n +0.0063  c* +0.116 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0680  ×√n 1.36  first-order 0.0113 (sd ρ̃ 0.1020) | bias ρ̂ -0.1229  β*/J* +0.0157 (z -3.1) | coverage 1.000  predicted 0.948 | (β(ρ̃)−β*)/√V* mean -0.0167 sd 0.0140
+warm-up: 5 replications at n = 400 in 3.7 s
+A n  2500 K 100 | ‖Mf‖/√n 0.0190  f′C_ϱf/n +0.0006  c* +0.017 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0290  ×√n 1.45  first-order 0.0011 (sd ρ̃ 0.0549) | bias ρ̂ +0.0213  β*/J* +0.0008 (z +0.8) | coverage 1.000  predicted 0.950 | (β(ρ̃)−β*)/√V* mean +0.0008 sd 0.0020
+3 replications at n = 2500 in 6.3 s. R = 500 per cell; MC SE of a coverage near 0.95: 0.010.
+
+Part 1. Arm A: K grows, ‖Mf‖/√n falls. Arm B (power): k = 4 fixed.
+A n   400 K  36 | ‖Mf‖/√n 0.0626  f′C_ϱf/n +0.0063  c* +0.116 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.1073  ×√n 2.15  first-order 0.0124 (sd ρ̃ 0.1401) | bias ρ̂ +0.0041  β*/J* +0.0157 (z -2.0) | coverage 0.948  predicted 0.948 | (β(ρ̃)−β*)/√V* mean +0.0090 sd 0.0330
+A n   900 K  64 | ‖Mf‖/√n 0.0315  f′C_ϱf/n +0.0014  c* +0.028 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0578  ×√n 1.73  first-order 0.0029 (sd ρ̃ 0.0950) | bias ρ̂ -0.0094  β*/J* +0.0026 (z -3.0) | coverage 0.946  predicted 0.950 | (β(ρ̃)−β*)/√V* mean +0.0007 sd 0.0063
+A n  1600 K  81 | ‖Mf‖/√n 0.0236  f′C_ϱf/n +0.0006  c* +0.014 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0360  ×√n 1.44  first-order 0.0011 (sd ρ̃ 0.0690) | bias ρ̂ -0.0044  β*/J* +0.0010 (z -1.8) | coverage 0.952  predicted 0.950 | (β(ρ̃)−β*)/√V* mean +0.0002 sd 0.0019
+A n  2500 K 100 | ‖Mf‖/√n 0.0190  f′C_ϱf/n +0.0006  c* +0.017 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0264  ×√n 1.32  first-order 0.0009 (sd ρ̃ 0.0511) | bias ρ̂ -0.0010  β*/J* +0.0008 (z -0.8) | coverage 0.946  predicted 0.950 | (β(ρ̃)−β*)/√V* mean +0.0002 sd 0.0018
+B n   400 K  16 | ‖Mf‖/√n 0.1823  f′C_ϱf/n +0.0501  c* +0.716 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0751  ×√n 1.50  first-order 0.0242 (sd ρ̃ 0.1064) | bias ρ̂ +0.0716  β*/J* +0.0765 (z -1.1) | coverage 0.860  predicted 0.890 | (β(ρ̃)−β*)/√V* mean +0.0986 sd 0.1399
+B n   900 K  16 | ‖Mf‖/√n 0.1890  f′C_ϱf/n +0.0697  c* +1.166 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0606  ×√n 1.82  first-order 0.0255 (sd ρ̃ 0.0646) | bias ρ̂ +0.0744  β*/J* +0.0776 (z -1.2) | coverage 0.744  predicted 0.785 | (β(ρ̃)−β*)/√V* mean +0.1436 sd 0.1458
+B n  1600 K  16 | ‖Mf‖/√n 0.1814  f′C_ϱf/n +0.0667  c* +1.439 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0429  ×√n 1.72  first-order 0.0247 (sd ρ̃ 0.0511) | bias ρ̂ +0.0744  β*/J* +0.0728 (z +0.7) | coverage 0.656  predicted 0.698 | (β(ρ̃)−β*)/√V* mean +0.1654 sd 0.1373
+B n  2500 K  16 | ‖Mf‖/√n 0.1861  f′C_ϱf/n +0.0806  c* +2.015 | gap sd(ρ̂−ρ̂*)/sd(ρ̂*) 0.0474  ×√n 2.37  first-order 0.0290 (sd ρ̃ 0.0366) | bias ρ̂ +0.0822  β*/J* +0.0765 (z +3.5) | coverage 0.386  predicted 0.478 | (β(ρ̃)−β*)/√V* mean +0.2600 sd 0.1493
+(part 1: 21.2 min)
+
+Part 2. root_rho(y, X, W; basis, roughness = ℛ̃*, reference = tensor_pspline(u, v; k = 30)), n = 900, R = 300
+k =  5, a = 4, ℛ̃* = 2.864: 300 fits | bias-aware: coverage 1.000 half-length 0.5124, b̃/√V̂ mean 10.73 | Wald: coverage 0.817 half-length 0.0818
+k =  5, a = 1, ℛ̃* = 0.716: 300 fits | bias-aware: coverage 0.997 half-length 0.1308, b̃/√V̂ mean 1.18 | Wald: coverage 0.970 half-length 0.0912
+k = 15, a = 4, ℛ̃* = 2.864: 300 fits | bias-aware: coverage 0.987 half-length 0.2101, b̃/√V̂ mean 0.68 | Wald: coverage 0.953 half-length 0.1767
+k = 15, a = 1, ℛ̃* = 0.716: 300 fits | bias-aware: coverage 0.970 half-length 0.1821, b̃/√V̂ mean 0.13 | Wald: coverage 0.963 half-length 0.1805
+Criterion (bias-aware coverage ≥ 0.93 in every cell): met
+Power (Wald below 0.90 at k = 5, a = 4): met
+(part 2: 15.3 min)
