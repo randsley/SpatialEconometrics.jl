@@ -1,0 +1,93 @@
+HC2 V̂ at ρ₀: exact bias and CS coverage; n = 900, jittered grid, kNN-6, hat basis + x, R = 1000
+Terms are over V. lin = the linear part's share of V. MC SE of a coverage near 0.95: 0.007.
+
+k = 9: K = 82, K/n = 0.091, max leverage 0.503 (checks: max|diag C| 1.1e-16, max|CP_B| 1.8e-16)
+  constant normal  a=1 | E V̂/V pred 1.0035 sim 1.0039 (z  +0.1; without Q2 z   +1.8) sd 0.095 | Q1 +0.0000 Q2 +0.0050 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0014 | lin 0.33 | CS 0.946 oracle 0.948
+  constant chisq3  a=1 | E V̂/V pred 1.0216 sim 1.0208 (z  -0.2; without Q2 z   +0.8) sd 0.165 | Q1 +0.0000 Q2 +0.0050 Q3 +0.0167 L1 +0.0000 L2 +0.0013 L3 +0.0022 L4 -0.0000 L5 -0.0035 | lin 0.33 | CS 0.951 oracle 0.951
+  constant uniform a=1 | E V̂/V pred 0.9985 sim 0.9979 (z  -0.3; without Q2 z   +2.1) sd 0.065 | Q1 +0.0000 Q2 +0.0050 Q3 -0.0050 L1 +0.0000 L2 +0.0000 L3 -0.0007 L4 -0.0000 L5 -0.0008 | lin 0.33 | CS 0.952 oracle 0.952
+  smooth   normal  a=1 | E V̂/V pred 1.0021 sim 1.0072 (z  +0.7; without Q2 z   +1.8) sd 0.232 | Q1 -0.0021 Q2 +0.0085 Q3 +0.0000 L1 +0.0002 L2 +0.0000 L3 +0.0001 L4 +0.0004 L5 -0.0050 | lin 0.16 | CS 0.947 oracle 0.952
+  smooth   chisq3  a=1 | E V̂/V pred 1.0301 sim 0.9870 (z  -4.0; without Q2 z   -3.2) sd 0.341 | Q1 -0.0021 Q2 +0.0085 Q3 +0.0273 L1 +0.0002 L2 -0.0004 L3 +0.0076 L4 +0.0004 L5 -0.0113 | lin 0.16 | CS 0.947 oracle 0.947
+  smooth   uniform a=1 | E V̂/V pred 0.9935 sim 0.9851 (z  -1.9; without Q2 z   +0.0) sd 0.143 | Q1 -0.0021 Q2 +0.0085 Q3 -0.0082 L1 +0.0002 L2 +0.0000 L3 -0.0021 L4 +0.0004 L5 -0.0032 | lin 0.16 | CS 0.950 oracle 0.945
+  rough    normal  a=1 | E V̂/V pred 1.0216 sim 1.0168 (z  -1.0; without Q2 z   +2.7) sd 0.148 | Q1 +0.0069 Q2 +0.0177 Q3 +0.0000 L1 -0.0016 L2 +0.0000 L3 +0.0020 L4 +0.0000 L5 -0.0035 | lin 0.35 | CS 0.946 oracle 0.942
+  rough    chisq3  a=1 | E V̂/V pred 1.0602 sim 1.0686 (z  +0.9; without Q2 z   +2.7) sd 0.309 | Q1 +0.0069 Q2 +0.0177 Q3 +0.0422 L1 -0.0016 L2 -0.0039 L3 +0.0084 L4 +0.0000 L5 -0.0096 | lin 0.35 | CS 0.963 oracle 0.952
+  rough    uniform a=1 | E V̂/V pred 1.0088 sim 1.0064 (z  -0.8; without Q2 z   +4.9) sd 0.098 | Q1 +0.0069 Q2 +0.0177 Q3 -0.0127 L1 -0.0016 L2 +0.0000 L3 +0.0001 L4 +0.0000 L5 -0.0017 | lin 0.35 | CS 0.950 oracle 0.948
+  constant normal  a=4 | E V̂/V pred 1.0032 sim 1.0000 (z  -1.1; without Q2 z   +0.5) sd 0.093 | Q1 +0.0000 Q2 +0.0045 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0013 | lin 0.39 | CS 0.956 oracle 0.956
+  constant chisq3  a=4 | E V̂/V pred 1.0205 sim 1.0212 (z  +0.1; without Q2 z   +1.0) sd 0.165 | Q1 +0.0000 Q2 +0.0045 Q3 +0.0152 L1 +0.0000 L2 +0.0020 L3 +0.0020 L4 -0.0000 L5 -0.0032 | lin 0.39 | CS 0.957 oracle 0.961
+  constant uniform a=4 | E V̂/V pred 0.9986 sim 1.0012 (z  +1.3; without Q2 z   +3.7) sd 0.061 | Q1 +0.0000 Q2 +0.0045 Q3 -0.0045 L1 +0.0000 L2 +0.0000 L3 -0.0006 L4 -0.0000 L5 -0.0007 | lin 0.39 | CS 0.931 oracle 0.932
+  smooth   normal  a=4 | E V̂/V pred 1.0020 sim 1.0051 (z  +0.4; without Q2 z   +1.5) sd 0.233 | Q1 -0.0020 Q2 +0.0080 Q3 +0.0000 L1 +0.0002 L2 +0.0000 L3 +0.0001 L4 +0.0004 L5 -0.0048 | lin 0.21 | CS 0.960 oracle 0.956
+  smooth   chisq3  a=4 | E V̂/V pred 1.0253 sim 1.0114 (z  -1.2; without Q2 z   -0.5) sd 0.360 | Q1 -0.0020 Q2 +0.0080 Q3 +0.0257 L1 +0.0002 L2 -0.0035 L3 +0.0071 L4 +0.0004 L5 -0.0106 | lin 0.21 | CS 0.953 oracle 0.952
+  smooth   uniform a=4 | E V̂/V pred 0.9940 sim 0.9933 (z  -0.2; without Q2 z   +1.6) sd 0.140 | Q1 -0.0020 Q2 +0.0080 Q3 -0.0077 L1 +0.0002 L2 +0.0000 L3 -0.0020 L4 +0.0004 L5 -0.0030 | lin 0.21 | CS 0.948 oracle 0.953
+  rough    normal  a=4 | E V̂/V pred 1.0199 sim 1.0178 (z  -0.4; without Q2 z   +3.0) sd 0.150 | Q1 +0.0063 Q2 +0.0162 Q3 +0.0000 L1 -0.0013 L2 +0.0000 L3 +0.0018 L4 +0.0000 L5 -0.0032 | lin 0.41 | CS 0.951 oracle 0.939
+  rough    chisq3  a=4 | E V̂/V pred 1.0560 sim 1.0601 (z  +0.4; without Q2 z   +2.0) sd 0.321 | Q1 +0.0063 Q2 +0.0162 Q3 +0.0386 L1 -0.0013 L2 -0.0028 L3 +0.0077 L4 +0.0000 L5 -0.0088 | lin 0.41 | CS 0.959 oracle 0.949
+  rough    uniform a=4 | E V̂/V pred 1.0082 sim 1.0081 (z  -0.0; without Q2 z   +5.6) sd 0.092 | Q1 +0.0063 Q2 +0.0162 Q3 -0.0116 L1 -0.0013 L2 +0.0000 L3 +0.0001 L4 +0.0000 L5 -0.0015 | lin 0.41 | CS 0.949 oracle 0.948
+  (0.5 min so far)
+
+k = 13: K = 170, K/n = 0.189, max leverage 0.783 (checks: max|diag C| 1.6e-16, max|CP_B| 2.1e-16)
+  constant normal  a=1 | E V̂/V pred 1.0071 sim 1.0088 (z  +0.5; without Q2 z   +4.0) sd 0.102 | Q1 +0.0000 Q2 +0.0112 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0041 | lin 0.39 | CS 0.945 oracle 0.942
+  constant chisq3  a=1 | E V̂/V pred 1.0364 sim 1.0307 (z  -1.1; without Q2 z   +1.1) sd 0.164 | Q1 +0.0000 Q2 +0.0112 Q3 +0.0324 L1 +0.0000 L2 -0.0027 L3 +0.0060 L4 -0.0000 L5 -0.0105 | lin 0.39 | CS 0.952 oracle 0.947
+  constant uniform a=1 | E V̂/V pred 0.9975 sim 0.9991 (z  +0.7; without Q2 z   +5.6) sd 0.073 | Q1 +0.0000 Q2 +0.0112 Q3 -0.0097 L1 +0.0000 L2 +0.0000 L3 -0.0018 L4 -0.0000 L5 -0.0022 | lin 0.39 | CS 0.953 oracle 0.952
+  smooth   normal  a=1 | E V̂/V pred 1.0071 sim 1.0078 (z  +0.1; without Q2 z   +2.4) sd 0.257 | Q1 -0.0023 Q2 +0.0192 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0001 L4 +0.0011 L5 -0.0110 | lin 0.19 | CS 0.949 oracle 0.946
+  smooth   chisq3  a=1 | E V̂/V pred 1.0428 sim 1.0643 (z  +1.4; without Q2 z   +2.6) sd 0.486 | Q1 -0.0023 Q2 +0.0192 Q3 +0.0506 L1 +0.0000 L2 -0.0140 L3 +0.0147 L4 +0.0011 L5 -0.0264 | lin 0.19 | CS 0.947 oracle 0.941
+  smooth   uniform a=1 | E V̂/V pred 0.9922 sim 0.9903 (z  -0.4; without Q2 z   +3.2) sd 0.169 | Q1 -0.0023 Q2 +0.0192 Q3 -0.0152 L1 +0.0000 L2 +0.0000 L3 -0.0042 L4 +0.0011 L5 -0.0064 | lin 0.19 | CS 0.958 oracle 0.958
+  rough    normal  a=1 | E V̂/V pred 1.0378 sim 1.0398 (z  +0.4; without Q2 z   +7.4) sd 0.158 | Q1 +0.0142 Q2 +0.0351 Q3 +0.0000 L1 -0.0054 L2 +0.0000 L3 +0.0042 L4 -0.0006 L5 -0.0096 | lin 0.41 | CS 0.956 oracle 0.954
+  rough    chisq3  a=1 | E V̂/V pred 1.1071 sim 1.1210 (z  +1.1; without Q2 z   +4.0) sd 0.386 | Q1 +0.0142 Q2 +0.0351 Q3 +0.0801 L1 -0.0054 L2 -0.0081 L3 +0.0186 L4 -0.0006 L5 -0.0267 | lin 0.41 | CS 0.959 oracle 0.949
+  rough    uniform a=1 | E V̂/V pred 1.0146 sim 1.0115 (z  -1.0; without Q2 z  +10.2) sd 0.099 | Q1 +0.0142 Q2 +0.0351 Q3 -0.0240 L1 -0.0054 L2 +0.0000 L3 -0.0001 L4 -0.0006 L5 -0.0045 | lin 0.41 | CS 0.964 oracle 0.966
+  constant normal  a=4 | E V̂/V pred 1.0061 sim 1.0062 (z  +0.0; without Q2 z   +3.2) sd 0.095 | Q1 +0.0000 Q2 +0.0096 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0035 | lin 0.48 | CS 0.954 oracle 0.952
+  constant chisq3  a=4 | E V̂/V pred 1.0326 sim 1.0257 (z  -1.4; without Q2 z   +0.5) sd 0.158 | Q1 +0.0000 Q2 +0.0096 Q3 +0.0275 L1 +0.0000 L2 -0.0007 L3 +0.0051 L4 -0.0000 L5 -0.0089 | lin 0.48 | CS 0.960 oracle 0.950
+  constant uniform a=4 | E V̂/V pred 0.9979 sim 0.9987 (z  +0.4; without Q2 z   +4.9) sd 0.066 | Q1 +0.0000 Q2 +0.0096 Q3 -0.0083 L1 +0.0000 L2 +0.0000 L3 -0.0015 L4 -0.0000 L5 -0.0019 | lin 0.48 | CS 0.934 oracle 0.931
+  smooth   normal  a=4 | E V̂/V pred 1.0058 sim 1.0079 (z  +0.3; without Q2 z   +2.4) sd 0.248 | Q1 -0.0020 Q2 +0.0169 Q3 +0.0000 L1 -0.0004 L2 +0.0000 L3 +0.0001 L4 +0.0010 L5 -0.0097 | lin 0.29 | CS 0.950 oracle 0.951
+  smooth   chisq3  a=4 | E V̂/V pred 1.0272 sim 1.0330 (z  +0.4; without Q2 z   +1.8) sd 0.410 | Q1 -0.0020 Q2 +0.0169 Q3 +0.0447 L1 -0.0004 L2 -0.0225 L3 +0.0130 L4 +0.0010 L5 -0.0233 | lin 0.29 | CS 0.956 oracle 0.945
+  smooth   uniform a=4 | E V̂/V pred 0.9927 sim 0.9886 (z  -0.8; without Q2 z   +2.5) sd 0.161 | Q1 -0.0020 Q2 +0.0169 Q3 -0.0134 L1 -0.0004 L2 +0.0000 L3 -0.0037 L4 +0.0010 L5 -0.0056 | lin 0.29 | CS 0.957 oracle 0.955
+  rough    normal  a=4 | E V̂/V pred 1.0309 sim 1.0326 (z  +0.4; without Q2 z   +6.8) sd 0.146 | Q1 +0.0121 Q2 +0.0298 Q3 +0.0000 L1 -0.0059 L2 +0.0000 L3 +0.0036 L4 -0.0005 L5 -0.0082 | lin 0.50 | CS 0.963 oracle 0.950
+  rough    chisq3  a=4 | E V̂/V pred 1.0936 sim 1.1046 (z  +0.9; without Q2 z   +3.5) sd 0.370 | Q1 +0.0121 Q2 +0.0298 Q3 +0.0680 L1 -0.0059 L2 -0.0030 L3 +0.0158 L4 -0.0005 L5 -0.0227 | lin 0.50 | CS 0.960 oracle 0.953
+  rough    uniform a=4 | E V̂/V pred 1.0111 sim 1.0101 (z  -0.3; without Q2 z   +9.6) sd 0.095 | Q1 +0.0121 Q2 +0.0298 Q3 -0.0204 L1 -0.0059 L2 +0.0000 L3 -0.0001 L4 -0.0005 L5 -0.0038 | lin 0.50 | CS 0.958 oracle 0.952
+  (0.8 min so far)
+
+k = 16: K = 257, K/n = 0.286, max leverage 0.951 (checks: max|diag C| 1.6e-16, max|CP_B| 2.9e-16)
+  constant normal  a=1 | E V̂/V pred 1.0099 sim 1.0031 (z  -2.0; without Q2 z   +3.9) sd 0.107 | Q1 +0.0000 Q2 +0.0202 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0103 | lin 0.37 | CS 0.954 oracle 0.955
+  constant chisq3  a=1 | E V̂/V pred 1.0563 sim 1.0573 (z  +0.2; without Q2 z   +3.5) sd 0.189 | Q1 +0.0000 Q2 +0.0202 Q3 +0.0475 L1 +0.0000 L2 +0.0007 L3 +0.0136 L4 -0.0000 L5 -0.0256 | lin 0.37 | CS 0.953 oracle 0.948
+  constant uniform a=1 | E V̂/V pred 0.9962 sim 0.9950 (z  -0.5; without Q2 z   +7.4) sd 0.081 | Q1 +0.0000 Q2 +0.0202 Q3 -0.0142 L1 +0.0000 L2 +0.0000 L3 -0.0041 L4 -0.0000 L5 -0.0057 | lin 0.37 | CS 0.949 oracle 0.949
+  smooth   normal  a=1 | E V̂/V pred 1.0093 sim 1.0045 (z  -0.6; without Q2 z   +3.6) sd 0.239 | Q1 -0.0025 Q2 +0.0318 Q3 +0.0000 L1 +0.0004 L2 +0.0000 L3 +0.0002 L4 +0.0012 L5 -0.0218 | lin 0.21 | CS 0.954 oracle 0.952
+  smooth   chisq3  a=1 | E V̂/V pred 1.0654 sim 1.0814 (z  +1.1; without Q2 z   +3.2) sd 0.467 | Q1 -0.0025 Q2 +0.0318 Q3 +0.0683 L1 +0.0004 L2 -0.0080 L3 +0.0272 L4 +0.0012 L5 -0.0530 | lin 0.21 | CS 0.963 oracle 0.957
+  smooth   uniform a=1 | E V̂/V pred 0.9901 sim 0.9900 (z  -0.0; without Q2 z   +6.2) sd 0.161 | Q1 -0.0025 Q2 +0.0318 Q3 -0.0205 L1 +0.0004 L2 +0.0000 L3 -0.0079 L4 +0.0012 L5 -0.0125 | lin 0.21 | CS 0.953 oracle 0.951
+  rough    normal  a=1 | E V̂/V pred 1.0558 sim 1.0578 (z  +0.4; without Q2 z  +10.2) sd 0.168 | Q1 +0.0145 Q2 +0.0524 Q3 +0.0000 L1 +0.0038 L2 +0.0000 L3 +0.0102 L4 -0.0026 L5 -0.0225 | lin 0.36 | CS 0.948 oracle 0.941
+  rough    chisq3  a=1 | E V̂/V pred 1.1635 sim 1.1720 (z  +0.6; without Q2 z   +4.0) sd 0.481 | Q1 +0.0145 Q2 +0.0524 Q3 +0.1108 L1 +0.0038 L2 +0.0036 L3 +0.0430 L4 -0.0026 L5 -0.0622 | lin 0.36 | CS 0.963 oracle 0.951
+  rough    uniform a=1 | E V̂/V pred 1.0246 sim 1.0202 (z  -1.3; without Q2 z  +14.1) sd 0.108 | Q1 +0.0145 Q2 +0.0524 Q3 -0.0332 L1 +0.0038 L2 +0.0000 L3 +0.0003 L4 -0.0026 L5 -0.0106 | lin 0.36 | CS 0.951 oracle 0.950
+  constant normal  a=4 | E V̂/V pred 1.0083 sim 1.0078 (z  -0.1; without Q2 z   +5.1) sd 0.102 | Q1 +0.0000 Q2 +0.0168 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0086 | lin 0.47 | CS 0.945 oracle 0.946
+  constant chisq3  a=4 | E V̂/V pred 1.0465 sim 1.0546 (z  +1.4; without Q2 z   +4.5) sd 0.176 | Q1 +0.0000 Q2 +0.0168 Q3 +0.0396 L1 +0.0000 L2 +0.0002 L3 +0.0113 L4 -0.0000 L5 -0.0213 | lin 0.47 | CS 0.960 oracle 0.961
+  constant uniform a=4 | E V̂/V pred 0.9968 sim 0.9977 (z  +0.4; without Q2 z   +7.3) sd 0.076 | Q1 +0.0000 Q2 +0.0168 Q3 -0.0119 L1 +0.0000 L2 +0.0000 L3 -0.0034 L4 -0.0000 L5 -0.0047 | lin 0.47 | CS 0.946 oracle 0.950
+  smooth   normal  a=4 | E V̂/V pred 1.0082 sim 1.0094 (z  +0.2; without Q2 z   +4.1) sd 0.226 | Q1 -0.0022 Q2 +0.0279 Q3 +0.0000 L1 +0.0004 L2 +0.0000 L3 +0.0002 L4 +0.0010 L5 -0.0192 | lin 0.30 | CS 0.946 oracle 0.946
+  smooth   chisq3  a=4 | E V̂/V pred 1.0487 sim 1.0298 (z  -1.6; without Q2 z   +0.8) sd 0.367 | Q1 -0.0022 Q2 +0.0279 Q3 +0.0600 L1 +0.0004 L2 -0.0159 L3 +0.0239 L4 +0.0010 L5 -0.0465 | lin 0.30 | CS 0.953 oracle 0.948
+  smooth   uniform a=4 | E V̂/V pred 0.9913 sim 0.9848 (z  -1.3; without Q2 z   +4.1) sd 0.163 | Q1 -0.0022 Q2 +0.0279 Q3 -0.0180 L1 +0.0004 L2 +0.0000 L3 -0.0069 L4 +0.0010 L5 -0.0109 | lin 0.30 | CS 0.951 oracle 0.952
+  rough    normal  a=4 | E V̂/V pred 1.0510 sim 1.0498 (z  -0.2; without Q2 z   +8.9) sd 0.154 | Q1 +0.0123 Q2 +0.0444 Q3 +0.0000 L1 +0.0070 L2 +0.0000 L3 +0.0086 L4 -0.0022 L5 -0.0190 | lin 0.46 | CS 0.958 oracle 0.947
+  rough    chisq3  a=4 | E V̂/V pred 1.1471 sim 1.1426 (z  -0.4; without Q2 z   +3.5) sd 0.357 | Q1 +0.0123 Q2 +0.0444 Q3 +0.0937 L1 +0.0070 L2 +0.0081 L3 +0.0364 L4 -0.0022 L5 -0.0526 | lin 0.46 | CS 0.957 oracle 0.950
+  rough    uniform a=4 | E V̂/V pred 1.0246 sim 1.0220 (z  -0.8; without Q2 z  +13.4) sd 0.098 | Q1 +0.0123 Q2 +0.0444 Q3 -0.0281 L1 +0.0070 L2 +0.0000 L3 +0.0002 L4 -0.0022 L5 -0.0089 | lin 0.46 | CS 0.960 oracle 0.955
+  (1.2 min so far)
+
+k = 19: K = 362, K/n = 0.402, max leverage 0.999 (checks: max|diag C| 1.5e-16, max|CP_B| 4.4e-16)
+  constant normal  a=1 | E V̂/V pred 1.0132 sim 1.0176 (z  +1.2; without Q2 z  +10.2) sd 0.116 | Q1 +0.0000 Q2 +0.0328 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0196 | lin 0.43 | CS 0.958 oracle 0.954
+  constant chisq3  a=1 | E V̂/V pred 1.0694 sim 1.0625 (z  -1.2; without Q2 z   +4.3) sd 0.191 | Q1 +0.0000 Q2 +0.0328 Q3 +0.0583 L1 +0.0000 L2 +0.0033 L3 +0.0208 L4 -0.0000 L5 -0.0458 | lin 0.43 | CS 0.959 oracle 0.953
+  constant uniform a=1 | E V̂/V pred 0.9973 sim 0.9992 (z  +0.7; without Q2 z  +12.6) sd 0.087 | Q1 +0.0000 Q2 +0.0328 Q3 -0.0175 L1 +0.0000 L2 +0.0000 L3 -0.0062 L4 -0.0000 L5 -0.0117 | lin 0.43 | CS 0.941 oracle 0.942
+  smooth   normal  a=1 | E V̂/V pred 1.0130 sim 1.0185 (z  +0.6; without Q2 z   +6.6) sd 0.271 | Q1 -0.0041 Q2 +0.0510 Q3 +0.0000 L1 -0.0006 L2 +0.0000 L3 +0.0002 L4 +0.0030 L5 -0.0364 | lin 0.27 | CS 0.938 oracle 0.933
+  smooth   chisq3  a=1 | E V̂/V pred 1.0764 sim 1.0628 (z  -1.0; without Q2 z   +2.7) sd 0.433 | Q1 -0.0041 Q2 +0.0510 Q3 +0.0844 L1 -0.0006 L2 -0.0105 L3 +0.0366 L4 +0.0030 L5 -0.0833 | lin 0.27 | CS 0.952 oracle 0.951
+  smooth   uniform a=1 | E V̂/V pred 0.9908 sim 0.9872 (z  -0.6; without Q2 z   +7.8) sd 0.193 | Q1 -0.0041 Q2 +0.0510 Q3 -0.0253 L1 -0.0006 L2 +0.0000 L3 -0.0107 L4 +0.0030 L5 -0.0224 | lin 0.27 | CS 0.941 oracle 0.945
+  rough    normal  a=1 | E V̂/V pred 1.0814 sim 1.0770 (z  -0.7; without Q2 z  +10.7) sd 0.201 | Q1 +0.0090 Q2 +0.0725 Q3 +0.0000 L1 +0.0131 L2 +0.0000 L3 +0.0147 L4 +0.0089 L5 -0.0368 | lin 0.43 | CS 0.960 oracle 0.957
+  rough    chisq3  a=1 | E V̂/V pred 1.2029 sim 1.2016 (z  -0.1; without Q2 z   +4.9) sd 0.457 | Q1 +0.0090 Q2 +0.0725 Q3 +0.1321 L1 +0.0131 L2 +0.0005 L3 +0.0629 L4 +0.0089 L5 -0.0961 | lin 0.43 | CS 0.971 oracle 0.948
+  rough    uniform a=1 | E V̂/V pred 1.0451 sim 1.0509 (z  +1.4; without Q2 z  +18.3) sd 0.135 | Q1 +0.0090 Q2 +0.0725 Q3 -0.0396 L1 +0.0131 L2 +0.0000 L3 +0.0002 L4 +0.0089 L5 -0.0190 | lin 0.43 | CS 0.958 oracle 0.951
+  constant normal  a=4 | E V̂/V pred 1.0103 sim 1.0118 (z  +0.4; without Q2 z   +7.8) sd 0.110 | Q1 +0.0000 Q2 +0.0256 Q3 +0.0000 L1 +0.0000 L2 +0.0000 L3 +0.0000 L4 -0.0000 L5 -0.0153 | lin 0.55 | CS 0.949 oracle 0.946
+  constant chisq3  a=4 | E V̂/V pred 1.0505 sim 1.0489 (z  -0.3; without Q2 z   +4.4) sd 0.173 | Q1 +0.0000 Q2 +0.0256 Q3 +0.0455 L1 +0.0000 L2 -0.0011 L3 +0.0163 L4 -0.0000 L5 -0.0358 | lin 0.55 | CS 0.967 oracle 0.957
+  constant uniform a=4 | E V̂/V pred 0.9979 sim 0.9987 (z  +0.3; without Q2 z   +9.8) sd 0.085 | Q1 +0.0000 Q2 +0.0256 Q3 -0.0137 L1 +0.0000 L2 +0.0000 L3 -0.0049 L4 -0.0000 L5 -0.0091 | lin 0.55 | CS 0.951 oracle 0.955
+  smooth   normal  a=4 | E V̂/V pred 1.0093 sim 1.0138 (z  +0.6; without Q2 z   +5.5) sd 0.255 | Q1 -0.0032 Q2 +0.0402 Q3 +0.0000 L1 -0.0014 L2 +0.0000 L3 +0.0002 L4 +0.0023 L5 -0.0288 | lin 0.43 | CS 0.961 oracle 0.954
+  smooth   chisq3  a=4 | E V̂/V pred 1.0482 sim 1.0353 (z  -1.0; without Q2 z   +2.1) sd 0.403 | Q1 -0.0032 Q2 +0.0402 Q3 +0.0666 L1 -0.0014 L2 -0.0195 L3 +0.0289 L4 +0.0023 L5 -0.0658 | lin 0.43 | CS 0.961 oracle 0.951
+  smooth   uniform a=4 | E V̂/V pred 0.9918 sim 0.9859 (z  -0.9; without Q2 z   +5.5) sd 0.196 | Q1 -0.0032 Q2 +0.0402 Q3 -0.0200 L1 -0.0014 L2 +0.0000 L3 -0.0085 L4 +0.0023 L5 -0.0177 | lin 0.43 | CS 0.963 oracle 0.961
+  rough    normal  a=4 | E V̂/V pred 1.0831 sim 1.0846 (z  +0.3; without Q2 z  +10.4) sd 0.181 | Q1 +0.0072 Q2 +0.0578 Q3 +0.0000 L1 +0.0287 L2 +0.0000 L3 +0.0117 L4 +0.0071 L5 -0.0293 | lin 0.55 | CS 0.964 oracle 0.951
+  rough    chisq3  a=4 | E V̂/V pred 1.1745 sim 1.1821 (z  +0.5; without Q2 z   +4.1) sd 0.499 | Q1 +0.0072 Q2 +0.0578 Q3 +0.1053 L1 +0.0287 L2 -0.0051 L3 +0.0502 L4 +0.0071 L5 -0.0766 | lin 0.55 | CS 0.955 oracle 0.944
+  rough    uniform a=4 | E V̂/V pred 1.0542 sim 1.0629 (z  +2.2; without Q2 z  +16.6) sd 0.127 | Q1 +0.0072 Q2 +0.0578 Q3 -0.0316 L1 +0.0287 L2 +0.0000 L3 +0.0001 L4 +0.0071 L5 -0.0151 | lin 0.55 | CS 0.958 oracle 0.954
+  (1.5 min so far)
+
+k = 21: K = 442, K/n = 0.491, max leverage 1: some Mᵢᵢ = 0, so sᵢ = ûᵢ²/Mᵢᵢ is undefined (THEORY.md, "Leverage 1 rules out any estimate free of f"); skipped
+
+Formula against simulation: largest |z| 4.0 over 72 cells. CS coverage at ρ₀: 0.931–0.971.
+
+Recheck of the largest |z| (k = 9, smooth, chisq3, a = 1) with R = 20000:
+  smooth   chisq3  a=1 | E V̂/V pred 1.0301 sim 1.0305 (z  +0.1; without Q2 z   +3.1) sd 0.402 | Q1 -0.0021 Q2 +0.0085 Q3 +0.0273 L1 +0.0002 L2 -0.0004 L3 +0.0076 L4 +0.0004 L5 -0.0113 | lin 0.16 | CS 0.953 oracle 0.947

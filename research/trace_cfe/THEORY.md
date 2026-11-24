@@ -29,7 +29,9 @@ REsd without A4, under `‖Mf‖ = o(√n)`, and so brings REsd into
 Proposition 7′ (`tc_resd_approx.jl`). Corollary 7′ lets the data choose
 the basis as well as λ, once the class is on the reference. Lemma 6 and
 Proposition 8 give the joint (trust-region) bound of the two terms, and
-show that most of Lemma 5's looseness is in the class (`tc_trust.jl`). The
+show that most of Lemma 5's looseness is in the class (`tc_trust.jl`).
+Lemma 7 gives the exact bias of the HC2 `V̂` at `ρ₀` for any error law, the
+first step towards `CS` when K/n → θ > 0 (`tc_hc2_bias.jl`). The
 bias-aware interval is compared with Armstrong & Kolesár's, and their
 optimal combination of moments is measured (`tc_combine.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
@@ -2428,6 +2430,128 @@ So `CS` covers at least as well as the Wald interval in every one of the
 180 cells, within Monte Carlo error (it is at most 0.5 points lower, against
 an SE of 0.7), and much better where `ρ` is weakly identified.
 
+## The test-inversion set when K/n → θ > 0 (started 2026-11-24)
+
+Proposition 6 assumes `K/n → 0` only for `V̂(ρ₀)/V → 1` (Proposition 2's
+steps 1 and 2). Its other input, Theorem 1, allows `K/n → θ ∈ [0, 1)`, and
+the set uses no root. So `CS` covers asymptotically if `V̂(ρ₀)/V → 1`, and
+at least at its level if `V̂(ρ₀) ≥ V(1 + o_p(1))`. The question is
+therefore the HC2 `V̂` at `ρ₀` alone. Lemma 7 gives its exact mean for any
+error law.
+
+**Lemma 7 (the exact bias of the HC2 `V̂` at `ρ₀`; proved).** Let
+`y₀ = f + ε` with `f ∈ span(B)` (A4), independent errors with variances
+`σᵢ²`, third moments `μ₃ᵢ` and fourth cumulants `κᵢ`. Let `C` be any fixed
+matrix with `diag C = 0` and `CP_B = 0`, `Cs = (C + C′)/2`, `Ω = Cs∘Cs`,
+`b = C′f`, and `V = 2σ²′Ωσ² + Σᵢbᵢ²σᵢ²`. Let
+
+    V̂ = 2s′Ωs + Σᵢ(b̂ᵢ² − noiseᵢ)sᵢ,   sᵢ = ûᵢ²/Mᵢᵢ,   û = My₀,   b̂ = Hy₀,
+    H = (C + C′)P_B,   noiseᵢ = Σₖ Hᵢₖ²sₖ,
+
+which is `root_rho`'s `V̂` at `ρ₀`. Write `D = Diag(M)`, `Σ = Diag(σ²)`,
+`𝒳 = (MΣM)∘(MΣM)`, `𝒦 = (M∘M)Diag(κ)(M∘M)`, `σ̄² = D⁻¹(M∘M)σ²` and
+`Γ = D⁻¹(2𝒳 + 𝒦)D⁻¹`. Then:
+
+(a) `g(ρ₀) = y₀′Cy₀ = b′ε + ε′Cε`, and `Var g = V` for every error law.
+
+(b) `E s = σ̄²` and `Cov s = Γ`.
+
+(c) `E V̂ − V = Q₁ + Q₂ + Q₃ + L₁ + L₂ + L₃ + L₄ + L₅`, where
+
+    Q₁ = 2σ̄²′Ωσ̄² − 2σ²′Ωσ²                  (the mean shift of s)
+    Q₂ = 4 tr(Ω D⁻¹𝒳D⁻¹) ≥ 0                  (the covariance of s, Gaussian part)
+    Q₃ = 2 tr(Ω D⁻¹𝒦D⁻¹)                      (the covariance of s, cumulant part)
+    L₁ = Σᵢ bᵢ²(σ̄ᵢ² − σᵢ²)
+    L₂ = 2Σᵢ bᵢ [(H∘M∘M)μ₃]ᵢ / Mᵢᵢ             (skewness)
+    L₃ = Σᵢ [2(HΣM)ᵢᵢ² + ((H∘H∘M∘M)κ)ᵢ] / Mᵢᵢ  (cross)
+    L₄ = Σᵢₖ Hᵢₖ² σ̄ᵢ²(σₖ² − σ̄ₖ²)               (the noise term's mean)
+    L₅ = −Σᵢₖ Hᵢₖ² Γᵢₖ                          (the noise term's covariance)
+
+(d) Under homoskedasticity, `σ̄² = σ²`, so `Q₁ = L₁ = L₄ = 0`, and
+`HΣM = σ²HM = 0` because `P_BM = 0`, so `L₃` keeps only its `κ` part. With
+normal errors, then, `E V̂ − V = Q₂ + L₅`. The measurements below show that
+`Q₂` and `L₅` grow with `K/n`; that they have non-zero limits when
+`K/n → θ > 0` is not proved.
+
+*Proof.* (a) `Cf = CP_Bf = 0`, so
+`g = (f + ε)′C(f + ε) = f′Cε + ε′Cε = b′ε + ε′Cε`, with `b = C′f`. Since `diag C = 0`, `Var(ε′Cε) = 2σ²′Ωσ²` for
+any law, and `Cov(b′ε, ε′Cε) = Σᵢ bᵢCᵢᵢμ₃ᵢ = 0`.
+(b) `û = Mε`, since `Mf = 0`. So `E ûᵢ² = Σₖ Mᵢₖ²σₖ²`, and, for independent
+errors,
+`Cov(ûᵢ², ûⱼ²) = 2(MΣM)ᵢⱼ² + Σₖ Mᵢₖ²Mⱼₖ²κₖ` (THEORY.md's CJN paragraphs).
+Divide by `MᵢᵢMⱼⱼ`.
+(c) The quadratic part: `E 2s′Ωs = 2(E s)′Ω(E s) + 2 tr(Ω Cov s)`, and
+(b) gives `Q₁ + Q₂ + Q₃` beyond `2σ²′Ωσ²`. The linear part: `Hf = (C + C′)f
+= b`, so `b̂ = b + ζ` with `ζ = Hε`. For linear forms `Υ₁ = α′ε` and
+`Υ₂ = ψ′ε`, `E[Υ₁Υ₂²] = Σₗ αₗψₗ²μ₃ₗ` and
+`E[Υ₁²Υ₂²] = EΥ₁² EΥ₂² + 2(EΥ₁Υ₂)² + Σₗ αₗ²ψₗ²κₗ`. With `Υ₁ = ζᵢ` and
+`Υ₂ = ûᵢ`, `EΥ₁Υ₂ = (HΣM)ᵢᵢ`, so
+- `E[b̂ᵢ²sᵢ] = bᵢ²σ̄ᵢ² + 2bᵢ[(H∘M∘M)μ₃]ᵢ/Mᵢᵢ + Var ζᵢ σ̄ᵢ² +
+  [2(HΣM)ᵢᵢ² + ((H∘H∘M∘M)κ)ᵢ]/Mᵢᵢ`;
+- `E[noiseᵢsᵢ] = Σₖ Hᵢₖ²(σ̄ₖ²σ̄ᵢ² + Γₖᵢ)`.
+
+With `Var ζᵢ = Σₖ Hᵢₖ²σₖ²`, the difference of the two, summed over `i` and
+less `Σᵢbᵢ²σᵢ²`, is `L₁ + … + L₅`.
+(d) Under homoskedasticity, `(M∘M)σ² = σ²diag(M)` because `Σₖ Mᵢₖ² = Mᵢᵢ`,
+so `σ̄² = σ²`. With normal errors `κ = 0` and `μ₃ = 0`, and
+`HΣM = 0`, as above. ∎
+
+Every term can be computed from the design, `f` and the error law, so the
+lemma can be checked exactly.
+
+**Numerical check (`tc_hc2_bias.jl`).** The design is a jittered 30 × 30
+grid (`n` = 900, each point uniform in its own cell), so that the hat
+basis's leverage stays below 1 for longer. It uses kNN-6 `W`, the basis
+`[tensor hats k × k, x]` and Jin & Lee's `C(ρ₀)`, with `f = x + a·P_Bg`
+(`a` = 1 and 4, so A4 holds). The variances are constant, smooth or rough
+(iid log-normal). The errors are normal, standardised `χ²₃` (`κ > 0`) or
+uniform (`κ < 0`). R = 1000 per cell, 72 cells.
+- **The formula is exact.** The simulated `E V̂/V` matches `1 + bias/V` with
+  `|z|` ≤ 2.2 in 71 cells. The 72nd (`k = 9`, smooth, `χ²₃`, `a = 1`) had
+  `z = −4.0`. Rerun with R = 20000 and a new seed, it gives 1.0305 against
+  the predicted 1.0301 (`z` = +0.1), with an sd of 0.402 against 0.341 at
+  R = 1000. The degree-4 statistic has heavy tails, and R = 1000 had
+  understated its standard error.
+- **Power: the old conjecture is false.** "Step 2" conjectured that `V̂` is
+  consistent under homoskedasticity when `K/n → θ > 0`. Omitting `Q₂` from
+  the prediction is rejected, at `z` up to 18. Under homoskedastic normal
+  errors, `Q₂/V` grows with `K/n`, and `L₅` offsets part of it:
+
+  | K/n (max leverage) | `Q₂/V` | `L₅/V` | `E V̂/V`, all 18 cells | `CS` at `ρ₀` | oracle |
+  |---|---|---|---|---|---|
+  | 0.09 (0.50) | 0.005 | −0.001 | 0.994–1.060 | 0.931–0.963 | 0.932–0.961 |
+  | 0.19 (0.78) | 0.010–0.011 | −0.004 | 0.992–1.107 | 0.934–0.964 | 0.931–0.966 |
+  | 0.29 (0.95) | 0.017–0.020 | −0.009 to −0.010 | 0.990–1.164 | 0.945–0.963 | 0.941–0.961 |
+  | 0.40 (0.999) | 0.026–0.033 | −0.015 to −0.020 | 0.991–1.203 | 0.938–0.971 | 0.933–0.961 |
+
+  At `k = 21` (K/n = 0.49) some leverage is 1, so `sᵢ` is undefined, and the
+  script skips the basis. This is the obstruction proved in "Leverage 1
+  rules out any estimate free of `f`".
+- **HC2 is not conservative everywhere.** `E V̂/V` is below 1 only with
+  uniform errors and constant or smooth variances, and never below 0.990.
+  There `Q₃` (the sign of `κ`) and `L₅` outweigh `Q₂`. It is largest, up to
+  1.20, with rough variances and `χ²₃` errors, where `Q₃` adds up to 0.13.
+- **`CS` at `ρ₀` covers 0.931–0.971.** The oracle, with the true `V`, covers
+  0.931–0.966 in the same cells. The two lowest (constant variances,
+  uniform errors, `a = 4`) are just as low with the true `V`. So at
+  `n` = 900 the departures come from the normal approximation, not from
+  `V̂`.
+
+**What this means for a theorem.** `V̂(ρ₀)` is not consistent when
+`K/n → θ > 0`. Its relative bias `β_V = (E V̂ − V)/V` has a limit that
+Lemma 7 makes explicit and that is not 0. What can be proved is the
+coverage that follows from that limit. If `V̂(ρ₀) − E V̂(ρ₀) = o_p(n)` (a
+concentration lemma that is still to be proved for a dense `M`), then
+
+    P(ρ₀ ∈ CS) − [2Φ(1.96√(1 + β_V)) − 1] → 0.
+
+At `β_V = −0.01`, the worst value measured, this is 0.949. Still to do:
+- the orders of the terms under `K/n → θ` with a local basis (bounds on
+  `Q₃` and `L₅` relative to `V`, in terms of the leverage);
+- the concentration lemma;
+- the proposition, then a check through `root_rho`, whose `C(ρ̃)` is
+  random, unlike the fixed `C(ρ₀)` here.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -2587,8 +2711,12 @@ linear in `y`.
    `χ²₃` errors (`tc_ar.jl`), at no cost in length where identification is
    strong. Over the whole grid with normal and `χ²₃` errors (180 cells),
    `CS` covers 0.932–0.992, and over-covers (to 0.99) only where the
-   leverage is near 0.95. Open: `CS` for K/n → θ > 0, which needs
-   Proposition 2's open case.
+   leverage is near 0.95. Open: `CS` for K/n → θ > 0. Started in "The
+   test-inversion set when K/n → θ > 0": Lemma 7 gives the HC2 `V̂(ρ₀)`'s
+   exact bias for any error law (`tc_hc2_bias.jl`). It is −1% to +20% up
+   to K/n = 0.40, and `CS` covers 0.931–0.971 there, as the oracle does.
+   Still to do: the terms' orders, a concentration lemma, the
+   proposition.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
