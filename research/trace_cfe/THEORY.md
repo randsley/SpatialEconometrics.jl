@@ -2786,6 +2786,59 @@ every cell:
 - **The set.** Membership in `r.cs` agreed with `g(ρ₀)² ≤ z²V̂(ρ₀)` in all
   12,000 draws.
 
+**Heteroskedastic errors: measured, not bounded (`tc_hc2_hetero.jl`).**
+Lemma 8 does not cover variances that differ across units. With `f = 0`
+and symmetric errors, every term of Lemma 7 is a quadratic form in
+`x = σ²`. The cumulant terms are `Σₖ cₖκₖ` with Lemma 8's `cₖ`, because
+`𝒦` does not involve `σ²`. So the worst cumulants are again `κₖ = −2σₖ⁴`
+(errors `±σᵢ`), and `E V̂ − V = x′Nx` with
+
+    N = 2(A′ΩA − Ω) + T + 2(H∘M)′D⁻¹(H∘M) + sym(A′(H∘H)(I − A)) − 2Diag(c),
+    A = D⁻¹(M∘M),   Tₖₗ = Σᵢ MᵢₖMᵢₗ(M′Diag(W̃ᵢ.)M)ₖₗ,   W̃ = sym(4Ω − 2H∘H)/(MᵢᵢMⱼⱼ).
+
+The terms are, in order: `Q₁`; `Q₂ + L₅ᴳ`; the Gaussian part of `L₃`,
+which is not 0 once `HΣM ≠ 0`; `L₄`; and the cumulants. The worst
+relative bias over variance patterns whose largest-to-smallest ratio is at
+most `r` is
+
+    β_het(r) = min { x′Nx / x′(2Ω)x : x ∈ [1, r]ⁿ }.
+
+This is a non-convex problem. It was searched by projected gradient from
+12 starts, so each value found is attained, not certified. A smooth class,
+`x = 1 + (r − 1)·sigmoid(Bₛθ)` with `Bₛ` the 4 × 4 tensor hats, was
+searched too.
+- **Checks.** `x′Nx` matches Lemma 7's terms at random `x` to 4e-14
+  relative. At `x = 1` it gives Lemma 8's `β_min` in all four designs.
+- **Power.** At iid random `x` the gap to Lemma 8 is only 0.0002–0.002.
+  The search is what finds the bad patterns.
+- **Simulation.** At the worst `r = 4` pattern, with errors `±σᵢ` and
+  R = 4000, the simulated `E V̂/V` matches the prediction (`|z|` ≤ 1.4).
+
+| design | constant | worst, r = 2 | r = 4 | r = 10 | smooth, r = 4 | smooth, r = 10 | `CS` / oracle at the r = 4 worst |
+|---|---|---|---|---|---|---|---|
+| jittered, `k = 13` | −0.014 | −0.037 | −0.065 | −0.119 | −0.032 | −0.057 | 0.945 / 0.953 |
+| jittered, `k = 16` | −0.021 | −0.064 | −0.115 | −0.207 | −0.048 | −0.081 | 0.937 / 0.952 |
+| random, `k = 10` | −0.010 | −0.023 | −0.041 | −0.077 | −0.026 | −0.047 | 0.953 / 0.959 |
+| rook, `k = 13` | −0.012 | −0.025 | −0.045 | −0.081 | −0.031 | −0.058 | 0.942 / 0.950 |
+
+- **Heteroskedasticity matters.** With the variance ratio up to 4, the
+  bias can be 3 to 6 times Lemma 8's worst case. Up to 10, it reaches
+  −21% at `K/n` = 0.29.
+- **Smoothness halves it but does not remove it.** The unrestricted worst
+  patterns sit at the bounds (93–98% of units) in weakly clustered blocks
+  (Moran's I +0.06 to +0.50). The smooth class (Moran's I +0.63 to +0.89)
+  is still 2 to 4 times Lemma 8 at `r = 4`. At `n` = 900, then, smooth
+  variances do not make the extra terms vanish.
+- **The coverage cost is smaller than the bias suggests.** At each
+  `r = 4` worst pattern, `CS` covers 0.937–0.953. The oracle, with the true
+  `V`, over-covers there (0.950–0.959) and offsets part of the bias.
+
+So `vhat_worst_bias` is the worst case only under homoskedasticity. A
+design-only bound with heteroskedastic errors needs a stated class for
+`σ²`, such as the ratio `r` or a smoothness class. `β_het(r)` can be
+computed for a given design, at `O(n⁴)` cost (10 s at `n` = 900), but only
+as an attained value, not a certified minimum.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
