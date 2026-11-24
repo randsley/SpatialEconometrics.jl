@@ -1,11 +1,14 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.6.0, tagged `v0.6.0` on 2026-11-19 (on `edbca6d`). It adds to
-> `v0.5.0` (tagged 2026-11-17): the check of the `ρ` search interval
-> against `W`'s spectrum (AUDIT 33); #15's two-channel spatial DiD; the
-> heteroskedasticity-robust spatial-error GMM and GS2SLS, with the fixes to
-> the default GS2SLS's panel inference (AUDIT 34–36); the Claude Code skill
-> (#14); and the notebooks on Google Colab. No tag is registered.
+> **Current version:** 0.7.0, tagged `v0.7.0` on 2026-11-24. It adds to
+> `v0.6.0` (tagged 2026-11-19) the `RootRho` submodule: `root_rho`, Jin &
+> Lee's REsd with a growing basis and a test-inversion set, a penalised
+> smoother (`tensor_pspline`), and a bias-aware interval under a roughness
+> bound (`basis_roughness`), with λ and the basis chosen by its length and
+> a finer reference basis for `f` outside the estimation basis (#13's
+> research item, `research/trace_cfe/THEORY.md`; AUDIT, the `root_rho`
+> entries). Docstring references are completed, and the test suite is one
+> file per testset. No tag is registered.
 >
 > 33 submodules, 4,355 test assertions in 67 top-level testsets with both
 > package extensions installed and 4,320 (plus 2 broken markers) without
@@ -1732,8 +1735,8 @@ reopened and re-sourced rather than executed from its own summary.
 Rows above the rule are measured; rows below are estimates. v0.4.0 has
 crossed the rule: it is not a projection any more but a tagged release
 (2026-11-06), and the figures it once projected — ~1,200 assertions and
-~13,800 lines — were passed some time ago. v0.5.0 (2026-11-16) and v0.6.0
-(2026-11-18) are likewise measured rows.
+~13,800 lines — were passed some time ago. v0.5.0 (2026-11-16), v0.6.0
+(2026-11-18) and v0.7.0 (2026-11-24) are likewise measured rows.
 
 | Milestone | Modules | Test assertions | Lines of `src/` |
 |---|---|---|---|
@@ -1773,6 +1776,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ `root_rho`'s bias-aware interval and `basis_roughness`) | 33 | 4,287 ¶¹¹ | 29,929 |
 | **master** (+ `root_rho`'s `reference` basis, Lemma 5) | 33 | 4,328 ¶¹² | 30,113 |
 | **master** (+ `root_rho`'s basis grid, Corollary 7′, and Proposition 1′) | 33 | 4,355 ¶¹³ | 30,203 |
+| **v0.7.0** (tagged 2026-11-24, = the row above) | 33 | 4,355 ¶¹³ | 30,203 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 

@@ -17,7 +17,7 @@ not, it is not in the General registry yet, so install from GitHub:
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl", rev = "v0.6.0")
+Pkg.add(url = "https://github.com/randsley/SpatialEconometrics.jl", rev = "v0.7.0")
 Pkg.add("StatsAPI")     # coef, stderror, vcov, coefnames, loglikelihood
 ```
 
