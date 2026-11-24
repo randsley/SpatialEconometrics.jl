@@ -29,7 +29,8 @@ REsd without A4, under `‖Mf‖ = o(√n)`, and so brings REsd into
 Proposition 7′ (`tc_resd_approx.jl`). Corollary 7′ lets the data choose
 the basis as well as λ, once the class is on the reference. Lemma 6 and
 Proposition 8 give the joint (trust-region) bound of the two terms, and
-show that most of Lemma 5's looseness is in the class (`tc_trust.jl`).
+show that most of Lemma 5's looseness is in the class (`tc_trust.jl`). The
+bias-aware interval is compared with Armstrong & Kolesár's.
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -2426,6 +2427,91 @@ So `CS` covers at least as well as the Wald interval in every one of the
 180 cells, within Monte Carlo error (it is at most 0.5 points lower, against
 an SE of 0.7), and much better where `ρ` is weakly identified.
 
+## Comparison with Armstrong & Kolesár (read 2026-11-24)
+
+Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
+and §4.3 (arXiv 1808.07387); the abstracts and introductions of Armstrong
+& Kolesár (2018) (arXiv 1511.06028) and Armstrong & Kolesár (2020) (arXiv
+1606.01200). The quotations are prose from those texts, with line-break hyphens
+and subscripts restored. No formula of theirs is used here.
+
+**What is the same.**
+- **The interval.** Armstrong & Kolesár (2021) take a moment condition that
+  holds only approximately at the truth, `g(θ₀) = c/√n` with `c ∈ C`, a
+  known set (their eq. (1)). Their CI (eq. (7)) is an asymptotically
+  linear estimator plus and minus its standard error times a critical
+  value, where "cv_α(t) is the 1 − α quantile of |Z|, with Z ∼ N(t, 1)",
+  evaluated at the worst-case bias over `C` divided by the standard error.
+  With one moment and one parameter, that is Proposition 7's `I_λ`: the
+  bias of the moment is `β`, the sensitivity is `1/J`, and `cv` is the same
+  function. Their local regime (bias of the order of the standard error) is
+  Proposition 3's `c_β = O(1)`. They also note that adding the worst-case
+  bias to `z_{1−α/2}` times the standard error is valid but conservative,
+  which is why Proposition 7 uses `cv`.
+- **The bound cannot come from the data.** Armstrong & Kolesár (2018) show,
+  for a convex centrosymmetric class, that "it is impossible to form CIs
+  that are substantively tighter using data-dependent tuning parameters,
+  and maintain coverage over the whole function class". Armstrong & Kolesár
+  (2021, §4.3.3) "recommend reporting results for a range of sets C(M)
+  indexed by a scalar M that bounds the magnitude of misspecification".
+  That is "Choosing ℛ"'s advice. Their results do not cover our case,
+  because the bias is not linear in `f` (below), and the remark in
+  "Choosing ℛ" is proved separately, from Kullback–Leibler and Pinsker.
+- **The tuning parameter chosen by the length of the CI.** Armstrong &
+  Kolesár (2020) choose the bandwidth that minimises the honest CI's
+  length, and find that "this approach leads to CIs that are more efficient
+  than conventional CIs that achieve coverage by undersmoothing or
+  subtracting an estimate of the bias". Proposition 7(b) and Corollary 7′
+  do the same for λ and the basis. The measured gains over the projection
+  (33–53% in `tc_honest.jl`, 26–44% in
+  `validation/mc_root_rho_bias_aware.jl`) and the finest basis chosen in
+  `validation/mc_root_rho_basis_grid.jl` agree with that finding.
+
+**What is different.**
+1. **The bias is quadratic in `f`, and its worst case is infinite.** Their
+   estimators are linear in the data, so the bias `k′c` is linear in `c`.
+   Over a bounded `C`, its worst case is a number that does not depend on
+   the data. They also restrict attention to estimators "that do not have
+   infinite worst-case bias when θ is unrestricted". Our moment is
+   quadratic, and its bias `β` has a linear term in `f₀`, which the class
+   leaves free (the remark after Lemma 4). No moment in our family has a
+   bias that does not depend on `f₀`. So `b̄` and `b̃` are bounds for each
+   `f`, estimated from the data through `f_B`. This has three
+   consequences:
+   - **Choosing λ needs more.** In their setting, the length of each
+     candidate is known up to `Σ̂`, so choosing by length is harmless. In
+     ours, it depends on the estimated `b̂`. That is why Proposition 7(b)
+     needs a separation condition, and why Proposition 8 cannot claim
+     (b).
+   - **The uniformity is over a smaller class.** Proposition 7(d) holds
+     over the `f` for which (i)–(iv) hold uniformly. (iii) needs
+     `b̄/√V = O(1)`, and `b̄` grows with `f₀`. So (d) can hold on
+     `F(ℛ) ∩ {f : ‖f₀‖ ≤ L√n}` for a fixed `L`, but not on all of `F(ℛ)`.
+     Their CIs are honest over the whole class.
+   - **The joint bound has no exact analogue.** For a linear functional,
+     their `sup_{c∈C}|k′c|` is the exact worst case. Lemma 6's `b_TR` is
+     the exact worst case only with `ã` held fixed.
+2. **The efficiency bound is not shown here.** Armstrong & Kolesár (2021,
+   Theorem 4.1) bound the expected length of any valid CI against theirs,
+   in the limiting experiment, for a convex centrosymmetric `C`: "For α =
+   0.05, this universal lower bound evaluates to 71.7%." For one candidate
+   with `f_B` known, the limit of Proposition 3 is a one-dimensional
+   experiment of that kind, with `C = [−b̃, b̃]`, and the bound would apply.
+   With `f_B` estimated, and over the choice of λ, it is not proved.
+3. **One candidate, not a combination.** Armstrong & Kolesár (2021, §2.2)
+   choose the optimal linear combination of all the moments, which trades
+   the variance against the worst-case bias. Proposition 7 picks one moment
+   from the grid, which is a restriction of that problem. By Lemma 5, the
+   bias of a combination `Σ_λ w_λ g_λ` is again linear plus quadratic in
+   `z̃`, with `ã_w = Σ w_λ ã_λ` and `H̃_w = Σ w_λ H̃_λ`. So Lemmas 5 and 6
+   bound it, and their trade-off can be computed. It needs the covariance
+   of the moments across λ. It is not built, and not measured.
+
+Armstrong & Kolesár (2018) also cover a coefficient in a partly linear
+regression with the nonparametric part in a convex class. That is the
+non-spatial analogue of this setting, at `ρ = 0`, where the estimator is
+linear in `y`.
+
 ## Still to do
 
 1. Theorem 1 and the Corollary are proved (2026-11-19), the Corollary
@@ -2482,7 +2568,9 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    covers 0.954 and 0.964 at its chosen λ with `ℛ` true, and is 33–53%
    shorter than the projection's. Proposition 7 proves its coverage at each
    λ, at a chosen λ (under a separation condition, or with Bonferroni), and
-   uniformly over `F(ℛ)`. Lemma 5 and Proposition 7′ cover `f ∉ span(B)`,
+   uniformly over the part of `F(ℛ)` on which its conditions hold
+   uniformly, which bounds `f₀` (see "Comparison with Armstrong &
+   Kolesár"). Lemma 5 and Proposition 7′ cover `f ∉ span(B)`,
    with the class on a finer reference basis (`tc_refbasis.jl`): the
    released rule covers 0.050–0.973 at a coarse `B`, the new one
    0.960–1.000, at a price that is small only for a fine `B`. Corollary 7′
@@ -2491,9 +2579,12 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    the joint bound of the linear and quadratic terms, and Proposition 8 its
    plug-in (`tc_trust.jl`). Most of Lemma 5's looseness is in the class,
    and the gain at a fine basis is 0–11%, so the joint bound is not in
-   `root_rho`. Still open: a sharper form of (iv)'s third condition;
-   and reading the bias-aware-interval literature (Armstrong & Kolesár) to
-   compare. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
+   `root_rho`. Armstrong & Kolesár are read and compared (the section
+   before this one): the interval is theirs for one moment, and the
+   differences come from a bias that is quadratic in `f` with `f₀` free.
+   Still open: a sharper form of (iv)'s third condition; the efficiency
+   bound with `f_B` estimated; and the optimal combination of the
+   candidate moments, which Lemmas 5 and 6 make computable. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
    it through a reference surface or a curvature bound, err large, and
    report the result across `ℛ`. The data cannot certify it (a remark,
    proved), and every plug-in rule tried under-covers.
@@ -2526,10 +2617,20 @@ images of Springer's free copy; Cattaneo, Jansson & Newey (2018), §3 (arXiv
 from the page images of the copies in `ExtRef/`, Bhansali, Giraitis &
 Kokoszka (2007), all of it; Kelejian & Prucha (2001), §3.1 and the proof of
 Theorem 1; Hall & Heyde (1980), §3.2; and Lee (2004)'s CLT, as restated in
-Lee (2023), ch. 1, §1.8.3 and Appendix 1A. The others have not been read.
+Lee (2023), ch. 1, §1.8.3 and Appendix 1A; and Armstrong & Kolesár, as
+listed in "Comparison with Armstrong & Kolesár". The others have not been
+read.
 - Anderson, T. W., & Rubin, H. (1949). Estimation of the parameters of a
   single equation in a complete system of stochastic equations. *Annals of
   Mathematical Statistics*, 20(1), 46–63. doi:10.1214/aoms/1177730090
+- Armstrong, T. B., & Kolesár, M. (2018). Optimal inference in a class of
+  regression models. *Econometrica*, 86(2), 655–683. doi:10.3982/ECTA14434
+- Armstrong, T. B., & Kolesár, M. (2020). Simple and honest confidence
+  intervals in nonparametric regression. *Quantitative Economics*, 11(1),
+  1–39. doi:10.3982/QE1199
+- Armstrong, T. B., & Kolesár, M. (2021). Sensitivity analysis using
+  approximate moment condition models. *Quantitative Economics*, 12(1),
+  77–108. doi:10.3982/QE1609
 - Bhansali, R. J., Giraitis, L., & Kokoszka, P. S. (2007). Convergence of
   quadratic forms with nonvanishing diagonal. *Statistics & Probability
   Letters*, 77(7), 726–734. doi:10.1016/j.spl.2006.11.007
