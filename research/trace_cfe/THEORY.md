@@ -34,7 +34,9 @@ Lemma 7 gives the exact bias of the HC2 `V̂` at `ρ₀` for any error law, the
 first step towards `CS` when K/n → θ > 0 (`tc_hc2_bias.jl`). Lemmas 8–10
 give its worst case over symmetric homoskedastic laws, the rate `O(K/n)` and
 its concentration, and Proposition 6″ gives `CS`'s coverage when K/n → θ > 0
-(`tc_hc2_worst.jl`, `tc_hc2_rate.jl`). The
+(`tc_hc2_worst.jl`, `tc_hc2_rate.jl`). Lemma 11 extends the rate to
+heteroskedastic errors with a bounded variance ratio (`tc_hc2_hetero.jl`,
+`tc_hc2_hetero_rate.jl`). The
 bias-aware interval is compared with Armstrong & Kolesár's, and their
 optimal combination of moments is measured (`tc_combine.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
@@ -2839,6 +2841,80 @@ design-only bound with heteroskedastic errors needs a stated class for
 computed for a given design, at `O(n⁴)` cost (10 s at `n` = 900), but only
 as an attained value, not a certified minimum.
 
+**Lemma 11 (the rate under heteroskedastic symmetric errors; proved).**
+In Lemma 7, let `xᵢ = σᵢ² ∈ [1, q]` (by scale), `μ₃ = 0`,
+`κₖ ∈ [−2xₖ², κ̄xₖ²]` and `κ* = max(2, κ̄)`. Keep Lemma 9's `h`, `h̄`,
+`rᵢ = hᵢ/Mᵢᵢ` and `V₀`, and write `ω = Ω1`. Then each term of Lemma 7 is
+bounded separately:
+
+    |Q₁| ≤ 4q(q − 1) h′ω,                  0 ≤ Q₂ ≤ 4(3q − 2)² r′Ωr,
+    |L₅ᴳ| ≤ 2q²‖H‖_F²,                     0 ≤ L₃ᴳ ≤ 2(q − 1)² Σᵢ hᵢ‖Hᵢ.‖²,
+    |L₄| ≤ q(q − 1) Σₖ hₖ‖H.ₖ‖²,           |L₁| ≤ (q − 1) Σᵢ bᵢ²hᵢ,
+    |Σₖ cₖκₖ| ≤ κ*q² Σₖ|cₖ|,              Σₖ|cₖ| ≤ 2(2 + h̄) r′Ωr + 2‖H‖_F²,
+
+where `L₅ᴳ` and `L₃ᴳ` are the Gaussian parts of `L₅` and `L₃`, and
+`Σcₖκₖ` collects `Q₃` and the `κ` parts of `L₃` and `L₅` (Lemma 8's `cₖ`).
+`L₂ = 0`. With `β̄_het(q)` the sum of the bounds divided by `V₀ + ‖b‖²`,
+`|β_V| ≤ β̄_het(q)`. Under Lemma 9's conditions, and with `‖b‖_∞` bounded,
+
+    |β_V| = O(q²K/n),
+
+uniformly over the class. So the bias vanishes when `K/n → 0` for any
+fixed `q`, and is of order `θ` when `K/n → θ`.
+
+*Proof.* Two facts do the work. First, `σ̄ᵢ² = Σⱼ wᵢⱼxⱼ` with
+`wᵢⱼ = Mᵢⱼ²/Mᵢᵢ ≥ 0`, `Σⱼ wᵢⱼ = 1` and `wᵢᵢ = Mᵢᵢ`, so
+`σ̄ᵢ² ∈ [1, q]` and `dᵢ = σ̄ᵢ² − xᵢ = Σ_{j≠i} wᵢⱼ(xⱼ − xᵢ)` has
+`|dᵢ| ≤ (q − 1)hᵢ`. Second, for `i ≠ j`, `Mᵢⱼ = −Pᵢⱼ` and `Pᵢⱼ² ≤ hᵢhⱼ`.
+- `Q₁ = 2d′Ω(σ̄² + x)`, and `Ω ≥ 0` entrywise, so `|Q₁| ≤ 4q Σᵢ|dᵢ|ωᵢ`.
+- `Q₂`: `Ωᵢᵢ = 0`. For `i ≠ j`, `MM = M` gives
+  `(MΣM)ᵢⱼ = xᵢMᵢⱼ + Mᵢⱼ(xⱼ − xᵢ)Mⱼⱼ + Σ_{k≠i,j} Pᵢₖ(xₖ − xᵢ)Pₖⱼ`. By
+  Cauchy–Schwarz this is at most `(q + (q − 1) + (q − 1))√(hᵢhⱼ)`, so
+  `𝒳ᵢⱼ ≤ (3q − 2)²hᵢhⱼ`.
+- `L₅ᴳ = −2Σᵢₖ Hᵢₖ²𝒳ᵢₖ/(MᵢᵢMₖₖ)`. `MΣM` is positive semi-definite with
+  `(MΣM)ᵢᵢ = Σⱼ Mᵢⱼ²xⱼ ≤ qMᵢᵢ`, so `𝒳ᵢₖ ≤ q²MᵢᵢMₖₖ`.
+- `L₃ᴳ = 2Σᵢ(HΣM)ᵢᵢ²/Mᵢᵢ`. `HM = C′P_BM = 0`, so
+  `(HΣM)ᵢᵢ = Σ_{k≠i} Hᵢₖ(xₖ − xᵢ)Mₖᵢ`. Cauchy–Schwarz with
+  `Σ_{k≠i} Pₖᵢ² = hᵢMᵢᵢ` gives `(HΣM)ᵢᵢ² ≤ (q − 1)²‖Hᵢ.‖²hᵢMᵢᵢ`.
+- `L₄ = Σᵢₖ Hᵢₖ²σ̄ᵢ²(−dₖ)`, and `L₁ = Σᵢ bᵢ²dᵢ`.
+- The cumulant terms are `Σₖ cₖκₖ`, because `𝒦` does not involve `x`, and
+  `|κₖ| ≤ κ*q²`. In `cₖ`, `Σₖ uₖ′Ωuₖ ≤ (2 + h̄)r′Ωr` by Lemma 9(ii)'s
+  bound `Σₖ Mᵢₖ²Mⱼₖ² ≤ (2 + h̄)hᵢhⱼ`. `Mᵢₖ² ≤ MᵢᵢMₖₖ` gives
+  `Σᵢₖ Hᵢₖ²Mᵢₖ²/Mᵢᵢ ≤ ‖H‖_F²` and `Σₖ uₖ′(H∘H)uₖ ≤ ‖H‖_F²`.
+
+`V = 2x′Ωx + Σbᵢ²xᵢ ≥ V₀ + ‖b‖²`. For the rate, `h′ω ≤ ‖Ω‖_∞K`,
+`Σᵢ bᵢ²hᵢ ≤ ‖b‖_∞²K`, and Lemma 9 gives `‖H‖_F² ≤ ‖C‖²K` and
+`r′Ωr ≤ ‖Ω‖_∞h̄K/(1 − h̄)²`. ∎
+
+Unlike Lemma 9, the proof uses no cancellation between `Q₂` and the
+cumulant terms. That costs a constant, but lets `κ` vary freely from unit
+to unit.
+
+**Measured (`tc_hc2_hetero_rate.jl`).** It uses the four designs of
+`tc_hc2_hetero.jl` with `q` = 2, 4, 10 and `κ̄ = 4`. Each design is tested
+at 51 variance patterns: the worst found, 40 random two-point patterns and
+10 uniform ones. Each pattern is run with `κ = −2x²`, `κ̄x²` and the worst
+mix, and at `f = 0`, `f = x_reg` and `f = P g`.
+- **Every term bound holds.** The smallest ratio of bound to `|term|` is
+  2.25 (`L₁`, rook). The terms add up to Lemma 7's bias to 2e-12.
+- **The bound is useless as a number.** `β̄_het` is 155 to 3,052 times the
+  worst `|β|` found, and exceeds 1 in every cell. The looseness grows with
+  `q`, because `Q₁` and `L₄` are bounded at `O(q²)`, while the worst `|β|`
+  grows about linearly in `q`.
+- **The planned power check did not bite.** Lemma 9's `β̄` has no `q`, so a
+  large enough `q` must exceed it. But it is loose enough (0.19 to 1.31)
+  that no cell with `q ≤ 10` did.
+- **The rate is the useful part.** At `q = 4` on the jittered grid, the
+  worst `β` divided by `K/n` was −0.37, −0.33, −0.34 and −0.40 at `k` = 7,
+  10, 13 and 16 (`K/n` = 0.06 to 0.29). At `K/n ≈ 0.19` it was −0.35,
+  −0.34 and −0.35 at `n` = 400, 900 and 1,600. So the bias is of order
+  `K/n`, as the lemma says, and it does not vanish as `n` grows at fixed
+  `K/n`.
+
+So `|β_het(4)| ≈ 0.35·K/n` in this design family, against Lemma 8's
+equal-variance `≈ 0.07·K/n`. The lemma proves the order. The constant is
+measured only, and it depends on the design.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -3010,8 +3086,12 @@ linear in `y`.
    Proposition 6″: the coverage tends to `2Φ(z√(1 + β_V)) − 1`, and is at
    least `2Φ(z√(1 + β_min)) − 1` under Lemma 8's errors. `root_rho`
    reports `β_min` as `vhat_worst_bias`
-   (`validation/mc_root_rho_hc2_worst.jl`). Open: a design-only bound with
-   heteroskedastic or skewed errors.
+   (`validation/mc_root_rho_hc2_worst.jl`). With heteroskedastic errors the
+   worst case is 3 to 6 times larger at a variance ratio of 4
+   (`tc_hc2_hetero.jl`). Lemma 11 proves the rate `O(q²K/n)` for variance
+   ratio `q`, with a bound that holds but is 155–3,052 times loose. The
+   measured constant is about 0.35 at `q = 4` (`tc_hc2_hetero_rate.jl`).
+   Open: skewed errors (`L₂`, linear in `b`), and a usable constant.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is

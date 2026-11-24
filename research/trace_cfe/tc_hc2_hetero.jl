@@ -216,6 +216,7 @@ function simulate(o, x, β; R = 4000, seed = 9)
     (; sim = mean(r), z = (mean(r) - 1 - β) / (std(r) / sqrt(R)), cs = cs / R, oc = oc / R)
 end
 
+if abspath(PROGRAM_FILE) == @__FILE__   # the study; tc_hc2_hetero_rate.jl includes the functions only
 println("The HC2 V̂'s worst-case bias at ρ₀ over heteroskedastic symmetric laws (f = 0); n = 900")
 println("β_het(r): worst x′Nx/x′(2Ω)x found over variance patterns with max/min ≤ r, κₖ = −2σₖ⁴ (κ̄σₖ⁴ where cₖ < 0)\n")
 rng = MersenneTwister(2026); t0 = time()
@@ -229,4 +230,5 @@ for (name, kind, k) in (("jittered k = 13", :jittered, 13), ("jittered k = 16", 
     s = simulate(o, x4, βsim)
     @printf("    Monte Carlo at the r = 4 pattern, ±σᵢ errors (R = 4000): E V̂/V predicted %.4f, simulated %.4f (z %+.1f) | CS at ρ₀ %.4f, oracle %.4f, 2Φ(1.96√(1+β)) − 1 = %.4f   (%.1f min)\n\n",
             1 + βsim, s.sim, s.z, s.cs, s.oc, 2cdf(Normal(), 1.96sqrt(1 + βsim)) - 1, (time() - t0) / 60)
+end
 end
