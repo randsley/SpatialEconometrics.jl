@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="SpatialEconometrics.jl">
+  <title>SpatialEconometrics.jl</title>
+  <!-- A rook lattice: one focal unit, its four neighbours, and the edges
+       of W that connect them. -->
+  <g stroke="#475569" stroke-width="1.6" stroke-linecap="round">
+    <path d="M16 16H88M16 40H88M16 64H88M16 88H88" />
+    <path d="M16 16V88M40 16V88M64 16V88M88 16V88" />
+  </g>
+  <g stroke="#93b4e3" stroke-width="2.6" stroke-linecap="round">
+    <path d="M16 40H64M40 16V64" />
+  </g>
+  <g fill="#1f2328" stroke="#64748b" stroke-width="1.8">
+    <circle cx="16" cy="16" r="5" /><circle cx="64" cy="16" r="5" /><circle cx="88" cy="16" r="5" />
+    <circle cx="88" cy="40" r="5" />
+    <circle cx="16" cy="64" r="5" /><circle cx="64" cy="64" r="5" /><circle cx="88" cy="64" r="5" />
+    <circle cx="16" cy="88" r="5" /><circle cx="40" cy="88" r="5" /><circle cx="64" cy="88" r="5" /><circle cx="88" cy="88" r="5" />
+  </g>
+  <g fill="#2b3a52" stroke="#93b4e3" stroke-width="2.2">
+    <circle cx="40" cy="16" r="5.6" /><circle cx="16" cy="40" r="5.6" />
+    <circle cx="64" cy="40" r="5.6" /><circle cx="40" cy="64" r="5.6" />
+  </g>
+  <circle cx="40" cy="40" r="7.4" fill="#93b4e3" />
+</svg>
