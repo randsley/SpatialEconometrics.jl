@@ -1,0 +1,96 @@
+(0) solver: 200 random problems (p = 4): brute force above b_TR by at most 0.0e+00 relative, below by at most 1.3e-02; b_TR > b̃ in 0; smallest (b̃ − b_TR)/b̃ 0.004
+    hard case (a ⊥ top eigenvector): b_TR 3.003750, brute force 3.003696, exact 3.003750
+
+k = 5 (K = 26), a = 1, k̃ = 30, ℛ̃* = 0.720
+  (1) oracle at ℛ̃*, /√V: |β̃|, b_TR, b̃, and the share of b̃ − |β̃| that is the bound
+    REsd@ρ₀   |β̃|   0.025  b_TR   1.089  b̃   1.326  share 0.18 
+    λ   0.0010 |β̃|   0.026  b_TR   0.906  b̃   1.108  share 0.19 
+    λ   0.0100 |β̃|   0.037  b_TR   0.905  b̃   1.107  share 0.19 
+    λ   0.1000 |β̃|   0.145  b_TR   0.906  b̃   1.110  share 0.21 
+    λ   1.0000 |β̃|   0.886  b_TR   1.271  b̃   1.540  share 0.41 
+    λ  10.0000 |β̃|   2.087  b_TR   2.539  b̃   2.792  share 0.36 
+    λ 100.0000 |β̃|   2.357  b_TR   3.500  b̃   3.722  share 0.16 
+  (2) at λ̂ (REsd + 12 λ), 2 draws:
+    ℛ̃ × 1, b̃ (package)   coverage 1.000, half-length 0.1637 (+0% against b̃)
+    ℛ̃ × 1, b_TR raw      coverage 1.000, half-length 0.1523 (-7% against b̃)
+    ℛ̃ × 1, min           coverage 1.000, half-length 0.1523 (-7% against b̃)
+    ℛ̃ × 4, b̃ (package)   coverage 1.000, half-length 0.6713 (+0% against b̃)
+    ℛ̃ × 4, b_TR raw      coverage 1.000, half-length 0.5558 (-17% against b̃)
+    ℛ̃ × 4, min           coverage 1.000, half-length 0.5558 (-17% against b̃)
+  0.2 min
+
+(warm-up above)
+
+k = 5 (K = 26), a = 1, k̃ = 30, ℛ̃* = 0.720
+  (1) oracle at ℛ̃*, /√V: |β̃|, b_TR, b̃, and the share of b̃ − |β̃| that is the bound
+    REsd@ρ₀   |β̃|   0.025  b_TR   1.089  b̃   1.326  share 0.18 
+    λ   0.0010 |β̃|   0.026  b_TR   0.906  b̃   1.108  share 0.19 
+    λ   0.0100 |β̃|   0.037  b_TR   0.905  b̃   1.107  share 0.19 
+    λ   0.1000 |β̃|   0.145  b_TR   0.906  b̃   1.110  share 0.21 
+    λ   1.0000 |β̃|   0.886  b_TR   1.271  b̃   1.540  share 0.41 
+    λ  10.0000 |β̃|   2.087  b_TR   2.539  b̃   2.792  share 0.36 
+    λ 100.0000 |β̃|   2.357  b_TR   3.500  b̃   3.722  share 0.16 
+  (2) at λ̂ (REsd + 12 λ), 300 draws:
+    ℛ̃ × 1, b̃ (package)   coverage 0.990, half-length 0.1482 (+0% against b̃)
+    ℛ̃ × 1, b_TR raw      coverage 0.987, half-length 0.1379 (-7% against b̃)
+    ℛ̃ × 1, min           coverage 0.987, half-length 0.1379 (-7% against b̃)
+    ℛ̃ × 4, b̃ (package)   coverage 1.000, half-length 0.6297 (+0% against b̃)
+    ℛ̃ × 4, b_TR raw      coverage 1.000, half-length 0.5247 (-17% against b̃)
+    ℛ̃ × 4, min           coverage 1.000, half-length 0.5247 (-17% against b̃)
+  1.9 min
+
+k = 15 (K = 226), a = 1, k̃ = 30, ℛ̃* = 0.720
+  (1) oracle at ℛ̃*, /√V: |β̃|, b_TR, b̃, and the share of b̃ − |β̃| that is the bound
+    REsd@ρ₀   |β̃|   0.000  b_TR   0.132  b̃   0.137  share 0.04 
+    λ   0.0010 |β̃|   0.003  b_TR   0.115  b̃   0.119  share 0.04 
+    λ   0.0100 |β̃|   0.004  b_TR   0.123  b̃   0.128  share 0.04 
+    λ   0.1000 |β̃|   0.014  b_TR   0.179  b̃   0.185  share 0.03 
+    λ   1.0000 |β̃|   0.095  b_TR   0.347  b̃   0.352  share 0.02 
+    λ  10.0000 |β̃|   0.652  b_TR   0.891  b̃   0.903  share 0.05 
+    λ 100.0000 |β̃|   1.929  b_TR   2.250  b̃   2.278  share 0.08 
+  (2) at λ̂ (REsd + 12 λ), 300 draws:
+    ℛ̃ × 1, b̃ (package)   coverage 0.960, half-length 0.1182 (+0% against b̃)
+    ℛ̃ × 1, b_TR raw      coverage 0.970, half-length 0.1234 (+4% against b̃)
+    ℛ̃ × 1, min           coverage 0.960, half-length 0.1182 (+0% against b̃)
+    ℛ̃ × 4, b̃ (package)   coverage 0.997, half-length 0.1741 (+0% against b̃)
+    ℛ̃ × 4, b_TR raw      coverage 0.997, half-length 0.1853 (+6% against b̃)
+    ℛ̃ × 4, min           coverage 0.997, half-length 0.1741 (-0% against b̃)
+  1.8 min
+
+k = 5 (K = 26), a = 4, k̃ = 30, ℛ̃* = 2.880
+  (1) oracle at ℛ̃*, /√V: |β̃|, b_TR, b̃, and the share of b̃ − |β̃| that is the bound
+    REsd@ρ₀   |β̃|   1.155  b_TR   9.134  b̃  11.126  share 0.20 
+    λ   0.0010 |β̃|   1.109  b_TR   7.607  b̃   9.331  share 0.21 
+    λ   0.0100 |β̃|   1.279  b_TR   7.619  b̃   9.338  share 0.21 
+    λ   0.1000 |β̃|   2.888  b_TR   7.962  b̃   9.905  share 0.28 
+    λ   1.0000 |β̃|  10.891  b_TR  12.519  b̃  15.711  share 0.66 
+    λ  10.0000 |β̃|  15.050  b_TR  16.166  b̃  17.936  share 0.61 
+    λ 100.0000 |β̃|  15.393  b_TR  17.261  b̃  18.754  share 0.44 
+  (2) at λ̂ (REsd + 12 λ), 300 draws:
+    ℛ̃ × 1, b̃ (package)   coverage 1.000, half-length 0.5158 (+0% against b̃)
+    ℛ̃ × 1, b_TR raw      coverage 1.000, half-length 0.4180 (-19% against b̃)
+    ℛ̃ × 1, min           coverage 1.000, half-length 0.4180 (-19% against b̃)
+    ℛ̃ × 4, b̃ (package)   coverage 1.000, half-length 4.5448 (+0% against b̃)
+    ℛ̃ × 4, b_TR raw      coverage 1.000, half-length 3.5154 (-23% against b̃)
+    ℛ̃ × 4, min           coverage 1.000, half-length 3.5154 (-23% against b̃)
+  2.0 min
+
+k = 15 (K = 226), a = 4, k̃ = 30, ℛ̃* = 2.880
+  (1) oracle at ℛ̃*, /√V: |β̃|, b_TR, b̃, and the share of b̃ − |β̃| that is the bound
+    REsd@ρ₀   |β̃|   0.012  b_TR   0.633  b̃   0.705  share 0.10 
+    λ   0.0010 |β̃|   0.030  b_TR   0.517  b̃   0.580  share 0.12 
+    λ   0.0100 |β̃|   0.050  b_TR   0.550  b̃   0.619  share 0.12 
+    λ   0.1000 |β̃|   0.230  b_TR   0.790  b̃   0.874  share 0.13 
+    λ   1.0000 |β̃|   1.579  b_TR   2.138  b̃   2.231  share 0.14 
+    λ  10.0000 |β̃|   8.792  b_TR   9.303  b̃   9.448  share 0.22 
+    λ 100.0000 |β̃|  14.678  b_TR  15.422  b̃  15.606  share 0.20 
+  (2) at λ̂ (REsd + 12 λ), 300 draws:
+    ℛ̃ × 1, b̃ (package)   coverage 0.980, half-length 0.1639 (+0% against b̃)
+    ℛ̃ × 1, b_TR raw      coverage 0.983, half-length 0.1694 (+3% against b̃)
+    ℛ̃ × 1, min           coverage 0.980, half-length 0.1639 (-0% against b̃)
+    ℛ̃ × 4, b̃ (package)   coverage 1.000, half-length 0.4316 (+0% against b̃)
+    ℛ̃ × 4, b_TR raw      coverage 1.000, half-length 0.3837 (-11% against b̃)
+    ℛ̃ × 4, min           coverage 1.000, half-length 0.3829 (-11% against b̃)
+  1.8 min
+
+total 7.6 min

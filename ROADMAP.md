@@ -1324,7 +1324,10 @@ and the method are in `research/trace_cfe/`.
   `validation/mc_root_rho_basis_grid.jl`: coverage 0.945–1.000 in four
   cells over k = 5, 10, 15, against 0.770 for the shortest interval across
   bases without a reference. AUDIT, "the basis chosen by the interval's
-  length". Not built: the joint (trust-region) bound.
+  length". The joint (trust-region) bound is proved and measured, not
+  built (THEORY.md, Lemma 6 and Proposition 8, `tc_trust.jl`): it is
+  0–11% shorter at the basis Corollary 7′ chooses, and most of the
+  looseness is in the class.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500

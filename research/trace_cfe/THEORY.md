@@ -27,7 +27,9 @@ Proposition 7′ extend both to `f ∉ span(B)`, with the class on a finer
 reference basis (`tc_refbasis.jl`). On 2026-11-24, Proposition 1′ proves
 REsd without A4, under `‖Mf‖ = o(√n)`, and so brings REsd into
 Proposition 7′ (`tc_resd_approx.jl`). Corollary 7′ lets the data choose
-the basis as well as λ, once the class is on the reference.
+the basis as well as λ, once the class is on the reference. Lemma 6 and
+Proposition 8 give the joint (trust-region) bound of the two terms, and
+show that most of Lemma 5's looseness is in the class (`tc_trust.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -86,6 +88,7 @@ line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, 
 | `B̃`, `Π̃`, `ψ̃`, `ℛ̃`, `F̃(ℛ̃)`, `f_B` | Lemma 5: a finer reference basis and its penalty; the coefficients of `f = B̃ψ̃`; its roughness bound; the class; `P_Bf` |
 | `ṽ`, `Q̃`, `χ̃`, `b̃`, `T̃`, `Υ̃`, `E` | Lemma 5: the linear coefficient; the quadratic matrix; its bound; the bias bound; `ṽ = T̃f_B`; `Π̃^{+1/2}T̃P_B`; `G(ϱ)′ − Δ(ϱ)` |
 | `B_k`, `𝒦`, `𝒢_𝒦` | Corollary 7′: a set of bases, its index set, and the grid of (basis, λ) pairs |
+| `z̃`, `ã`, `H̃`, `TR`, `b_TR`, `b̂_min` | Lemma 6 and Proposition 8: `Π̃^{1/2}ψ̃₁`; `Π̃^{+1/2}ṽ`; `Π̃^{+1/2}sym(Q̃)Π̃^{+1/2}`; the trust-region maximum; the joint bound; the smaller of the two plug-in bounds |
 | `β(ϱ)`, `β*`, `c_β*`, `r̄` | Proposition 1′: `f′C(ϱ)f`; `β(ρ₀)`; `β*/√V*`; Proposition 7′: `ℛ̃‖MB̃Π̃^{+1/2}‖_op`, the largest `‖Mf‖` over `F̃(ℛ̃)` |
 | `θ` | the limit of `K/n` |
 | `κ_W`, `n_W`, `X`, `ωⱼ`, `φⱼ`, `πⱼ` | Proposition 5: `‖W‖_F² ≥ κ_W n`; neighbours per row; `Ws + D`; its eigenvalues and eigenvectors; their overlaps with `B` |
@@ -1511,8 +1514,8 @@ is Lemma 5, with `ℛ̃` from the interpolant (`ℛ̃*`, true for `f̃`, and
   the whole curvature budget on the part of `f` that `B` misses. Such
   functions are in the class: inside each cell the remainder has the
   curvature of `f` itself. So much of the gap is probably the class and
-  not the bound, but that is not shown. The joint (trust-region) bound of
-  the two terms would show how much is the bound.
+  not the bound. Lemma 6 and `tc_trust.jl` confirm this: the joint bound
+  closes only 2–66% of the gap.
 - **A rule for K.** The new half-length can be compared across bases, and
   its minimum over `k` is at the finest `k` tried (15) in all four
   settings. This is a measured version of "undersmooth". Corollary 7′
@@ -1544,6 +1547,127 @@ covers 0.050–0.923 in `tc_refbasis.jl` and 0.833 in
 `validation/mc_root_rho_reference.jl`. With the reference, a coarse basis
 pays for its remainder in `b̃`, and the comparison is fair. The corollary
 does not cover a set of bases that grows with `n`.
+
+**Lemma 6 (the joint bound of the two terms; proved).** In Lemma 5(d),
+write `z̃ = Π̃^{1/2}ψ̃₁`, `ã = Π̃^{+1/2}ṽ` and
+`H̃ = Π̃^{+1/2} sym(Q̃) Π̃^{+1/2}`. For `t > 0` and a symmetric `S`, let
+
+    TR(a, S; t) = max_{‖z‖ ≤ t} a′z + z′Sz,    b_TR = max(TR(ã, H̃; ℛ̃), TR(−ã, −H̃; ℛ̃)).
+
+Then:
+
+(a) `|β| ≤ b_TR ≤ b̃` for every `f ∈ F̃(ℛ̃)` with these `ã`, `H̃`. `b_TR`
+is the smallest bound on `|β|` that holds for every `ψ̃₁` in the ball when
+`ã` and `H̃` are held fixed.
+
+(b) `z*` attains `TR(a, S; t)` if, for some `μ ≥ max(λ_max(S), 0)`,
+`(μI − S)z* = a/2`, `‖z*‖ ≤ t` and `μ(t − ‖z*‖) = 0`. Such a `μ` and `z*`
+always exist.
+
+(c) `TR(·, S; t)` is convex and `t`-Lipschitz, and `z*(a)` is a
+subgradient at `a`: `TR(â, S; t) ≥ TR(a, S; t) + z*(a)′(â − a)`.
+
+*Proof.* (a) `ψ̃₁ ∈ range(Π̃)`, so `ψ̃₁ = Π̃^{+1/2}z̃` with `‖z̃‖ ≤ ℛ̃`, and
+Lemma 5(d) gives `β = ã′z̃ + z̃′H̃z̃`. Taking `±β` gives the first
+inequality. The second follows from `ã′z ≤ ℛ̃‖ã‖` and `z′H̃z ≤ ℛ̃²χ̃` on the
+ball, with `‖ã‖ = √(ṽ′Π̃⁺ṽ)`. The maximum is attained at some `z` in the
+ball. That `z` is `Π̃^{1/2}ψ̃₁` for a `ψ̃₁` in the ball, because `ã` and
+`H̃` vanish on `null(Π̃)`, so a component there does not change the value.
+(b) Sufficiency: for `‖z‖ ≤ t`,
+`a′z + z′Sz ≤ [a′z − z′(μI − S)z] + μt²`. The bracket is concave, because
+`μI − S ⪰ 0`, and its gradient vanishes at `z*`. So the bracket is at most
+`a′z* − z*′(μI − S)z*`. Then the right side equals
+`a′z* + z*′Sz* + μ(t² − ‖z*‖²)`, which is the value at `z*` by
+complementary slackness. Existence: let `s = max(λ_max(S), 0)` and
+`z(μ) = (μI − S)⁻¹a/2`. For `μ > s`, `‖z(μ)‖` is continuous and
+decreasing, and it tends to 0. If it exceeds `t` as `μ ↓ s`, a root
+`μ > s` of `‖z(μ)‖ = t` exists. Otherwise the limit `z(s)` exists with
+`‖z(s)‖ ≤ t`. If `s = 0 > λ_max(S)`, take `μ = 0` and `z* = z(0)`. If
+`s = λ_max(S)`, then `a` is orthogonal to the top eigenspace, because
+otherwise the norm diverges. Then `z* = z(s) + τe` satisfies the
+conditions, with `e` a top eigenvector and `τ = √(t² − ‖z(s)‖²)`. This is
+the hard case.
+(c) `TR` is a maximum of functions that are affine in `a`, so it is convex.
+At `z*` the affine function is `a′z* + z*′Sz*`, which gives the
+subgradient. Each affine function has a slope of norm `‖z‖ ≤ t`. ∎
+
+`tc_trust.jl` (0) checks the solver of (b) against brute force on 200
+random problems and on a built hard case.
+- Brute force never exceeds `b_TR`, and it is at most 1.3% below it.
+- In the hard case, `b_TR` equals the closed form, 3.003750.
+- `b_TR ≤ b̃` held in all 200 problems, with `(b̃ − b_TR)/b̃` at least
+  0.004.
+
+**Proposition 8 (the joint bound with a plug-in; proved, given Proposition
+7′).** Form `â = Π̃^{+1/2}T̃P_By₀(ρ̂₀)` raw, without debiasing, and let
+`b̂_TR` be `b_TR` at `â`. Let `b̂_min = min(b̂, b̂_TR)`, with `b̂` the
+debiased estimate of `b̃` of Proposition 7′. Then Proposition 7(a), (c)
+and (d) hold for the interval with `t̂ = b̂_min/√V̂`. (b) is not claimed.
+
+*Proof.* Proposition 7's step 2 shows `â − ã = Υ̃ε − t₀Υ̃Gη`, with
+`t₀ = O_p(n^{−1/2})` and `‖t₀Υ̃Gη‖ = O_p(‖Υ̃‖_op)`. Let `z*` attain `b_TR`
+at `ã`, with the sign that attains it. `z*` does not depend on `ε`, and
+`‖z*‖ ≤ ℛ̃`. By Lemma 6(c),
+
+    b̂_TR ≥ b_TR − |z*′Υ̃ε| − ℛ̃ O_p(‖Υ̃‖_op).
+
+`z*′Υ̃ε` has mean 0 and variance at most `σ̄²ℛ̃²‖Υ̃‖_op²`. So both terms are
+`O_p(ℛ̃‖Υ̃‖_op)`, which is `o_p(√V)` by (iv). Hence
+`(b_TR − b̂_TR)₊/√V → 0`, and `b_TR ≥ |β|` by Lemma 6(a). Proposition 7′
+gives the same for `b̂` against `b̃ ≥ |β|`. So the minimum of the two
+estimates satisfies `(|β| − b̂_min)₊/√V → 0`. For (a), (c) and (d), steps
+3 and 4 of Proposition 7 use only this, because `cv` is increasing and
+1-Lipschitz (step 1). For REsd at `ϱ = ρ̃`: `TR` is `ℛ̃`-Lipschitz in `a`,
+and a change in `H̃` moves its value by at most
+`ℛ̃²‖H̃(ρ̃) − H̃(ρ₀)‖_op`. So Proposition 7′'s REsd bullet applies, without
+the debiasing term. ∎
+
+`b̂_TR` is biased up, because `‖â‖² ≈ ‖ã‖² + ‖Υ̃ε‖²`. `‖ã‖²` can be
+debiased, but `ã` is a vector and cannot. For the same reason, `b̂_TR` does
+not converge to `b_TR` when `ℛ̃‖Υ̃‖_F/√V` does not vanish. Proposition 7(b)
+needs that convergence, so (b) is not claimed. Where the debiased `b̂` is
+shorter, the minimum keeps it.
+
+**Measured** (`tc_trust.jl`). The design is tc_refbasis's, with `k = 5` and
+15, `a = 1` and 4, the reference `k̃ = 30`, and R = 300. Part (1) is the
+oracle at `ℛ̃*` for `f̃` itself: `|β̃|`, `b_TR` and `b̃`, each divided by
+`√V`. The share `(b̃ − b_TR)/(b̃ − |β̃|)` is the part of the looseness that
+is in the bound. The rest is in the class.
+- **Most of the looseness is in the class.** The share is:
+  - 0.16–0.41 at `k = 5`, `a = 1`;
+  - 0.20–0.66 at `k = 5`, `a = 4`;
+  - 0.02–0.08 at `k = 15`, `a = 1`;
+  - 0.10–0.22 at `k = 15`, `a = 4`.
+
+  At small λ and for REsd, it is at most 0.21. For example, REsd at
+  `k = 15`, `a = 4` has `|β̃|` = 0.012, `b_TR` = 0.633 and `b̃` = 0.705.
+- **Coverage and half-length at λ̂** (REsd and 12 λ). The `b̃` column gives
+  the half-length in brackets, and the other columns give the change in
+  half-length against it:
+
+  | k | a | ℛ̃ | `b̃` | `b̂_TR` raw | `b̂_min` |
+  |---|---|---|---|---|---|
+  | 5 | 1 | `ℛ̃*` | 0.990 (0.148) | 0.987 (−7%) | 0.987 (−7%) |
+  | 5 | 1 | `4ℛ̃*` | 1.000 (0.630) | 1.000 (−17%) | 1.000 (−17%) |
+  | 15 | 1 | `ℛ̃*` | 0.960 (0.118) | 0.970 (+4%) | 0.960 (0%) |
+  | 15 | 1 | `4ℛ̃*` | 0.997 (0.174) | 0.997 (+6%) | 0.997 (0%) |
+  | 5 | 4 | `ℛ̃*` | 1.000 (0.516) | 1.000 (−19%) | 1.000 (−19%) |
+  | 5 | 4 | `4ℛ̃*` | 1.000 (4.545) | 1.000 (−23%) | 1.000 (−23%) |
+  | 15 | 4 | `ℛ̃*` | 0.980 (0.164) | 0.983 (+3%) | 0.980 (0%) |
+  | 15 | 4 | `4ℛ̃*` | 1.000 (0.432) | 1.000 (−11%) | 1.000 (−11%) |
+
+  The `b̃` column repeats tc_refbasis's table, as it should.
+- **The gain is mostly at a coarse basis.** `b̂_min` is 7–23% shorter at
+  `k = 5`, and 0–11% shorter at `k = 15`. At `k = 15` the raw `b̂_TR` is
+  longer than `b̃` in three of four cells, because of its upward bias. At
+  `a = 4`, Corollary 7′ picks `k = 15` in 199 of 200 draws
+  (`validation/mc_root_rho_basis_grid.jl`). So where the data choose the
+  basis, the gain is 0% at `ℛ̃*` and 11% at `4ℛ̃*`.
+- **Not built in `root_rho`.** There are three reasons. The gain at the
+  basis that Corollary 7′ chooses is small at `ℛ̃*`. Proposition 7(b), on
+  which the default choice of λ by length relies, is not proved for
+  `b̂_min`. And the looseness that remains is in the class, which a tighter
+  bound cannot remove.
 
 **Proposition 5 (a primitive condition for A5; proved).** Let `W` be
 non-negative with a zero diagonal, `‖W‖_op ≤ c_W` and `‖W‖_F² ≥ κ_W n`; a
@@ -2363,10 +2487,11 @@ an SE of 0.7), and much better where `ρ` is weakly identified.
    released rule covers 0.050–0.973 at a coarse `B`, the new one
    0.960–1.000, at a price that is small only for a fine `B`. Corollary 7′
    chooses the basis by the same length over a grid of `(basis, λ)` pairs
-   against one reference (`root_rho` with a vector `basis`). Still open:
-   the joint bound of the linear and quadratic terms (a trust-region
-   problem) in place of their sum, which would show how much of Lemma 5's
-   looseness is the bound; a sharper form of (iv)'s third condition;
+   against one reference (`root_rho` with a vector `basis`). Lemma 6 gives
+   the joint bound of the linear and quadratic terms, and Proposition 8 its
+   plug-in (`tc_trust.jl`). Most of Lemma 5's looseness is in the class,
+   and the gain at a fine basis is 0–11%, so the joint bound is not in
+   `root_rho`. Still open: a sharper form of (iv)'s third condition;
    and reading the bias-aware-interval literature (Armstrong & Kolesár) to
    compare. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
    it through a reference surface or a curvature bound, err large, and
