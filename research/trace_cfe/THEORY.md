@@ -3003,6 +3003,63 @@ computed from the design alone, exactly, for about the cost of
 `vhat_worst_bias`: one `n × n × n` product for `T` and an SVD of
 `C′[X, B]`.
 
+**Leave-three-out: the estimator that step 2 asked for (literature, 2026-11-24).**
+Step 2 ended with: "What is needed is an estimate of `σᵢ²σⱼ²` that is free of
+`f`, for example a leave-two-out product, or Kline et al.'s split, which a
+dense projection does not allow." Anatolyev & Sølvsten (2023, *Journal of
+Econometrics*, doi:10.1016/j.jeconom.2023.03.011; read from arXiv 2003.07320v3)
+construct one, for the variance of a quadratic form with many regressors.
+In their words (Section 1): "While the product of leave-one-out estimators is
+biased for the product of variances because of mutual dependence, dropping
+three observations in successive fashion breaks the dependence between
+estimators of individual error variances, and hence provides unbiasedness
+of their products."
+
+Their Section 2.6, with `β̂₋ᵢⱼₖ` the OLS estimate without observations `i`,
+`j`, `k` and `σ̂²ᵢ,₋ⱼₖ = yᵢ(yᵢ − xᵢ′β̂₋ᵢⱼₖ)`, quoted from the arXiv text
+(formulas to be checked against the page images before implementing):
+
+    σ̂²ᵢ,₋ⱼ = yᵢ Σ_{k≠j} M̌ᵢₖ,₋ᵢⱼ yₖ,   M̌ᵢₖ,₋ᵢⱼ = (MⱼⱼMᵢₖ − MᵢⱼMⱼₖ)/Dᵢⱼ,      (10)
+    σ̂²ᵢσ̂²ⱼ (their hat over the product) = yᵢ Σ_{k≠j} M̌ᵢₖ,₋ᵢⱼ yₖ · σ̂²ⱼ,₋ᵢₖ.   (11)
+
+Here `Dᵢⱼ = MᵢᵢMⱼⱼ − Mᵢⱼ²`. They show that (11) is symmetric in `i` and `j`.
+Unbiasedness follows because `σ̂²ⱼ,₋ᵢₖ` is independent of `(yᵢ, yₖ)` given the
+regressors. They state that "the product `x′ⱼβ x′ₖβ σ²ᵢ`" in their variance
+"can similarly be estimated without bias using leave-three-out estimators".
+- **The match with our moment.** Lemma 7(a) gives `Var g(ρ₀) =
+  2Σ_{i≠j} Ωᵢⱼσᵢ²σⱼ² + Σᵢ bᵢ²σᵢ²` with `b = C′f`, and `diag Ω = 0`. So (11)
+  estimates the quadratic part without bias for any `f ∈ span(B)` and any
+  variances. The linear part is `Σᵢ Σₖₗ CₖᵢCₗᵢ fₖfₗσᵢ²`, the analogue of
+  their `x′ⱼβ x′ₖβ σ²ᵢ`. An unbiased `V̂` at `ρ₀` would then need no worst
+  case at all: Proposition 6″ with `β_V = 0`.
+- **The condition.** Exact size needs the design to keep full rank after
+  leaving out any three observations (`Dᵢⱼₖ > 0`). This is "Leverage 1 rules
+  out any estimate free of `f`" again, one level down. With `Dᵢⱼₖ` small the
+  estimates are noisy. Where it fails they "use estimators for the products
+  of individual error variances that are intentionally biased upward", which
+  keeps validity and can make the test conservative.
+- **The cost.** Their Section 2.7: the leave-out residuals follow
+  recursively from `M` by Sherman–Morrison–Woodbury, the doubly indexed
+  objects by matrix operations, and the rest "by a single loop across `i`
+  with matrices containing `Dᵢⱼₖ` and leave-three-out residuals renewed at
+  each iteration". That is `O(n³)`, the same order as `root_rho` now.
+- **What the earlier measurements warn.** In step 2 the estimators that
+  removed HC2's bias in `E V̂` were noisier, and under-covered where HC2 did
+  not (`tc_coverage_vhat.jl`, `tc_coverage_cjnc.jl`). Being unbiased is not
+  enough. The test is coverage against HC2's, at the leverages of a local
+  basis (up to 0.95).
+- **Not new to the literature, as far as found.** A Scite search for
+  leave-three-out with spatial or quadratic-form terms found no spatial use
+  (70 hits, none relevant). Mikusheva & Sun (2022, *Review of Economic
+  Studies*, doi:10.1093/restud/rdab097) use leave-out quadratic forms for
+  weak-instrument-robust tests, and are the nearest neighbour for our
+  test-inversion set. They are not read yet.
+
+The next step is measurement, not a build. Implement (10)–(11) and the
+linear part densely at `ρ₀`, in `tc_hc2_bias.jl`'s designs. Check
+unbiasedness against Lemma 7 (power: HC2's bias is detected). Then measure
+coverage against HC2's at K/n up to 0.29, with strong and weak signals.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -3180,7 +3237,9 @@ linear in `y`.
    ratio `q`, with a bound that holds but is 155–3,052 times loose. The
    measured constant is about 0.35 at `q = 4` (`tc_hc2_hetero_rate.jl`).
    Lemma 12 gives the exact worst case with skewed errors (one law,
-   `|γ| ≤ γ̄`), and its order `O(γ̄h̄)` (`tc_hc2_skew.jl`). Open: a usable
+   `|γ| ≤ γ̄`), and its order `O(γ̄h̄)` (`tc_hc2_skew.jl`). Lead: Anatolyev &
+   Sølvsten's leave-three-out estimator would give an unbiased `V̂` under
+   heteroskedasticity, to be measured against HC2's coverage. Open: a usable
    constant with heteroskedastic errors.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
