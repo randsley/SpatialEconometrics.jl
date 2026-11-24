@@ -36,7 +36,8 @@ give its worst case over symmetric homoskedastic laws, the rate `O(K/n)` and
 its concentration, and Proposition 6″ gives `CS`'s coverage when K/n → θ > 0
 (`tc_hc2_worst.jl`, `tc_hc2_rate.jl`). Lemma 11 extends the rate to
 heteroskedastic errors with a bounded variance ratio (`tc_hc2_hetero.jl`,
-`tc_hc2_hetero_rate.jl`). The
+`tc_hc2_hetero_rate.jl`), and Lemma 12 gives the exact worst case with
+skewed errors (`tc_hc2_skew.jl`). The
 bias-aware interval is compared with Armstrong & Kolesár's, and their
 optimal combination of moments is measured (`tc_combine.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
@@ -2915,6 +2916,93 @@ So `|β_het(4)| ≈ 0.35·K/n` in this design family, against Lemma 8's
 equal-variance `≈ 0.07·K/n`. The lemma proves the order. The constant is
 measured only, and it depends on the design.
 
+**Lemma 12 (the worst case with skewed errors, homoskedastic; proved).**
+In Lemma 7, let `σᵢ² = 1` and let `γₖ = μ₃ₖ` be free. Write
+`T = D⁻¹(H∘M∘M)`, `A = Q₂ + L₅ᴳ` (Lemma 8), and let `𝓑` be the range of
+`C′[X, B]`, so that `b = C′f ∈ 𝓑` for every `f ∈ span(B)`. Then:
+
+(a) `E V̂ − V = A + Σₖ cₖκₖ + 2b′Tγ` and `V = V₀ + ‖b‖²`, for every law
+and every `f`.
+
+(b) For iid errors with `|γ| ≤ γ̄` and `Σₖcₖ ≥ 0`, and over all
+`f ∈ span(B)`, let `τ = ‖Π_𝓑T1‖` and `a(γ) = A − 2Σₖcₖ + γ²Σₖcₖ`. Then
+
+    β_V ≥ β_skew(γ̄) = min over 0 ≤ γ ≤ γ̄ of [a(γ) − √(a(γ)² + 4γ²τ²V₀)] / (2V₀),
+
+with equality for the two-point law of skewness `γ` and
+`b = −s*Π_𝓑T1/τ`, where `s* = [a + √(a² + 4γ²τ²V₀)]/(2γτ)`. At `γ = 0`
+this is Lemma 8's `β_min`.
+
+(c) `β_min − γ̄τ/√V₀ ≤ β_skew(γ̄) ≤ β_min`, and
+
+    τ/√V₀ ≤ ‖C‖₁h̄ / ((1 − h̄)√(V₀/n)),
+
+where `‖C‖₁` is the largest absolute column sum. So skewness adds
+`O(γ̄h̄)` to the worst case. That is `O(K/n)` when the leverage is
+balanced (`h̄ ≤ c·K/n`), as for a local basis on spread-out locations.
+
+(d) For unit-specific `|γₖ| ≤ γ̄` and `κₖ ≤ κ̄` where `cₖ < 0`, the same
+lower bound holds with Lemma 8(c)'s `β_min`, and with `τ` replaced by
+`sup ‖Π_𝓑Tγ‖` over the box. That supremum is at most
+`γ̄√n‖C‖₁h̄/(1 − h̄)`.
+
+*Proof.* (a) With `σ² = 1`, Lemma 7(d) leaves `Q₂`, `Q₃`, `L₂`, the `κ`
+part of `L₃`, and `L₅`. `L₂ = 2Σᵢbᵢ(Tγ)ᵢ`. The rest is Lemma 8(a). `V` has
+no `μ₃` term, because `Cov(b′ε, ε′Cε) = Σᵢ bᵢCᵢᵢμ₃ᵢ = 0`.
+(b) Every law has `κ ≥ γ² − 2` (Pearson), with equality only for a
+two-point law. The bias is linear in `κ` with slope `Σₖcₖ ≥ 0`, so
+`κ = γ² − 2`. Replacing `(γ, b)` by `(−γ, −b)` changes nothing, so take
+`γ ≥ 0`. Write `b = s·v` with `v ∈ 𝓑` a unit vector. The numerator
+`a + 2γs·v′T1` is smallest at `v = −Π_𝓑T1/τ`, which leaves
+`(a − 2γτs)/(V₀ + s²)`. That is the Rayleigh quotient of
+`[[a, −γτ√V₀], [−γτ√V₀, 0]]/V₀` at `(√V₀, s)`, and the minimum over `s`
+is its smaller eigenvalue.
+(c) `√(a² + 4g²V₀) ≤ |a| + 2g√V₀`, and `a(γ) ≥ a(0)`. For the rate:
+`|Pᵢₖ| ≤ √(hᵢhₖ) ≤ h̄`, so `|Hᵢₖ| = |(C′P_B)ᵢₖ| ≤ h̄Σⱼ|Cⱼᵢ| ≤ ‖C‖₁h̄`.
+Then `(T1)ᵢ = HᵢᵢMᵢᵢ + Σ_{k≠i} HᵢₖPᵢₖ²/Mᵢᵢ` has
+`|(T1)ᵢ| ≤ ‖C‖₁h̄(1 + hᵢ/Mᵢᵢ) ≤ ‖C‖₁h̄/(1 − h̄)`, and `τ ≤ ‖T1‖`.
+(d) `κₖ ≥ γₖ² − 2 ≥ −2` where `cₖ > 0`, so `a ≥ V₀β_min`, and the same
+eigenvalue bound applies. The row bound of (c) holds for `|Tγ|`. ∎
+
+**Measured (`tc_hc2_skew.jl`).** It uses the four designs of
+`tc_hc2_hetero.jl` (`n` = 900) with `γ̄` = 1 and 2.
+- **(b) is exact.** A brute-force search over 2,002 directions in `𝓑`, a
+  grid of `γ` and the size of `b` never goes below the closed form. Its
+  smallest value differs from the closed form by at most 4e-5, and the
+  closed form's own `b` attains it.
+- **The simulation agrees.** At the worst `(γ, f)`, with two-point errors
+  and R = 4000, the simulated `E V̂/V` matches the prediction (`|z|` ≤ 1.8).
+  At `f = 0` it does too.
+- **Power.** At the worst `f`, in the three designs where the worst `γ` is
+  not 0, the prediction without `L₂` is rejected at
+  `z` = −16 to −39.
+
+| design | symmetric (Lemma 8) | `γ̄ = 1` | `γ̄ = 2` | unit-specific, `γ̄ = 2` | `CS` / oracle at the `γ̄ = 2` worst |
+|---|---|---|---|---|---|
+| jittered, `k = 13` | −0.014 | −0.028 | −0.038 | −0.062 | 0.942 / 0.948 |
+| jittered, `k = 16` | −0.021 | −0.040 | −0.055 | −0.090 | 0.945 / 0.953 |
+| random, `k = 10` | −0.010 | −0.019 | −0.026 | −0.053 | 0.948 / 0.949 |
+| rook, `k = 13` | −0.012 | −0.012 | −0.012 | −0.019 | 0.947 / 0.948 |
+
+- **Skewness costs up to 2.7 times the symmetric worst case** with one
+  common `γ`. With unit-specific `γₖ` the search finds 1.6 to 2 times more
+  again, but only as an attained value.
+- **On the rook lattice it costs nothing** with a common `γ`. There `τ` is
+  small, and the higher kurtosis forced by Pearson's bound outweighs the
+  skewness term.
+- **The order is `K/n`, not `√(K/n)`.** On the jittered grid,
+  `τ/√V₀ / (K/n)` was 0.13–0.17 at `k` = 7–16 (`n` = 900). At
+  `K/n ≈ 0.19` it was 0.15, 0.14, 0.15 and 0.15 at `n` = 400, 900, 1,600
+  and 2,500. The crude bound `τ² ≤ ‖H‖_F²` would allow `√(K/n)`.
+- **(c)'s inequalities hold.** Its first one is within a factor of 2. Its
+  rate bound `τ̄` holds but is 400–4,500 times loose here, because the
+  largest leverage (0.33–0.95) is far above `K/n`.
+
+So with a stated skewness bound and one common law, the worst case can be
+computed from the design alone, exactly, for about the cost of
+`vhat_worst_bias`: one `n × n × n` product for `T` and an SVD of
+`C′[X, B]`.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -3091,7 +3179,9 @@ linear in `y`.
    (`tc_hc2_hetero.jl`). Lemma 11 proves the rate `O(q²K/n)` for variance
    ratio `q`, with a bound that holds but is 155–3,052 times loose. The
    measured constant is about 0.35 at `q = 4` (`tc_hc2_hetero_rate.jl`).
-   Open: skewed errors (`L₂`, linear in `b`), and a usable constant.
+   Lemma 12 gives the exact worst case with skewed errors (one law,
+   `|γ| ≤ γ̄`), and its order `O(γ̄h̄)` (`tc_hc2_skew.jl`). Open: a usable
+   constant with heteroskedastic errors.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
