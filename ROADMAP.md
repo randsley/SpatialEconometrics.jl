@@ -1327,7 +1327,9 @@ and the method are in `research/trace_cfe/`.
   length". The joint (trust-region) bound is proved and measured, not
   built (THEORY.md, Lemma 6 and Proposition 8, `tc_trust.jl`): it is
   0–11% shorter at the basis Corollary 7′ chooses, and most of the
-  looseness is in the class.
+  looseness is in the class. Armstrong & Kolesár's optimal combination of
+  the candidate moments is measured and not built either
+  (`tc_combine.jl`): the oracle gains 0.6–1.8% at `k = 15`.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500

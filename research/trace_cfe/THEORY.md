@@ -30,7 +30,8 @@ Proposition 7′ (`tc_resd_approx.jl`). Corollary 7′ lets the data choose
 the basis as well as λ, once the class is on the reference. Lemma 6 and
 Proposition 8 give the joint (trust-region) bound of the two terms, and
 show that most of Lemma 5's looseness is in the class (`tc_trust.jl`). The
-bias-aware interval is compared with Armstrong & Kolesár's.
+bias-aware interval is compared with Armstrong & Kolesár's, and their
+optimal combination of moments is measured (`tc_combine.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
 and their output. ROADMAP #13,
 research item, theory step 1.
@@ -2505,7 +2506,36 @@ and subscripts restored. No formula of theirs is used here.
    bias of a combination `Σ_λ w_λ g_λ` is again linear plus quadratic in
    `z̃`, with `ã_w = Σ w_λ ã_λ` and `H̃_w = Σ w_λ H̃_λ`. So Lemmas 5 and 6
    bound it, and their trade-off can be computed. It needs the covariance
-   of the moments across λ. It is not built, and not measured.
+   of the moments across λ.
+
+   **Measured** (`tc_combine.jl`, the oracle). The design is tc_trust's,
+   with all quantities exact for `f̃` (normal errors, so the covariance
+   needs no fourth moments). The candidates are REsd at `ρ₀` and the
+   smoother at 11 values of λ. The script minimises
+   `ℓ(w) = cv(b̃(w)/√V_w)√V_w` over `w′J = 1` by Nelder–Mead, started at
+   the best single candidate. The optimiser recovers a closed-form (GLS)
+   optimum to 2.4e-11. The criterion, set before the run, was a gain of
+   10% at `k = 15` for both `ℛ̃*` and `4ℛ̃*`.
+
+   | k | a | `ℛ̃` | best single | combination | change |
+   |---|---|---|---|---|---|
+   | 5 | 1 | `ℛ̃*` | 0.146 | 0.142 | −3.0% |
+   | 5 | 1 | `4ℛ̃*` | 0.614 | 0.327 | −46.7% |
+   | 15 | 1 | `ℛ̃*` | 0.118 | 0.117 | −1.1% |
+   | 15 | 1 | `4ℛ̃*` | 0.177 | 0.175 | −0.6% |
+   | 5 | 4 | `ℛ̃*` | 0.352 | 0.286 | −18.6% |
+   | 5 | 4 | `4ℛ̃*` | 1.864 | 1.375 | −26.2% |
+   | 15 | 4 | `ℛ̃*` | 0.160 | 0.159 | −0.7% |
+   | 15 | 4 | `4ℛ̃*` | 0.429 | 0.422 | −1.8% |
+
+   The entries are half-lengths. The oracle coverage of every row is
+   0.967–1.000. At `k = 15` the gain is 0.6–1.8%, so the criterion is not
+   met, and the combination is not built. Neighbouring moments are highly
+   correlated (0.93–1.00). At the coarse basis the combination cancels part
+   of the worst-case bias and gains up to 47%, but it is still longer than
+   the best single candidate at `k = 15` (1.375 against 0.429 at `a = 4`,
+   `4ℛ̃*`), which Corollary 7′ would choose. A plug-in can only lose more,
+   because the oracle uses the true `ã_j`.
 
 Armstrong & Kolesár (2018) also cover a coefficient in a partly linear
 regression with the nonparametric part in a convex class. That is the
@@ -2582,9 +2612,10 @@ linear in `y`.
    `root_rho`. Armstrong & Kolesár are read and compared (the section
    before this one): the interval is theirs for one moment, and the
    differences come from a bias that is quadratic in `f` with `f₀` free.
-   Still open: a sharper form of (iv)'s third condition; the efficiency
-   bound with `f_B` estimated; and the optimal combination of the
-   candidate moments, which Lemmas 5 and 6 make computable. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
+   The optimal combination of the candidate moments is measured in that
+   section (`tc_combine.jl`): it gains under 2% at a fine basis, so it is
+   not built. Still open: a sharper form of (iv)'s third condition; and
+   the efficiency bound with `f_B` estimated. "Choosing ℛ" (`tc_rchoice.jl`) answers how to pick `ℛ`: state
    it through a reference surface or a curvature bound, err large, and
    report the result across `ℛ`. The data cannot certify it (a remark,
    proved), and every plug-in rule tried under-covers.

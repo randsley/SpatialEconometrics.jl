@@ -1,0 +1,27 @@
+(0) optimiser: three unbiased moments, ℓ found 0.85846219, closed form (GLS) 0.85846219, rel. gap 2.4e-11; best single 2.369956 (power: longer by 176%)
+
+k = 5 (K = 26), a = 1, k̃ = 30, ℛ̃* = 0.720; 12 candidates; Lanczos χ against LAPACK, largest rel. gap 3.0e-15; setup 0.1 min
+  single b̃/√V at ℛ̃* (REsd, then λ = 10^-3, 10^-2, …, 10^2; compare tc_trust.jl (1)): 1.326 1.108 1.107 1.110 1.541 2.795 3.728
+  correlation of the moments: REsd with λ = 10^-3 0.983; neighbouring λ 0.980–1.000; λ = 10^-3 with 10^2 0.749
+  ℛ̃ × 1: best single λ 0.3162  ℓ 0.14628 (coverage 0.992) | combination ℓ 0.14182 (-3.0%, coverage 0.984), b̃/√V 0.861, b_TR/√V 0.682, |β|/√V 0.286 | weight shares λ 0.0100 0.21, λ 0.1000 0.19, λ 0.3162 0.15 | 4.5 min
+  ℛ̃ × 4: best single λ 0.3162  ℓ 0.61437 (coverage 1.000) | combination ℓ 0.32730 (-46.7%, coverage 1.000), b̃/√V 2.381, b_TR/√V 1.762, |β|/√V 0.102 | weight shares λ 0.0032 0.24, REsd@ρ₀ 0.17, λ 0.0010 0.14 | 2.9 min
+
+k = 15 (K = 226), a = 1, k̃ = 30, ℛ̃* = 0.720; 12 candidates; Lanczos χ against LAPACK, largest rel. gap 8.9e-16; setup 0.1 min
+  single b̃/√V at ℛ̃* (REsd, then λ = 10^-3, 10^-2, …, 10^2; compare tc_trust.jl (1)): 0.137 0.119 0.128 0.185 0.352 0.903 2.280
+  correlation of the moments: REsd with λ = 10^-3 0.962; neighbouring λ 0.970–0.997; λ = 10^-3 with 10^2 0.418
+  ℛ̃ × 1: best single λ 3.1623  ℓ 0.11785 (coverage 0.968) | combination ℓ 0.11651 (-1.1%, coverage 0.967), b̃/√V 0.488, b_TR/√V 0.482, |β|/√V 0.208 | weight shares λ 1.0000 0.21, λ 3.1623 0.20, λ 10.0000 0.18 | 4.6 min
+  ℛ̃ × 4: best single λ 0.3162  ℓ 0.17656 (coverage 0.994) | combination ℓ 0.17548 (-0.6%, coverage 0.995), b̃/√V 1.149, b_TR/√V 1.060, |β|/√V 0.031 | weight shares λ 0.3162 0.22, λ 3.1623 0.18, λ 0.1000 0.16 | 5.2 min
+
+k = 5 (K = 26), a = 4, k̃ = 30, ℛ̃* = 2.880; 12 candidates; Lanczos χ against LAPACK, largest rel. gap 3.0e-15; setup 0.1 min
+  single b̃/√V at ℛ̃* (REsd, then λ = 10^-3, 10^-2, …, 10^2; compare tc_trust.jl (1)): 11.140 9.340 9.347 9.916 15.751 18.010 18.834
+  correlation of the moments: REsd with λ = 10^-3 0.982; neighbouring λ 0.931–1.000; λ = 10^-3 with 10^2 0.344
+  ℛ̃ × 1: best single λ 3.1623  ℓ 0.35194 (coverage 1.000) | combination ℓ 0.28642 (-18.6%, coverage 0.998), b̃/√V 4.558, b_TR/√V 3.768, |β|/√V 3.388 | weight shares λ 3.1623 0.18, λ 10.0000 0.17, λ 1.0000 0.14 | 3.7 min
+  ℛ̃ × 4: best single λ 31.6228 ℓ 1.86379 (coverage 1.000) | combination ℓ 1.37525 (-26.2%, coverage 1.000), b̃/√V 59.317, b_TR/√V 55.314, |β|/√V 11.690 | weight shares λ 0.1000 0.19, λ 3.1623 0.17, λ 1.0000 0.12 | 3.9 min
+
+k = 15 (K = 226), a = 4, k̃ = 30, ℛ̃* = 2.880; 12 candidates; Lanczos χ against LAPACK, largest rel. gap 8.9e-16; setup 0.1 min
+  single b̃/√V at ℛ̃* (REsd, then λ = 10^-3, 10^-2, …, 10^2; compare tc_trust.jl (1)): 0.705 0.581 0.619 0.875 2.232 9.465 15.669
+  correlation of the moments: REsd with λ = 10^-3 0.943; neighbouring λ 0.938–0.997; λ = 10^-3 with 10^2 0.216
+  ℛ̃ × 1: best single λ 0.3162  ℓ 0.16037 (coverage 0.990) | combination ℓ 0.15923 (-0.7%, coverage 0.991), b̃/√V 1.304, b_TR/√V 1.216, |β|/√V 0.554 | weight shares λ 0.3162 0.22, λ 1.0000 0.17, λ 3.1623 0.14 | 6.5 min
+  ℛ̃ × 4: best single λ 0.1000  ℓ 0.42938 (coverage 1.000) | combination ℓ 0.42176 (-1.8%, coverage 1.000), b̃/√V 4.807, b_TR/√V 3.712, |β|/√V 0.259 | weight shares λ 0.0100 0.23, λ 0.0316 0.22, λ 0.1000 0.19 | 8.4 min
+
+total 40.3 min
