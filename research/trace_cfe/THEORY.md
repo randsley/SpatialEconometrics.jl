@@ -31,7 +31,10 @@ the basis as well as λ, once the class is on the reference. Lemma 6 and
 Proposition 8 give the joint (trust-region) bound of the two terms, and
 show that most of Lemma 5's looseness is in the class (`tc_trust.jl`).
 Lemma 7 gives the exact bias of the HC2 `V̂` at `ρ₀` for any error law, the
-first step towards `CS` when K/n → θ > 0 (`tc_hc2_bias.jl`). The
+first step towards `CS` when K/n → θ > 0 (`tc_hc2_bias.jl`). Lemmas 8–10
+give its worst case over symmetric homoskedastic laws, the rate `O(K/n)` and
+its concentration, and Proposition 6″ gives `CS`'s coverage when K/n → θ > 0
+(`tc_hc2_worst.jl`, `tc_hc2_rate.jl`). The
 bias-aware interval is compared with Armstrong & Kolesár's, and their
 optimal combination of moments is measured (`tc_combine.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
@@ -2616,15 +2619,172 @@ run with Rademacher, uniform and normal errors, at R = 4000.
   at `n` = 900 is the normal approximation of `g`, not `V̂`.
 
 So in these designs, the HC2 `V̂`'s bias costs at most 0.003 of coverage,
-whatever the symmetric law. Still to do:
-- **a bound on `β_min` from the leverage alone**, so that the lemma gives
-  a rate without computing `Q₂`, `L₅ᴳ` and `cₖ`;
-- **the concentration lemma**;
-- **the proposition**, then a check through `root_rho`, whose `C(ρ̃)` is
-  random, unlike the fixed `C(ρ₀)` here.
+whatever the symmetric law. `root_rho` reports `β_min` at its final moment
+matrix as `vhat_worst_bias`, with the coverage it implies.
 
-`β_min` could also be reported by `root_rho` as a diagnostic. It costs
-`O(n³)`, as the HC2 `V̂` already does. It is not built.
+**Lemma 9 (the rate of the worst case; proved).** Under Lemma 8's
+hypotheses, write `h = diag(P_B)`, `h̄ = maxᵢ hᵢ`, `rᵢ = hᵢ/Mᵢᵢ` and
+`V₀ = 2Σᵢⱼ Ωᵢⱼ`. Then
+
+    |β_min| ≤ β̄ = [4‖C′P_B‖_F² + 4(1 + h̄) r′Ωr] / V₀,
+
+and
+
+    β̄ ≤ (K/n) · [4‖C‖² + 4(1 + h̄)h̄‖Ω‖_∞/(1 − h̄)²] / (V₀/n).
+
+So if `‖C‖` and `‖Ω‖_∞` (the largest row sum) are bounded, `h̄ ≤ 1 − δ` and
+`V₀ ≥ cn` (A5), then `β_min = O(K/n)`. The bias is of order θ when
+`K/n → θ`, and vanishes when `K/n → 0`, as Proposition 2 requires.
+
+*Proof.* At `κ = −2`, Lemma 8(a) gives
+`β_min V₀ = Q₂ + L₅ᴳ − 4Σₖuₖ′Ωuₖ − 2Σᵢₖ Hᵢₖ²Mᵢₖ²/Mᵢᵢ + 2Σₖuₖ′(H∘H)uₖ`
+when this is negative. The last term is ≥ 0, so drop it.
+(i) `M` is positive semi-definite, so `Mᵢₖ² ≤ MᵢᵢMₖₖ`. Hence
+`|L₅ᴳ| ≤ 2‖H‖_F²`, and `Σᵢₖ Hᵢₖ²Mᵢₖ²/Mᵢᵢ ≤ Σᵢₖ Hᵢₖ²Mₖₖ ≤ ‖H‖_F²`. Since
+`CP_B = 0`, `H = (C + C′)P_B = C′P_B`.
+(ii) `Ωᵢᵢ = 0`, so `4Σₖuₖ′Ωuₖ − Q₂ = 4Σ_{i≠j} Ωᵢⱼ(Σₖ Mᵢₖ²Mⱼₖ² − Mᵢⱼ²)/(MᵢᵢMⱼⱼ)`.
+For `i ≠ j`, `Mᵢⱼ = −Pᵢⱼ`, and `Σₖ Mᵢₖ²Mⱼₖ² = (Mᵢᵢ² + Mⱼⱼ²)Pᵢⱼ² +
+Σ_{k≠i,j} Pᵢₖ²Pⱼₖ²`. Since `Mᵢᵢ² + Mⱼⱼ² ≤ 2`, the bracket is at most
+`Pᵢⱼ² + Σₖ Pᵢₖ²Pⱼₖ²`. Here `Pᵢⱼ² ≤ hᵢhⱼ`, and
+`Σₖ Pᵢₖ²Pⱼₖ² ≤ (maxₖ Pⱼₖ²)Σₖ Pᵢₖ² ≤ h̄hⱼhᵢ`. With `Ω ≥ 0` entrywise, the
+difference is at most `4(1 + h̄)r′Ωr`.
+Adding (i) and (ii) gives `−β_min V₀ ≤ 4‖H‖_F² + 4(1 + h̄)r′Ωr`.
+For the rate: `‖C′P_B‖_F² ≤ ‖C‖²‖P_B‖_F² = ‖C‖²K`. Also
+`r′Ωr ≤ ‖Ω‖_∞‖r‖²`, because `Ω` is symmetric and non-negative, and
+`‖r‖² ≤ h̄Σᵢhᵢ/(1 − h̄)² = h̄K/(1 − h̄)²`. ∎
+
+**Measured (`tc_hc2_rate.jl`, part 1, the ten designs of Lemma 8).**
+- **The bound holds.** `β̄ ≥ |β_min|` in every design.
+- **It is loose.** `β̄/|β_min|` is 6 (rook, `k = 9`) to 221 (jittered,
+  `k = 19`, leverage 0.999), and `β̄/(K/n)` is 0.5–12.7.
+
+So the lemma gives the rate, not a usable number. Its looseness grows with
+the leverage, through `1/(1 − h̄)²` and the cancellations that (i) and
+(ii) ignore. This is why `root_rho` computes `β_min` exactly.
+
+**Lemma 10 (`V̂` concentrates; proved).** Let `C` be fixed, and assume:
+- (i) independent errors with `E εᵢ = 0` and `E εᵢ⁸ ≤ c`;
+- (ii) `Mᵢᵢ ≥ δ > 0`;
+- (iii) `‖C‖₁, ‖C‖_∞ ≤ c` (largest column and row sums of `|C|`), and
+  `‖P_B‖_∞ ≤ c`, a **local basis**;
+- (iv) `‖f‖_∞ ≤ c`.
+
+Then `Var V̂ ≤ c′n`. With A5 (`V ≥ cn`),
+`V̂/V − E V̂/V = O_p(n^{−1/2})`.
+
+(iii) holds for `C = (G′ − Δ)M` when the row and column sums of `|G(ρ₀)|`
+are bounded, as is usual for a SAR model, and `‖P_B‖_∞` is bounded. The
+second condition is new. It says each unit's fitted value draws on a
+bounded total weight of the others. It holds for a B-spline or hat basis
+whose Gram matrix is banded and well conditioned, because the inverse of
+such a matrix decays exponentially away from the band (Demko, Moss &
+Smith, 1984; cited from its standard use, not read for this note). It
+fails for a global basis such as polynomials of growing degree.
+
+*Proof.* Write `V̂ = s′Ψs + Σᵢ b̂ᵢ²sᵢ`, with
+`Ψ = 2Ω − (H∘H + (H∘H)′)/2`, since `Σᵢ noiseᵢsᵢ = s′(H∘H)s`.
+- **Bounded weights.** For any matrix `A`, `Σⱼ Aᵢⱼ² ≤ ‖A‖_∞²`. So
+  `‖Ω‖_∞ ≤ ‖Cs‖_∞²` and `‖H∘H‖_∞ ≤ ‖H‖_∞²`. With
+  `‖H‖_∞ ≤ ‖C + C′‖_∞‖P_B‖_∞` and
+  `‖H‖₁ ≤ ‖C + C′‖₁‖P_B‖_∞` (`P_B` is symmetric), (iii) gives
+  `‖Ψ‖_∞ ≤ c`, `‖H‖₁, ‖H‖_∞ ≤ c` and `‖M‖₁ ≤ 1 + ‖P_B‖_∞ ≤ c`.
+- **Bounded moments.** `ûᵢ = Σₖ Mᵢₖεₖ` with `Σₖ Mᵢₖ² = Mᵢᵢ ≤ 1`, so
+  Rosenthal's inequality and (i) give `E ûᵢ⁸ ≤ c`. In the same way,
+  `ζᵢ = (Hε)ᵢ` has `E ζᵢ⁸ ≤ c`. `b = Hf`, so `|bᵢ| ≤ ‖H‖_∞‖f‖_∞ ≤ c` by
+  (iv), and `b̂ᵢ = bᵢ + ζᵢ` has a bounded eighth moment. By (ii),
+  `E sᵢ⁴ ≤ c`, and by Minkowski, `E(Ψs)ᵢ⁴ ≤ c`.
+- **Efron–Stein.** `Var V̂ ≤ ½Σₗ E(V̂ − V̂⁽ˡ⁾)²`, where `V̂⁽ˡ⁾` replaces
+  `εₗ` by an independent copy `εₗ′`. Write `Δ = εₗ′ − εₗ`, `m = Meₗ` and
+  `η = Heₗ`. Then `û` moves by `Δm`, `b̂` by `Δη`, and `sᵢ` by
+  `δsᵢ = (2Δûᵢmᵢ + Δ²mᵢ²)/Mᵢᵢ`. So
+  `V̂⁽ˡ⁾ − V̂ = 2δs′Ψs + δs′Ψδs + Σᵢ(2Δηᵢb̂ᵢ + Δ²ηᵢ²)(sᵢ + δsᵢ) + Σᵢ b̂ᵢ²δsᵢ`.
+  Each term is a sum `Σᵢ aᵢYᵢ` or `Σᵢⱼ aᵢΨᵢⱼa′ⱼYᵢⱼ`, with weights `aᵢ` among
+  `mᵢ`, `mᵢ²`, `ηᵢ`, `ηᵢ²` and their products. The weights satisfy
+  `Σᵢ|aᵢ| ≤ c`, because `Σᵢ|mᵢ| ≤ ‖M‖₁`, `Σᵢ|ηᵢ| ≤ ‖H‖₁` and
+  `|mᵢ|, |ηᵢ| ≤ c`. For the double sum,
+  `Σᵢⱼ|aᵢ||Ψᵢⱼ||a′ⱼ| ≤ ‖a′‖_∞‖Ψ‖_∞Σᵢ|aᵢ|`.
+- **Each term is bounded.** Each `Y` is a product of at most four factors
+  among `Δ`, `ûᵢ`, `b̂ᵢ`, `sᵢ` and `(Ψs)ᵢ`, of degree at most 4 in the
+  errors, so `E Y²` needs moments of order at most 8. By Hölder's inequality and the moment bounds above,
+  `E Y² ≤ c`. For example, `E[Δ²ûᵢ²b̂ᵢ⁴] ≤ (EΔ⁸)^{1/4}(Eûᵢ⁸)^{1/4}(Eb̂ᵢ⁸)^{1/2}`.
+  `E(Σᵢ aᵢYᵢ)² ≤ (Σᵢ|aᵢ|)² maxᵢ E Yᵢ²`, so `E(V̂ − V̂⁽ˡ⁾)² ≤ c` for every
+  `ℓ`, and `Var V̂ ≤ cn`. ∎
+
+Without (iii)'s local basis, `Σᵢ|mᵢ|` can be of order `√(nhₗ)`, and the
+argument gives only `Var V̂ = O(n²)`.
+
+**Measured (`tc_hc2_rate.jl`, part 2).** The design is the jittered grid
+with `n` = 400, 900 and 1600, at `K/n` ≈ 0.09 and ≈ 0.19 (hat bases
+`k` = 6, 9, 12 and 9, 13, 17), with `f = x + P_Bg`. The errors are
+normal or `χ²₃`, and R = 2000.
+- **(iii) holds in these designs.** `‖P_B‖_∞` is 4.3–4.7 and flat in `n`.
+- **`V̂` concentrates at the rate.** With constant variances, and with
+  bounded ones (iid uniform on [0.2, 1.8]), `√n·sd(V̂/V)` is flat in `n`.
+  The slope of log sd on log `n` is −0.45 to −0.53, against the lemma's
+  −1/2.
+- **Power.** The same slope for `g²/V`, which does not concentrate, is
+  −0.17 to +0.09.
+- **The counter-example.** With iid log-normal variances, as in
+  `tc_hc2_bias.jl`, `√n·sd(V̂/V)` grows from 8.9 to 10.6 (`χ²₃`,
+  `K/n ≈ 0.09`), and the slopes are −0.34 to −0.48 and erratic. These
+  variances have no bound, so the largest of them grows with `n`, and
+  the errors' eighth moments are not bounded uniformly, as (i) requires. That design is outside
+  the lemma.
+
+**Proposition 6″ (the test-inversion set when `K/n → θ ∈ [0, 1)`;
+proved).** Let `C` be as in Proposition 6, and assume:
+- Theorem 1's conditions with `K/n → θ`, so `g(ρ₀)/√V ⇒ N(0, 1)`;
+- A5 (`V ≥ cn`);
+- Lemma 10's (i)–(iv).
+
+Let `β_V = (E V̂(ρ₀) − V)/V` (Lemma 7). Then:
+
+(a) `P(ρ₀ ∈ CS) − [2Φ(z√(1 + β_V)) − 1] → 0`, provided
+`liminf β_V > −1`.
+
+(b) Under Lemma 8's hypotheses (homoskedastic, symmetric, `Σₖcₖ ≥ 0`),
+`liminf P(ρ₀ ∈ CS) ≥ liminf [2Φ(z√(1 + β_min)) − 1]`. By Lemma 9,
+`β_min = O(K/n)`, so the loss of coverage is
+`zφ(z)|β_min|(1 + o(1)) + o(1)`, which is `0.115|β_min|` at 95%.
+
+*Proof.* (a) `ρ₀ ∈ CS` if and only if `(g/√V)² ≤ z²V̂/V`. By Lemma 10 and
+A5, `V̂/V = 1 + β_V + O_p(n^{−1/2})`. `β_V` is bounded, because each of
+Lemma 7's terms is `O(n)` under Lemma 10's conditions and `V ≥ cn`. Take
+any subsequence along which `β_V → β*`, with `β* > −1`. Along it, Slutsky's
+lemma gives `P(ρ₀ ∈ CS) → P(χ²₁ ≤ z²(1 + β*)) = 2Φ(z√(1 + β*)) − 1`. Every
+subsequence has a further such subsequence, and `Φ` is continuous, so the
+difference tends to 0.
+(b) Lemma 8(b) gives `β_V ≥ β_min`, and `2Φ(z√(1 + β)) − 1` increases in
+`β`. Its derivative at `β = 0` is `zφ(z)`. ∎
+
+So the HC2 `V̂` is not consistent when `K/n → θ > 0`, but the set still
+covers. Its coverage is off by the explicit amount in (a). With
+homoskedastic symmetric errors, (b) bounds the shortfall from the design
+alone, and `root_rho` reports that bound.
+
+Outside (b), with heteroskedastic or skewed errors, (a) still holds, but
+`β_V` has no design-only lower bound. The −1% to +20% of `tc_hc2_bias.jl`
+is what was measured there. (a) uses `C` as Proposition 6 does: Theorem 1
+and Lemma 10 are stated for a fixed `C`, while `root_rho`'s `C(ρ̃)` is
+random.
+
+**Measured through `root_rho` (`validation/mc_root_rho_hc2_worst.jl`).**
+The design is a jittered 30 × 30 grid, with kNN-6 and
+`basis = tensor_pspline(u, v; k)` for `k` = 9, 13, 16 (`K/n` = 0.09,
+0.19, 0.29; leverage up to 0.986). The errors are Rademacher or normal, and
+`f` is 0 or `0.5x + P_Bg`. R = 1000 per cell, 12 cells, with the prediction
+computed at `C(ρ₀)`. The pass criterion, set before the run, was met in
+every cell:
+- **`CS` covers 0.944–0.966.** The prediction `2Φ(z√(1 + β_V)) − 1` is
+  0.947–0.955, and every cell is within 0.012 of it (the allowance was
+  0.021, 3 SE). Every cell is also above the bound from the reported
+  `vhat_worst_bias`, less 3 SE.
+- **Power.** With `V̂` scaled by 0.7, the coverage is 0.888–0.920, within
+  0.015 of its prediction, 0.895–0.906, and below 0.929 in every cell.
+- **The diagnostic.** The mean reported `vhat_worst_bias` (at `C(ρ̃)`) is
+  within 0.0001 of `β_min` at `C(ρ₀)`.
+- **The set.** Membership in `r.cs` agreed with `g(ρ₀)² ≤ z²V̂(ρ₀)` in all
+  12,000 draws.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
@@ -2785,15 +2945,20 @@ linear in `y`.
    `χ²₃` errors (`tc_ar.jl`), at no cost in length where identification is
    strong. Over the whole grid with normal and `χ²₃` errors (180 cells),
    `CS` covers 0.932–0.992, and over-covers (to 0.99) only where the
-   leverage is near 0.95. Open: `CS` for K/n → θ > 0. Started in "The
-   test-inversion set when K/n → θ > 0": Lemma 7 gives the HC2 `V̂(ρ₀)`'s
+   leverage is near 0.95. `CS` for K/n → θ > 0 is Proposition 6″, in "The
+   test-inversion set when K/n → θ > 0". Lemma 7 gives the HC2 `V̂(ρ₀)`'s
    exact bias for any error law (`tc_hc2_bias.jl`). It is −1% to +20% up
    to K/n = 0.40, and `CS` covers 0.931–0.971 there, as the oracle does.
    Lemma 8 gives its worst case over symmetric homoskedastic laws, which
    is Rademacher errors at `f = 0`, computable from the design. In ten
    designs it is −0.4% to −2.3%, a coverage of at least 0.947
-   (`tc_hc2_worst.jl`). Still to do: a leverage bound on that worst case,
-   a concentration lemma, and the proposition.
+   (`tc_hc2_worst.jl`). Lemma 9 bounds it by `O(K/n)`, and Lemma 10
+   proves that `V̂` concentrates with a local basis (`tc_hc2_rate.jl`).
+   Proposition 6″: the coverage tends to `2Φ(z√(1 + β_V)) − 1`, and is at
+   least `2Φ(z√(1 + β_min)) − 1` under Lemma 8's errors. `root_rho`
+   reports `β_min` as `vhat_worst_bias`
+   (`validation/mc_root_rho_hc2_worst.jl`). Open: a design-only bound with
+   heteroskedastic or skewed errors.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
@@ -2874,6 +3039,9 @@ read.
   regression models with many covariates and heteroscedasticity. *Journal of
   the American Statistical Association*, 113(523), 1350–1361.
   doi:10.1080/01621459.2017.1328360
+- Demko, S., Moss, W. F., & Smith, P. W. (1984). Decay rates for inverses of
+  band matrices. *Mathematics of Computation*, 43(168), 491–499.
+  doi:10.2307/2008290
 - de Jong, P. (1987). A central limit theorem for generalized quadratic forms.
   *Probability Theory and Related Fields*, 75, 261–277. doi:10.1007/BF00354037
 - Hall, P., & Heyde, C. C. (1980). *Martingale Limit Theory and Its

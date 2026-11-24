@@ -1,9 +1,9 @@
 # Test suite
 
 `runtests.jl` holds the shared setup and a single outer testset,
-"SpatialEconometrics.jl Full Suite Verification", which includes the 67
+"SpatialEconometrics.jl Full Suite Verification", which includes the 68
 top-level testsets in order from `testsets/`, one file each (`01_…` to
-`50_…`). The list `_TESTSET_FILES` in `runtests.jl` sets the order.
+`51_…`). The list `_TESTSET_FILES` in `runtests.jl` sets the order.
 
 Until 2026-11-19 the testsets sat inline in that outer block, about 11,000
 lines. Julia lowers and compiles a top-level expression as a whole before it
@@ -69,6 +69,7 @@ The numbers follow the order in which the features were added.
 | 48 | `root_rho`'s bias-aware interval: Lemma 4's bound against the exact `f′Af`, the interval against a reference, `λ` chosen by length, `basis_roughness` |
 | 49 | `root_rho` on a reference basis: Lemma 5's bound against the exact bias of an `f` outside `span(B)`, condition (R), `basis_roughness(g, u, v; k)` |
 | 50 | `root_rho` with the basis chosen by the interval's length: the grid as the union of single-basis grids, Bonferroni over every `(basis, λ)` pair, the guards, condition (R) per basis |
+| 51 | `root_rho`'s `vhat_worst_bias` (THEORY.md, Lemma 8): against a dense reimplementation at REsd's final `C`, unchanged with a reference basis, `NaN` for the smoother; Rademacher errors at `f = 0` reach it (Monte Carlo, R = 20000), with power (the bias is detected); the coverage it implies; `show` |
 
 A lettered testset (`4b`, `11c`, …) was added later to its area, usually by
 an audit finding that `docs/AUDIT.md` records.

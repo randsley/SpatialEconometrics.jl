@@ -5803,3 +5803,64 @@ Cell 1 matches the entry above's `k = 15` cell (0.139), so the search costs
 nothing in length; Bonferroni costs 49%. Without a reference the coarsest
 basis wins every draw and under-covers. Not measured: other `W`, `n` or
 error laws, more than three bases.
+
+## `root_rho`: the HC2 `V̂`'s worst-case bias
+
+Added on 2026-11-24. The HC2 `V̂` is not consistent when `K/n → θ > 0`,
+so Proposition 6's argument for the test-inversion set stops there.
+`research/trace_cfe/THEORY.md` now has:
+- Lemma 7: the exact bias of `V̂(ρ₀)`, for any error law;
+- Lemma 8: its worst case over symmetric homoskedastic laws, computed from
+  the design, and reached by Rademacher errors at `f = 0`;
+- Lemma 9: that worst case is `O(K/n)`;
+- Lemma 10: `V̂` concentrates when the basis is local;
+- Proposition 6″: `CS` covers `2Φ(z√(1 + β_V)) − 1` for large `n`, and at
+  least `2Φ(z√(1 + β_min)) − 1` under Lemma 8's errors.
+
+The research checks are `tc_hc2_bias.jl`, `tc_hc2_worst.jl` and
+`tc_hc2_rate.jl`. A projection's result gains `vhat_worst_bias`: Lemma 8 at
+the final moment matrix, `NaN` for the smoother, and `-Inf` when the bias
+has no worst case. `show` prints it with the coverage it implies. It costs
+two `n × n × n` products, 0.04 s at `n` = 900 and 1.8 s at `n` = 3969.
+
+**Testset 51** (17 assertions; testset 49's design, `tensor_pspline`
+`k = 6`, `K/n` = 0.19):
+- **Against an independent dense reimplementation** of Lemma 8 at REsd's
+  final `C`, rebuilt from `ρ̃`: agreement to 1e-9. The value is unchanged
+  with a reference basis, and `NaN` for the smoother.
+- **Rademacher errors at `f = 0`, R = 20000:** `E V̂/V` equals `1 + β_min`
+  within 4 SE (1.93 SE on 1.13, 0.2 SE on 1.10). Power: it differs
+  from 1 by more than 5 SE (27.8 SE on 1.13, 31.1 SE on 1.10). At
+  R = 4000 the agreement statistic was 3.2 SE on 1.13. R = 200000 on
+  another seed gave 1.5 SE, so the formula holds and that seed's first
+  4000 draws were unlucky. R was raised; the bound was not moved.
+- **The coverage formula** against Distributions, to 1e-6. The package's
+  `Φ` is Abramowitz & Stegun 26.2.17.
+- **`show`** prints the line for a projection, and not for the smoother.
+
+**Monte Carlo** (`validation/mc_root_rho_hc2_worst.jl`, output committed):
+- **Design.** A jittered 30 × 30 grid, kNN-6, `X = x`,
+  `basis = tensor_pspline(u, v; k)` with `k` = 9, 13, 16 (`K/n` = 0.09,
+  0.19, 0.29; leverage up to 0.986). Rademacher and normal errors,
+  `f = 0` and `f = 0.5x + P_Bg`, R = 1000, 12 cells, through the released
+  function. The prediction is computed at `C(ρ₀)`; the package uses
+  `C(ρ̃)`.
+- **Criteria, set before the run:**
+  1. coverage within ±0.021 of `2Φ(z√(1 + β_V)) − 1`;
+  2. coverage at or above the reported bound, less 0.021;
+  3. power: with `V̂ × 0.7`, coverage within ±0.021 of its prediction and
+     below 0.929;
+  4. the mean reported `vhat_worst_bias` within 0.005 of `β_min` at
+     `C(ρ₀)`;
+  5. `r.cs` agrees with `g(ρ₀)² ≤ z²V̂(ρ₀)` in every draw.
+
+All five were met in every cell:
+- **Coverage** 0.944–0.966 against predictions of 0.947–0.955, with the
+  largest gap 0.012.
+- **Power** 0.888–0.920.
+- **The diagnostic** within 0.0001 of `β_min` at `C(ρ₀)`.
+- **Membership** agreed in all 12,000 draws.
+
+Not measured: heteroskedastic or skewed errors through the package (the
+research run `tc_hc2_bias.jl` covers them with a fixed `C`), other `W`,
+other `n`.

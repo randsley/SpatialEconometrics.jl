@@ -38,6 +38,16 @@ The result of [`root_rho`](@ref).
 - `root_found` — `false` when the moment has no admissible root at either
   step. Then `rho`, `se` and `ci_wald` are `NaN`, and `cs` is still valid.
 - `rho_bounds`.
+- `vhat_worst_bias` — for a projection, the worst case of the HC2 `V̂`'s
+  relative bias `(E V̂ − V)/V` at `ρ₀`, over symmetric homoskedastic error
+  laws (THEORY.md, Lemma 8). It is computed from `W`, `[X, B]` and the
+  final moment matrix alone, and is reached by Rademacher (`±σ`) errors at
+  `f = 0`. The test-inversion set then covers at least
+  `2Φ(z√(1 + vhat_worst_bias)) − 1` for large `n` (Proposition 6″). It is
+  `0` when the bias cannot be negative, `-Inf` when it has no worst case,
+  and `NaN` for a penalised smoother, where Lemma 8 does not apply. The
+  HC2 `V̂` is not consistent when `K/n` does not tend to 0, and this is the
+  price.
 - `roughness` — the bound `ℛ` given for the bias-aware interval (`NaN`
   when none was asked for).
 - `bias_bound` — `b̄`, the bound on the moment's bias `|E g(ρ₀)|` over the
@@ -106,6 +116,21 @@ Two intervals are returned (see [`RootRhoResult`](@ref)): the Wald interval
 with the HC2 `V̂`, and the test-inversion set `{ρ : g(ρ)² ≤ z²V̂(ρ)}`,
 which stays valid when `ρ` is weakly identified. `V̂(ρ)` is a quartic in `ρ`,
 so the set's endpoints are exact.
+
+**When `K/n` is not small.** The HC2 `V̂` is not consistent when `K/n`
+tends to `θ > 0`. Its relative bias at `ρ₀` has an explicit limit
+(THEORY.md, Lemma 7), and the test-inversion set covers
+`2Φ(z√(1 + β_V)) − 1` for large `n` (Proposition 6″). That needs a local
+basis, one whose projection draws on a bounded total weight of the units
+(Lemma 10), such as [`tensor_pspline`](@ref). With homoskedastic symmetric
+errors, the bias is at least the worst case over error laws, which is
+computed from the design alone (Lemma 8) and reported as
+`vhat_worst_bias`, for a projection. It is `O(K/n)` (Lemma 9). It was −0.4%
+to −2.7% at `K/n` = 0.06–0.40 in the designs measured, so the set's
+coverage stays at or above about 94.7%. With heteroskedastic or skewed
+errors the bias has no such design-only bound. It was −1% to +20% where
+measured. The computation adds two `n × n × n` products, about 1.8 s at
+n = 4000.
 
 ### Arguments
 

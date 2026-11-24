@@ -10,9 +10,9 @@
 > entries). Docstring references are completed, and the test suite is one
 > file per testset. No tag is registered.
 >
-> 33 submodules, 4,355 test assertions in 67 top-level testsets with both
-> package extensions installed and 4,320 (plus 2 broken markers) without
-> them, measured on 2026-11-24 on Julia 1.13.4, and without them on 1.10.13.
+> 33 submodules, 4,372 test assertions in 68 top-level testsets with both
+> package extensions installed and 4,337 (plus 2 broken markers) without
+> them, measured on 2026-11-24 on Julia 1.13.4, and without them on 1.10.14.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
 > 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
@@ -1333,6 +1333,22 @@ and the method are in `research/trace_cfe/`.
   looseness is in the class. Armstrong & Kolesár's optimal combination of
   the candidate moments is measured and not built either
   (`tc_combine.jl`): the oracle gains 0.6–1.8% at `k = 15`.
+- **Built (2026-11-24): `CS` when `K/n → θ > 0`, and `vhat_worst_bias`.**
+  The HC2 `V̂` is not consistent when `K/n → θ > 0`. THEORY.md's Lemmas
+  7–10 give:
+  - its exact bias, for any error law;
+  - its worst case over symmetric homoskedastic laws, computed from the
+    design;
+  - that this worst case is `O(K/n)`;
+  - that `V̂` concentrates with a local basis.
+
+  Proposition 6″ then gives the coverage of `CS`:
+  `2Φ(z√(1 + β_V)) − 1`, and at least `2Φ(z√(1 + β_min)) − 1`.
+  `root_rho` reports `β_min` as `vhat_worst_bias` for a projection (testset
+  51). `validation/mc_root_rho_hc2_worst.jl`: `CS` covers 0.944–0.966 at
+  `K/n` up to 0.29, within 0.012 of the prediction in 12 cells. AUDIT, "the
+  HC2 `V̂`'s worst-case bias". Open: a design-only bound with
+  heteroskedastic or skewed errors.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
@@ -1777,6 +1793,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ `root_rho`'s `reference` basis, Lemma 5) | 33 | 4,328 ¶¹² | 30,113 |
 | **master** (+ `root_rho`'s basis grid, Corollary 7′, and Proposition 1′) | 33 | 4,355 ¶¹³ | 30,203 |
 | **v0.7.0** (tagged 2026-11-24, = the row above) | 33 | 4,355 ¶¹³ | 30,203 |
+| **master** (+ `root_rho`'s `vhat_worst_bias`, Lemmas 7–10 and Proposition 6″) | 33 | 4,372 ¶¹⁴ | 30,275 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1936,8 +1953,14 @@ extensions, and 4,320 plus 2 broken on 1.10.13 without them, both 27 above
 ¶¹²: testset 50 (the basis grid). The `src/` count rose by 90, all in
 `RootRho.jl`.
 
-Measured on master: 33 submodules plus the umbrella across 30,203 lines of
-`src/`, 12,075 lines of tests, 5,397 lines of examples across 34 scripts,
+¶¹⁴ Measured locally on 2026-11-24: 4,372 passed on Julia 1.13.4 with both
+extensions, and 4,337 plus 2 broken on 1.10.14 without them, both 17 above
+¶¹³: testset 51 (the HC2 `V̂`'s worst case). Its Monte Carlo assertion has
+margins of 2.07× on 1.13 and 20× on 1.10 against its bound. The `src/` count
+rose by 72, all in `RootRho.jl`.
+
+Measured on master: 33 submodules plus the umbrella across 30,275 lines of
+`src/`, 12,154 lines of tests, 5,397 lines of examples across 34 scripts,
 398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 

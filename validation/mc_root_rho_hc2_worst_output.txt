@@ -1,0 +1,17 @@
+root_rho's test-inversion set at K/n = 0.09–0.29 against Proposition 6″; n = 900, R = 1000
+Flags: the criteria passed in that cell (1–5, see the header); '-' marks a failure.
+
+k =  9 (K/n 0.091, max leverage 0.490) rademacher f = zero   | β_V -0.0080 → 0.9491, CS 0.9510 | reported β_min -0.0080 (at C(ρ₀) -0.0080) → bound 0.9491 | ×0.7: predicted 0.8976, simulated 0.9030 | 12345
+k =  9 (K/n 0.091, max leverage 0.490) rademacher f = smooth | β_V -0.0069 → 0.9492, CS 0.9510 | reported β_min -0.0080 (at C(ρ₀) -0.0080) → bound 0.9491 | ×0.7: predicted 0.8978, simulated 0.8940 | 12345
+k =  9 (K/n 0.091, max leverage 0.490) normal     f = zero   | β_V +0.0085 → 0.9510, CS 0.9550 | reported β_min -0.0080 (at C(ρ₀) -0.0080) → bound 0.9491 | ×0.7: predicted 0.9004, simulated 0.9030 | 12345
+k =  9 (K/n 0.091, max leverage 0.490) normal     f = smooth | β_V +0.0073 → 0.9508, CS 0.9450 | reported β_min -0.0080 (at C(ρ₀) -0.0080) → bound 0.9491 | ×0.7: predicted 0.9002, simulated 0.8990 | 12345
+k = 13 (K/n 0.189, max leverage 0.853) rademacher f = zero   | β_V -0.0187 → 0.9478, CS 0.9460 | reported β_min -0.0188 (at C(ρ₀) -0.0187) → bound 0.9478 | ×0.7: predicted 0.8957, simulated 0.8950 | 12345
+k = 13 (K/n 0.189, max leverage 0.853) rademacher f = smooth | β_V -0.0158 → 0.9482, CS 0.9500 | reported β_min -0.0188 (at C(ρ₀) -0.0187) → bound 0.9478 | ×0.7: predicted 0.8962, simulated 0.9050 | 12345
+k = 13 (K/n 0.189, max leverage 0.853) normal     f = zero   | β_V +0.0249 → 0.9528, CS 0.9510 | reported β_min -0.0188 (at C(ρ₀) -0.0187) → bound 0.9478 | ×0.7: predicted 0.9031, simulated 0.8970 | 12345
+k = 13 (K/n 0.189, max leverage 0.853) normal     f = smooth | β_V +0.0210 → 0.9523, CS 0.9520 | reported β_min -0.0188 (at C(ρ₀) -0.0187) → bound 0.9478 | ×0.7: predicted 0.9025, simulated 0.8910 | 12345
+k = 16 (K/n 0.286, max leverage 0.986) rademacher f = zero   | β_V -0.0236 → 0.9472, CS 0.9440 | reported β_min -0.0237 (at C(ρ₀) -0.0236) → bound 0.9472 | ×0.7: predicted 0.8948, simulated 0.8880 | 12345
+k = 16 (K/n 0.286, max leverage 0.986) rademacher f = smooth | β_V -0.0197 → 0.9477, CS 0.9640 | reported β_min -0.0237 (at C(ρ₀) -0.0236) → bound 0.9472 | ×0.7: predicted 0.8955, simulated 0.9080 | 12345
+k = 16 (K/n 0.286, max leverage 0.986) normal     f = zero   | β_V +0.0428 → 0.9547, CS 0.9630 | reported β_min -0.0237 (at C(ρ₀) -0.0236) → bound 0.9472 | ×0.7: predicted 0.9060, simulated 0.9200 | 12345
+k = 16 (K/n 0.286, max leverage 0.986) normal     f = smooth | β_V +0.0357 → 0.9539, CS 0.9660 | reported β_min -0.0237 (at C(ρ₀) -0.0236) → bound 0.9472 | ×0.7: predicted 0.9048, simulated 0.9190 | 12345
+
+All criteria met in every cell: yes (33.2 min)

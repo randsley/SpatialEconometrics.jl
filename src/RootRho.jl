@@ -45,10 +45,11 @@ intervals, so smooth **less** than a good fit of `f` would.
 The growing-basis results (a CLT for the moment with a dense `M`, the
 consistency of the HC2 `V̂`, the validity of `CS`, and the penalised
 smoother, and its bias-aware interval) are proved in
-`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 1′, 2, 4, 6, 7
-and 7′, and Lemmas 4 and 5). They have not been checked by anyone else.
-They are measured in that directory and in `validation/mc_root_rho.jl` and
-`validation/mc_root_rho_smoother.jl`.
+`research/trace_cfe/THEORY.md` (Theorem 1, Propositions 1, 1′, 2, 4, 6,
+6″, 7 and 7′, and Lemmas 4, 5 and 7–10). They have not been checked by
+anyone else. They are measured in that directory and in
+`validation/mc_root_rho.jl`, `validation/mc_root_rho_smoother.jl` and
+`validation/mc_root_rho_hc2_worst.jl`.
 
 # References
 
@@ -108,6 +109,16 @@ The result of [`root_rho`](@ref).
 - `root_found` — `false` when the moment has no admissible root at either
   step. Then `rho`, `se` and `ci_wald` are `NaN`, and `cs` is still valid.
 - `rho_bounds`.
+- `vhat_worst_bias` — for a projection, the worst case of the HC2 `V̂`'s
+  relative bias `(E V̂ − V)/V` at `ρ₀`, over symmetric homoskedastic error
+  laws (THEORY.md, Lemma 8). It is computed from `W`, `[X, B]` and the
+  final moment matrix alone, and is reached by Rademacher (`±σ`) errors at
+  `f = 0`. The test-inversion set then covers at least
+  `2Φ(z√(1 + vhat_worst_bias)) − 1` for large `n` (Proposition 6″). It is
+  `0` when the bias cannot be negative, `-Inf` when it has no worst case,
+  and `NaN` for a penalised smoother, where Lemma 8 does not apply. The
+  HC2 `V̂` is not consistent when `K/n` does not tend to 0, and this is the
+  price.
 - `roughness` — the bound `ℛ` given for the bias-aware interval (`NaN`
   when none was asked for).
 - `bias_bound` — `b̄`, the bound on the moment's bias `|E g(ρ₀)|` over the
@@ -147,6 +158,7 @@ struct RootRhoResult{T<:AbstractFloat}
     vhat::T
     root_found::Bool
     rho_bounds::Tuple{T, T}
+    vhat_worst_bias::T
     roughness::T
     bias_bound::T
     ci_bias_aware::Tuple{T, T}
@@ -214,6 +226,12 @@ function Base.show(io::IO, r::RootRhoResult)
         @printf(io, "Test-inversion %g%% set:       %s\n", pct, s)
         r.cs_touches_bound && println(io,
             "  The set reaches a bound of rho_bounds: ρ is weakly identified.")
+    end
+    if r.vhat_worst_bias == -Inf
+        println(io, "  HC2 V̂: no worst case over symmetric error laws (its bias falls as the kurtosis grows)")
+    elseif !isnan(r.vhat_worst_bias)
+        @printf(io, "  HC2 V̂: worst-case bias %.1f%% (symmetric homoskedastic errors), so the set covers ≥ %.1f%% for large n\n",
+                100 * r.vhat_worst_bias, 100 * _coverage_given_bias(r.vhat_worst_bias, r.level))
     end
     if !isempty(r.beta)
         println(io, "β (point estimates only; no standard errors):")
@@ -330,6 +348,44 @@ function _vhat_poly_general(A::Matrix{T}, H::Matrix{T}, M::Matrix{T}, m::Vector{
     end
     return (p[1], p[2], p[3], p[4], p[5])
 end
+
+# Lemma 8 (THEORY.md): the worst case of the HC2 V̂'s relative bias at ρ₀ over
+# symmetric homoskedastic error laws, β_min = min(0, Q₂ + L₅ᴳ − 2Σₖcₖ)/(2Σᵢⱼ Ωᵢⱼ),
+# reached by Rademacher (±σ) errors at f = 0. With uₖ = (Mᵢₖ²/Mᵢᵢ)ᵢ (the
+# columns of U) and H = (C + C′)P:
+#   Q₂ = 4Σᵢⱼ ΩᵢⱼMᵢⱼ²/(MᵢᵢMⱼⱼ),  L₅ᴳ = −2Σᵢⱼ Hᵢⱼ²Mᵢⱼ²/(MᵢᵢMⱼⱼ),
+#   Σₖcₖ = 2Σₖuₖ′Ωuₖ + Σᵢₖ Hᵢₖ²Mᵢₖ²/Mᵢᵢ − Σₖuₖ′(H∘H)uₖ.
+# −Inf when Σₖcₖ < 0: the bias then falls without limit as the kurtosis grows.
+# Two n × n × n products and four n × n matrices.
+function _hc2_worst_bias(C::Matrix{T}, Q::Matrix{T}, Mii::Vector{T}) where {T}
+    n = size(C, 1)
+    Ω = C .+ C'
+    H = (Ω * Q) * Q'
+    Ω .= (Ω ./ 2) .^ 2
+    H .= H .^ 2
+    U = Q * Q'
+    @inbounds for j in 1:n, i in 1:n
+        m = (i == j ? one(T) : zero(T)) - U[i, j]
+        U[i, j] = m^2 / Mii[i]
+    end
+    q2 = zero(T); l5 = zero(T); t3 = zero(T)
+    @inbounds for j in 1:n, i in 1:n
+        q2 += Ω[i, j] * U[i, j] / Mii[j]
+        l5 += H[i, j] * U[i, j] / Mii[j]
+        t3 += H[i, j] * U[i, j]
+    end
+    B = Ω * U
+    c1 = dot(U, B)
+    mul!(B, H, U)
+    sumc = 2c1 + t3 - dot(U, B)
+    sumc < 0 && return T(-Inf)
+    return min(zero(T), 4q2 - 2l5 - 2sumc) / (2 * sum(Ω))
+end
+
+# The coverage that a relative bias β of V̂ implies for the test-inversion set
+# at level `level`: 2Φ(z√(1 + β)) − 1.
+_coverage_given_bias(β::Real, level::Real) =
+    β <= -1 ? zero(β) : 2 * _normcdf(_norminv(1 - (1 - level) / 2) * sqrt(1 + β)) - 1
 
 # The exact-diagonal moment matrix A = MW + MDM, (M∘M)d = −diag(MW), for a
 # symmetric M. diag A = 0 exactly: diag(MDM) = (M∘M)d needs only that M is
@@ -623,6 +679,21 @@ Two intervals are returned (see [`RootRhoResult`](@ref)): the Wald interval
 with the HC2 `V̂`, and the test-inversion set `{ρ : g(ρ)² ≤ z²V̂(ρ)}`,
 which stays valid when `ρ` is weakly identified. `V̂(ρ)` is a quartic in `ρ`,
 so the set's endpoints are exact.
+
+**When `K/n` is not small.** The HC2 `V̂` is not consistent when `K/n`
+tends to `θ > 0`. Its relative bias at `ρ₀` has an explicit limit
+(THEORY.md, Lemma 7), and the test-inversion set covers
+`2Φ(z√(1 + β_V)) − 1` for large `n` (Proposition 6″). That needs a local
+basis, one whose projection draws on a bounded total weight of the units
+(Lemma 10), such as [`tensor_pspline`](@ref). With homoskedastic symmetric
+errors, the bias is at least the worst case over error laws, which is
+computed from the design alone (Lemma 8) and reported as
+`vhat_worst_bias`, for a projection. It is `O(K/n)` (Lemma 9). It was −0.4%
+to −2.7% at `K/n` = 0.06–0.40 in the designs measured, so the set's
+coverage stays at or above about 94.7%. With heteroskedastic or skewed
+errors the bias has no such design-only bound. It was −1% to +20% where
+measured. The computation adds two `n × n × n` products, about 1.8 s at
+n = 4000.
 
 # Arguments
 
@@ -1079,19 +1150,20 @@ function _root_rho_projection_C(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC
     vp = _vhat_poly(C, Q, Mii, yv, Wy)
     cs = _inversion_set(a, b, c, vp, z, bnds)
     touches = !isempty(cs) && (cs[1][1] == bnds[1] || cs[end][2] == bnds[2])
+    βw = _hc2_worst_bias(C, Q, Mii)
 
     if ρ === nothing
         nanT = T(NaN)
         return RootRhoResult{T}(nanT, ρ1 === nothing ? nanT : ρ1, nanT, (nanT, nanT), cs,
             touches, length(cs) > 1, T(level), fill(nanT, kx), vnames, n, K, :projection,
-            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, _no_bias(T)...), C
+            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, βw, _no_bias(T)...), C
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : T(NaN)
     β = kx > 0 ? (Z \ (yv .- ρ .* Wy))[1:kx] : T[]
     return RootRhoResult{T}(ρ, ρ1, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, T(level), β, vnames, n, K, :projection, zero(T), T(K), maximum(h),
-        a, b, c, vp, V, true, bnds, _no_bias(T)...), C
+        a, b, c, vp, V, true, bnds, βw, _no_bias(T)...), C
 end
 
 # The penalised smoother: S = Z(Z′Z + λΩ̃)⁻¹Z′, the exact-diagonal moment in
@@ -1131,7 +1203,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     if ρ === nothing
         r = RootRhoResult{T}(nanT, nanT, nanT, (nanT, nanT), cs, touches, length(cs) > 1,
             level, fill(nanT, kx), vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
-            vp, nanT, false, bnds, _no_bias(T)...)
+            vp, nanT, false, bnds, nanT, _no_bias(T)...)
         return bias === nothing ? r : _with_bias(r, bias.ℛ, nanT, (nanT, nanT), T[], T[];
                                                  refK = bias.refK)
     end
@@ -1140,7 +1212,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     β = kx > 0 ? (F \ (Z' * (y .- ρ .* Wy)))[1:kx] : T[]
     r = RootRhoResult{T}(ρ, nanT, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, level, β, vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
-        vp, V, true, bnds, _no_bias(T)...)
+        vp, V, true, bnds, nanT, _no_bias(T)...)
     bias === nothing && return r
     lin, χ = _bias_parts(M, d, Z, Ws, bias)
     bbar = bias.ℛ * lin + bias.ℛ^2 * χ

@@ -1,0 +1,36 @@
+Part 1. Lemma 9: the worst case β_min (Lemma 8) against its bound β̄; n = 900
+
+jittered k =  9: K/n 0.091, max leverage 0.503 | β_min -0.0073 | β̄ 0.1247 (H part 0.1019, Ω part 0.0228) | β̄/|β_min| 17.2 | β̄/(K/n) 1.37 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+jittered k = 13: K/n 0.189, max leverage 0.783 | β_min -0.0144 | β̄ 0.5186 (H part 0.3808, Ω part 0.1378) | β̄/|β_min| 35.9 | β̄/(K/n) 2.75 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+jittered k = 16: K/n 0.286, max leverage 0.951 | β_min -0.0205 | β̄ 1.3141 (H part 0.7771, Ω part 0.5370) | β̄/|β_min| 64.1 | β̄/(K/n) 4.60 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+jittered k = 19: K/n 0.402, max leverage 0.999 | β_min -0.0232 | β̄ 5.1226 (H part 1.4199, Ω part 3.7026) | β̄/|β_min| 221.1 | β̄/(K/n) 12.74 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+random   k =  7: K/n 0.056, max leverage 0.540 | β_min -0.0039 | β̄ 0.0728 (H part 0.0636, Ω part 0.0092) | β̄/|β_min| 18.7 | β̄/(K/n) 1.31 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+random   k = 10: K/n 0.112, max leverage 0.807 | β_min -0.0100 | β̄ 0.2637 (H part 0.2205, Ω part 0.0431) | β̄/|β_min| 26.5 | β̄/(K/n) 2.35 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+random   k = 12: K/n 0.161, max leverage 0.933 | β_min -0.0154 | β̄ 0.5194 (H part 0.4149, Ω part 0.1044) | β̄/|β_min| 33.7 | β̄/(K/n) 3.22 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+rook     k =  9: K/n 0.091, max leverage 0.441 | β_min -0.0073 | β̄ 0.0442 (H part 0.0152, Ω part 0.0290) | β̄/|β_min| 6.0 | β̄/(K/n) 0.48 | check ‖H‖_F² = ‖C′P‖_F²: 1.7e-16
+rook     k = 13: K/n 0.189, max leverage 0.684 | β_min -0.0115 | β̄ 0.1864 (H part 0.0473, Ω part 0.1391) | β̄/|β_min| 16.2 | β̄/(K/n) 0.99 | check ‖H‖_F² = ‖C′P‖_F²: 0.0e+00
+rook     k = 16: K/n 0.286, max leverage 0.893 | β_min -0.0125 | β̄ 0.6864 (H part 0.0940, Ω part 0.5924) | β̄/|β_min| 54.8 | β̄/(K/n) 2.40 | check ‖H‖_F² = ‖C′P‖_F²: 1.4e-16
+
+β̄ ≥ |β_min| in every design: yes; β̄/|β_min| 6.0–221.1; β̄/(K/n) 0.48–12.74
+
+Part 2. Lemma 10: sd(V̂/V) as n grows at fixed K/n; R = 2000 per cell
+bounded = iid U(0.2, 1.8) variances (A1); lognormal = iid log-normal, unbounded as n grows (outside A1)
+
+K/n ≈ 0.09: ‖P_B‖_∞ = 4.28, 4.56, 4.56 for n = 400, 900, 1600
+K/n ≈ 0.09 constant  normal | K/n 0.092 0.091 0.091 | max leverage 0.561 0.503 0.469 | √n·sd(V̂/V) 2.81 2.88 2.78 | slope -0.50 | power: slope for g²/V +0.09
+K/n ≈ 0.09 constant  chisq3 | K/n 0.092 0.091 0.091 | max leverage 0.561 0.503 0.469 | √n·sd(V̂/V) 5.01 4.98 4.92 | slope -0.51 | power: slope for g²/V -0.07
+K/n ≈ 0.09 bounded   normal | K/n 0.092 0.091 0.091 | max leverage 0.561 0.503 0.469 | √n·sd(V̂/V) 3.16 3.17 3.05 | slope -0.52 | power: slope for g²/V +0.05
+K/n ≈ 0.09 bounded   chisq3 | K/n 0.092 0.091 0.091 | max leverage 0.561 0.503 0.469 | √n·sd(V̂/V) 5.61 5.66 5.52 | slope -0.51 | power: slope for g²/V -0.05
+K/n ≈ 0.09 lognormal normal | K/n 0.092 0.091 0.091 | max leverage 0.561 0.503 0.469 | √n·sd(V̂/V) 4.51 4.61 5.14 | slope -0.41 | power: slope for g²/V +0.02
+K/n ≈ 0.09 lognormal chisq3 | K/n 0.092 0.091 0.091 | max leverage 0.561 0.503 0.469 | √n·sd(V̂/V) 8.85 8.89 10.56 | slope -0.38 | power: slope for g²/V -0.17
+  (1.0 min so far)
+K/n ≈ 0.19: ‖P_B‖_∞ = 4.67, 4.72, 4.69 for n = 400, 900, 1600
+K/n ≈ 0.19 constant  normal | K/n 0.205 0.189 0.181 | max leverage 0.887 0.783 0.755 | √n·sd(V̂/V) 3.03 3.07 2.94 | slope -0.52 | power: slope for g²/V -0.02
+K/n ≈ 0.19 constant  chisq3 | K/n 0.205 0.189 0.181 | max leverage 0.887 0.783 0.755 | √n·sd(V̂/V) 5.03 5.19 5.36 | slope -0.45 | power: slope for g²/V +0.05
+K/n ≈ 0.19 bounded   normal | K/n 0.205 0.189 0.181 | max leverage 0.887 0.783 0.755 | √n·sd(V̂/V) 3.35 3.37 3.22 | slope -0.53 | power: slope for g²/V -0.01
+K/n ≈ 0.19 bounded   chisq3 | K/n 0.205 0.189 0.181 | max leverage 0.887 0.783 0.755 | √n·sd(V̂/V) 5.90 5.82 6.18 | slope -0.47 | power: slope for g²/V +0.02
+K/n ≈ 0.19 lognormal normal | K/n 0.205 0.189 0.181 | max leverage 0.887 0.783 0.755 | √n·sd(V̂/V) 4.89 4.63 6.24 | slope -0.34 | power: slope for g²/V -0.04
+K/n ≈ 0.19 lognormal chisq3 | K/n 0.205 0.189 0.181 | max leverage 0.887 0.783 0.755 | √n·sd(V̂/V) 15.56 10.86 16.78 | slope -0.48 | power: slope for g²/V +0.08
+  (1.9 min so far)
+
+slope of log sd(V̂/V) on log n, constant and bounded variances: -0.53 to -0.45 (Lemma 10: −1/2); for g²/V: -0.17 to +0.09 (0)

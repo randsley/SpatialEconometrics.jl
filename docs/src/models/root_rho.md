@@ -94,6 +94,33 @@ where they differ, the Wald interval is the one that under-covers.
 If the moment has no admissible root at either step, `root_found` is false,
 `ρ̂` and the Wald interval are `NaN`, and `CS` is still returned.
 
+### When `K/n` is not small
+
+The HC2 `V̂` is consistent only when `K/n → 0`. When `K/n → θ > 0`, its
+relative bias at the true `ρ`, `β_V = (E V̂ − V)/V`, does not vanish.
+THEORY.md's Lemma 7 gives it exactly for any error law, and
+Proposition 6″ shows that `CS` then covers `2Φ(z√(1 + β_V)) − 1` for large
+`n`. Two conditions matter:
+
+- **A local basis.** `V̂` concentrates around its mean (Lemma 10) when
+  the projection on `[X, B]` draws on a bounded total weight of the units:
+  `‖P_B‖_∞`, its largest absolute row sum, is bounded. A tensor P-spline or
+  hat basis has this property; polynomials of growing degree do not.
+- **The error law.** With homoskedastic symmetric errors, the bias is at
+  least a worst case over error laws (Lemma 8). It is reached by ±σ
+  (Rademacher) errors at `f = 0` and computed from `W` and `[X, B]` alone.
+  It is `O(K/n)` (Lemma 9). `root_rho` reports it for a projection as
+  `r.vhat_worst_bias`, and `show` prints the coverage it implies:
+
+  ```
+    HC2 V̂: worst-case bias -2.1% (symmetric homoskedastic errors), so the set covers ≥ 94.8% for large n
+  ```
+
+  It was −0.4% to −2.7% in the designs measured (`K/n` = 0.06–0.40), a
+  coverage of at least 94.7%. With heteroskedastic or skewed errors there
+  is no design-only bound, and the bias was −1% to +20% where measured.
+  It is `NaN` for the penalised smoother, where Lemma 8 does not apply.
+
 ## Choosing the basis
 
 The intervals are valid only when the approximation error of `f` is small
@@ -252,7 +279,9 @@ there. With the largest basis of the Monte Carlo (`K/n` ≈ 0.19), one
 replication (a `root_rho` fit plus a `closed_form_rho` fit) took 0.12 s at
 `n = 900` and 0.35 s at `n = 1600`. The penalised smoother holds about six
 `n × n` matrices and solves one dense `n × n` system. One fit took 0.10 s at
-`n = 900` (`k = 15`) and 0.29 s at `n = 1600` (`k = 20`).
+`n = 900` (`k = 15`) and 0.29 s at `n = 1600` (`k = 20`). A projection
+also computes `vhat_worst_bias`: two more `n × n × n` products, 0.04 s at
+`n = 900` and 1.8 s at `n = 3969`.
 
 ## What is proved and what is measured
 
@@ -261,7 +290,9 @@ dimension. The results for a basis that grows with `n` are in
 `research/trace_cfe/THEORY.md`: a CLT for the moment with a dense `M`
 (Theorem 1), the first step's plug-in having no first-order effect
 (Proposition 1), the consistency of HC2 `V̂` (Proposition 2), and the
-validity of `CS` without identification (Proposition 6). The penalised
+validity of `CS` without identification (Proposition 6), and its coverage
+when `K/n` does not tend to 0, with the worst case of `V̂`'s bias
+(Proposition 6″, Lemmas 7–10). The penalised
 smoother, its moment and its `V̂` are Proposition 4. **No one else has
 checked these proofs.**
 

@@ -168,6 +168,7 @@ const _TESTSET_FILES = [
     "48_root_rho_bias_aware_interval.jl",
     "49_root_rho_reference_basis.jl",
     "50_root_rho_basis_grid.jl",
+    "51_root_rho_hc2_worst_bias.jl",
 ]
 
 @testset "SpatialEconometrics.jl Full Suite Verification" begin

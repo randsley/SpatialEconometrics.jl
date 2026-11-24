@@ -12,10 +12,10 @@ semiparametric spatial models, short-panel dynamic models with correlated
 random effects or common shocks, spatial log-GARCH for the variance, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.7.0** — 4,355 test assertions across 67 top-level testsets
+> **Version 0.7.0** — 4,372 test assertions across 68 top-level testsets
 > with both package extensions installed, measured on Julia 1.13.4. Without
-> them, 4,320 pass and two broken markers stand in for the extension testsets,
-> measured on Julia 1.10.13. See [Validation Status](#validation-status) for
+> them, 4,337 pass and two broken markers stand in for the extension testsets,
+> measured on Julia 1.10.14. See [Validation Status](#validation-status) for
 > Monte Carlo results.
 
 **Documentation:** [stable](https://randsley.github.io/SpatialEconometrics.jl/stable/)
@@ -124,7 +124,7 @@ exported name.
 | [Common Factors & Spatio-Temporal](https://randsley.github.io/SpatialEconometrics.jl/dev/models/common_factors/) | CD and `α` tests, SP-CCE, STAR, interactive fixed effects |
 | [Spatial VAR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spvar/) | Multivariate space-time systems, STIR, the nested panel VAR |
 | [Semiparametric Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/semiparametric/) | Partially linear SAR, closed-form `ρ`, `β(τ)` |
-| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis, or with a penalised smoother and a bias-aware interval under a stated roughness bound, also for `f` outside the basis through a finer reference basis, with the basis chosen by the data; a test-inversion set valid under weak identification |
+| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis, or with a penalised smoother and a bias-aware interval under a stated roughness bound, also for `f` outside the basis through a finer reference basis, with the basis chosen by the data; a test-inversion set valid under weak identification, and when `K/n` does not vanish, with a design-only bound on its coverage |
 | [Spatial log-GARCH](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spatial_garch/) | Spatial dependence in the conditional variance; covariate-distance `W` for unknown locations |
 | [GWR & MGWR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gwr/) | Coefficient surfaces, multiscale backfitting |
 | [Gravity Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gravity/) | PPML and negative binomial with high-dimensional FE |
@@ -248,7 +248,7 @@ our own because:
 SpatialEconometrics/
 ├── src/            # 34 modules: the umbrella plus 33 submodules
 ├── ext/            # Makie and Turing package extensions (see ext/README.md)
-├── test/           # runtests.jl + testsets/: 67 top-level testsets, one file each (see test/README.md)
+├── test/           # runtests.jl + testsets/: 68 top-level testsets, one file each (see test/README.md)
 ├── skills/         # a Claude Code skill for the package (see skills/README.md)
 ├── examples/       # 34 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference
@@ -291,7 +291,7 @@ SpatialEconometrics/
 | Short-T CRE Dynamic Panel | ✓ | **Yes** (Li & Yang's Table 1 replicated, 4,500/4,500 fits; sandwich coverage 0.92–0.97 for `β`, `ρ`, `λ`) |
 | Short-T Common-Shock Panel | ✓ | **Yes** (`validation/mc_serl_sdpd_output.txt`: at `L = 1` coverage of `ρ` 0.93–0.96 to `N = 4000`, at `L = 0` it falls to 0.40; the default `Q` biases `β` at large `N` when regressors are serially correlated with the loadings, and every period of `X` as `Q` removes it) |
 | Spatial log-GARCH | ✓ | **Yes** (`validation/mc_spatial_log_garch_output.txt`: Sato & Matsuda's Table 1 reproduced at `n = 400`, where the derived sandwich covers 0.93–0.96 except near `λ = 1`; the quasi-likelihood is unbounded as `λ → 1`, so 36–39% of `n = 100` samples at `λ = 0.9` have no interior maximum and the fit throws; a proxy `W` biases `ρ̂` more as `n` grows) |
-| Root Estimator of ρ | ✓ | **Yes** (`validation/mc_root_rho_output.txt`: 108 cells, 3 `W`, `n` 400–1600, `K/n` up to 0.19; the test-inversion set covers 0.935–0.975 and the Wald interval 0.931–0.975, with `|bias|` at most 0.06, while the plain closed form is biased by −0.05 to −1.76 on the same draws; and with the penalised smoother, `validation/mc_root_rho_smoother_output.txt`: 108 cells, both intervals cover 0.934–0.982 wherever the exact shrinkage bias `c` is at most 0.25, and as predicted by `c` elsewhere; the bias-aware interval, `validation/mc_root_rho_bias_aware_output.txt`: 0.957–0.987 with `ℛ` correct or 4× too large; on a reference basis, `validation/mc_root_rho_reference_output.txt`: 0.977–1.000, against 0.833 without it on a coarse basis; with the basis chosen by length, `validation/mc_root_rho_basis_grid_output.txt`: 0.945–1.000, against 0.770 without a reference; the growing-basis theory has not been checked by anyone else) |
+| Root Estimator of ρ | ✓ | **Yes** (`validation/mc_root_rho_output.txt`: 108 cells, 3 `W`, `n` 400–1600, `K/n` up to 0.19; the test-inversion set covers 0.935–0.975 and the Wald interval 0.931–0.975, with `|bias|` at most 0.06, while the plain closed form is biased by −0.05 to −1.76 on the same draws; and with the penalised smoother, `validation/mc_root_rho_smoother_output.txt`: 108 cells, both intervals cover 0.934–0.982 wherever the exact shrinkage bias `c` is at most 0.25, and as predicted by `c` elsewhere; the bias-aware interval, `validation/mc_root_rho_bias_aware_output.txt`: 0.957–0.987 with `ℛ` correct or 4× too large; on a reference basis, `validation/mc_root_rho_reference_output.txt`: 0.977–1.000, against 0.833 without it on a coarse basis; with the basis chosen by length, `validation/mc_root_rho_basis_grid_output.txt`: 0.945–1.000, against 0.770 without a reference; the test-inversion set at `K/n` up to 0.29, `validation/mc_root_rho_hc2_worst_output.txt`: 0.944–0.966, within 0.012 of Proposition 6″'s prediction in 12 cells; the growing-basis theory has not been checked by anyone else) |
 
 **Cross-sectional SDM Monte Carlo results** (`validation/mc_sdm_output.txt`):
 ρ̂ mean = 0.595 (true 0.600); mean SE = 0.0324, empirical SD = 0.0328; 95%
