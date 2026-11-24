@@ -118,7 +118,12 @@ The result of [`root_rho`](@ref).
   `0` when the bias cannot be negative, `-Inf` when it has no worst case,
   and `NaN` for a penalised smoother, where Lemma 8 does not apply. The
   HC2 `V̂` is not consistent when `K/n` does not tend to 0, and this is the
-  price.
+  price. With `skewness = γ̄ > 0` it is the worst case over homoskedastic
+  laws whose skewness is at most `γ̄` in size, and over every `f` in
+  span`[X, basis]` (Lemma 12). Skewness raises the bias through the signal
+  `C′f`, so the worst `f` is then not 0.
+- `skewness` — the bound `γ̄` used for `vhat_worst_bias` (0: symmetric
+  errors; `NaN` for the smoother).
 - `roughness` — the bound `ℛ` given for the bias-aware interval (`NaN`
   when none was asked for).
 - `bias_bound` — `b̄`, the bound on the moment's bias `|E g(ρ₀)|` over the
@@ -159,6 +164,7 @@ struct RootRhoResult{T<:AbstractFloat}
     root_found::Bool
     rho_bounds::Tuple{T, T}
     vhat_worst_bias::T
+    skewness::T
     roughness::T
     bias_bound::T
     ci_bias_aware::Tuple{T, T}
@@ -230,8 +236,10 @@ function Base.show(io::IO, r::RootRhoResult)
     if r.vhat_worst_bias == -Inf
         println(io, "  HC2 V̂: no worst case over symmetric error laws (its bias falls as the kurtosis grows)")
     elseif !isnan(r.vhat_worst_bias)
-        @printf(io, "  HC2 V̂: worst-case bias %.1f%% (symmetric homoskedastic errors), so the set covers ≥ %.1f%% for large n\n",
-                100 * r.vhat_worst_bias, 100 * _coverage_given_bias(r.vhat_worst_bias, r.level))
+        law = r.skewness > 0 ? @sprintf("homoskedastic errors, |skewness| ≤ %.3g", r.skewness) :
+                               "symmetric homoskedastic errors"
+        @printf(io, "  HC2 V̂: worst-case bias %.1f%% (%s), so the set covers ≥ %.1f%% for large n\n",
+                100 * r.vhat_worst_bias, law, 100 * _coverage_given_bias(r.vhat_worst_bias, r.level))
     end
     if !isempty(r.beta)
         println(io, "β (point estimates only; no standard errors):")
@@ -356,18 +364,27 @@ end
 #   Q₂ = 4Σᵢⱼ ΩᵢⱼMᵢⱼ²/(MᵢᵢMⱼⱼ),  L₅ᴳ = −2Σᵢⱼ Hᵢⱼ²Mᵢⱼ²/(MᵢᵢMⱼⱼ),
 #   Σₖcₖ = 2Σₖuₖ′Ωuₖ + Σᵢₖ Hᵢₖ²Mᵢₖ²/Mᵢᵢ − Σₖuₖ′(H∘H)uₖ.
 # −Inf when Σₖcₖ < 0: the bias then falls without limit as the kurtosis grows.
+#
+# With γ̄ > 0 (Lemma 12): homoskedastic laws with |skewness| ≤ γ̄ and every f in
+# span(Q). Pearson's bound κ ≥ γ² − 2 sets the worst kurtosis, and the worst f
+# is a 2 × 2 eigenvalue problem:
+#   β(γ) = [a − √(a² + 4γ²τ²V₀)]/(2V₀),  a = Q₂ + L₅ᴳ − 2Σₖcₖ + γ²Σₖcₖ,
+# with τ = ‖Π(T1)‖, (T1)ᵢ = Σₖ HᵢₖMᵢₖ²/Mᵢᵢ and Π the projection on range(C′Q).
+# The minimum over 0 ≤ γ ≤ γ̄ is found on a grid and refined by golden section.
+# At γ = 0, β(0) = min(0, a)/V₀ is Lemma 8's value.
 # Two n × n × n products and four n × n matrices.
-function _hc2_worst_bias(C::Matrix{T}, Q::Matrix{T}, Mii::Vector{T}) where {T}
+function _hc2_worst_bias(C::Matrix{T}, Q::Matrix{T}, Mii::Vector{T}, γ̄::T = zero(T)) where {T}
     n = size(C, 1)
     Ω = C .+ C'
     H = (Ω * Q) * Q'
-    Ω .= (Ω ./ 2) .^ 2
-    H .= H .^ 2
     U = Q * Q'
     @inbounds for j in 1:n, i in 1:n
         m = (i == j ? one(T) : zero(T)) - U[i, j]
         U[i, j] = m^2 / Mii[i]
     end
+    t1 = γ̄ > 0 ? vec(sum(H .* U; dims = 2)) : T[]
+    Ω .= (Ω ./ 2) .^ 2
+    H .= H .^ 2
     q2 = zero(T); l5 = zero(T); t3 = zero(T)
     @inbounds for j in 1:n, i in 1:n
         q2 += Ω[i, j] * U[i, j] / Mii[j]
@@ -379,7 +396,33 @@ function _hc2_worst_bias(C::Matrix{T}, Q::Matrix{T}, Mii::Vector{T}) where {T}
     mul!(B, H, U)
     sumc = 2c1 + t3 - dot(U, B)
     sumc < 0 && return T(-Inf)
-    return min(zero(T), 4q2 - 2l5 - 2sumc) / (2 * sum(Ω))
+    V0 = 2 * sum(Ω)
+    a0 = 4q2 - 2l5 - 2sumc
+    γ̄ > 0 || return min(zero(T), a0) / V0
+    F = svd(C' * Q)
+    r = count(>(1e-10 * F.S[1]), F.S)
+    τ = norm(view(F.U, :, 1:r)' * t1)
+    β(γ) = (a = a0 + γ^2 * sumc; (a - sqrt(a^2 + 4 * (γ * τ)^2 * V0)) / (2V0))
+    return _min_on_interval(β, zero(T), γ̄)
+end
+
+# The minimum of a smooth scalar function on [lo, hi]: a grid of 201 points,
+# then golden section on the cells around the best one.
+function _min_on_interval(f, lo::T, hi::T) where {T}
+    g = range(lo, hi; length = 201)
+    v = f.(g)
+    j = argmin(v)
+    a, b = g[max(j - 1, 1)], g[min(j + 1, length(g))]
+    φ = (sqrt(T(5)) - 1) / 2
+    x1 = b - φ * (b - a); x2 = a + φ * (b - a); f1 = f(x1); f2 = f(x2)
+    for _ in 1:60
+        if f1 <= f2
+            b, x2, f2 = x2, x1, f1; x1 = b - φ * (b - a); f1 = f(x1)
+        else
+            a, x1, f1 = x1, x2, f2; x2 = a + φ * (b - a); f2 = f(x2)
+        end
+    end
+    return min(v[j], f1, f2)
 end
 
 # The coverage that a relative bias β of V̂ implies for the test-inversion set
@@ -659,7 +702,7 @@ end
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
              roughness = nothing, bonferroni = false, reference = nothing,
              varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
-             max_dense_n = 4000)
+             max_dense_n = 4000, skewness = 0)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -697,8 +740,22 @@ with the largest variance up to 4 times the smallest, it found −4% to −12%
 (3 to 6 times `vhat_worst_bias`), and up to 10 times, −8% to −21%. The set
 still covered 0.937–0.953 at those patterns (research/trace_cfe/
 tc_hc2_hetero.jl). So `vhat_worst_bias` is the worst case only when all
-units share one error variance. The computation adds two `n × n × n` products, about 1.8 s at
-n = 4000.
+units share one error variance.
+
+With skewed errors (one law for all units, `|skewness| ≤ γ̄`), the worst
+case can still be computed from the design alone (Lemma 12). Skewness
+enters through the signal `C′f`, so the worst `f` is not 0, and Pearson's
+bound (excess kurtosis ≥ skewness² − 2) fixes the worst kurtosis. Pass
+`skewness = γ̄` to have `vhat_worst_bias` report it. At `γ̄ = 2` it was up to
+2.7 times the symmetric worst case in the designs measured, and no worse
+on a rook lattice, where the kurtosis that skewness forces outweighs it
+(research/trace_cfe/tc_hc2_skew.jl). It grows with the number of
+neighbours in `W`. With a different
+skewness for each unit it can be 1.6 to 2 times worse again, which is not
+covered.
+
+The computation adds two `n × n × n` products, about 1.8 s at n = 4000,
+and with `skewness > 0` an SVD of the `n × K` matrix `C′[X, basis]`.
 
 # Arguments
 
@@ -726,6 +783,9 @@ n = 4000.
   [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
   so that `f` need not lie in `span(basis)` (see below). Then `roughness`
   may be given without `penalty`, for the projection alone.
+- `skewness` — a bound `γ̄ ≥ 0` on the errors' `|skewness|`, used only for
+  `vhat_worst_bias` (0 by default: symmetric errors). It does not change
+  the estimate or the intervals.
 
 # With a penalised smoother
 
@@ -939,9 +999,13 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
                        roughness::Union{Nothing, Real} = nothing, bonferroni::Bool = false,
                        nbonf::Int = 0, reference = nothing, varnames = nothing,
                        level::Real = 0.95, rho_bounds = (-0.99, 0.99),
-                       max_dense_n::Integer = 4000)
+                       max_dense_n::Integer = 4000, skewness::Real = 0)
     T = Float64
     n = length(y)
+    (isfinite(skewness) && skewness >= 0) || throw(ArgumentError(
+        "root_rho: skewness is a bound on the errors' |skewness|, so it must be finite and " *
+        "non-negative, got $skewness"))
+    γ̄ = T(skewness)
     size(X, 1) == n || throw(DimensionMismatch("root_rho: y has $n rows, X has $(size(X, 1))"))
     size(W) == (n, n) || throw(DimensionMismatch("root_rho: W is $(size(W)), expected ($n, $n)"))
     basis === nothing || size(basis, 1) == n || throw(DimensionMismatch(
@@ -1007,7 +1071,7 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
                   "intercept in X: drop one of them.")
     yv = Vector{T}(y)
     penalised || roughness !== nothing ||
-        return _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds)
+        return _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds, γ̄)
     roughness === nothing && return _root_rho_penalised(yv, Z, Ws, kx, Pm, T(lambda), vnames,
                                                         T(level), bnds, nothing)
     # The bias-aware interval: one λ, or λ chosen by length with the projection as λ = 0.
@@ -1038,7 +1102,7 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
     end
     α0 = 1 - T(level)
     if !penalised                                   # the projection alone, with a reference
-        proj, C = _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds)
+        proj, C = _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds, γ̄)
         bias = (; ℛ = T(roughness), N, pilot, α = α0 / max(nbonf, 1), Zt, Nt, MZZt, refK)
         return _projection_with_bias(proj, C, bias)
     end
@@ -1049,7 +1113,7 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
     fits = [_root_rho_penalised(yv, Z, Ws, kx, Pm, λ, vnames, T(level), bnds, bias) for λ in λs]
     lambda isa AbstractVector || return fits[1]
     proj = try
-        _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds)
+        _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds, γ̄)
     catch e
         e isa ArgumentError || rethrow()
         @warn "root_rho: the projection (λ = 0) is left out of the candidates: $(e.msg)"
@@ -1119,7 +1183,8 @@ _root_rho_projection(args...) = first(_root_rho_projection_C(args...))
 
 # The same, with the final moment matrix C, for the bias bound (Lemma 5(c)).
 function _root_rho_projection_C(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T}, kx::Int,
-                                vnames::Vector{String}, level::T, bnds::Tuple{T, T}) where {T}
+                                vnames::Vector{String}, level::T, bnds::Tuple{T, T},
+                                γ̄::T = zero(T)) where {T}
     n, K = size(Z)
     Q = Matrix(qr(Z).Q)[:, 1:K]
     Mii = 1 .- vec(sum(abs2, Q; dims = 2))
@@ -1155,20 +1220,20 @@ function _root_rho_projection_C(yv::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC
     vp = _vhat_poly(C, Q, Mii, yv, Wy)
     cs = _inversion_set(a, b, c, vp, z, bnds)
     touches = !isempty(cs) && (cs[1][1] == bnds[1] || cs[end][2] == bnds[2])
-    βw = _hc2_worst_bias(C, Q, Mii)
+    βw = _hc2_worst_bias(C, Q, Mii, γ̄)
 
     if ρ === nothing
         nanT = T(NaN)
         return RootRhoResult{T}(nanT, ρ1 === nothing ? nanT : ρ1, nanT, (nanT, nanT), cs,
             touches, length(cs) > 1, T(level), fill(nanT, kx), vnames, n, K, :projection,
-            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, βw, _no_bias(T)...), C
+            zero(T), T(K), maximum(h), a, b, c, vp, nanT, false, bnds, βw, γ̄, _no_bias(T)...), C
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : T(NaN)
     β = kx > 0 ? (Z \ (yv .- ρ .* Wy))[1:kx] : T[]
     return RootRhoResult{T}(ρ, ρ1, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, T(level), β, vnames, n, K, :projection, zero(T), T(K), maximum(h),
-        a, b, c, vp, V, true, bnds, βw, _no_bias(T)...), C
+        a, b, c, vp, V, true, bnds, βw, γ̄, _no_bias(T)...), C
 end
 
 # The penalised smoother: S = Z(Z′Z + λΩ̃)⁻¹Z′, the exact-diagonal moment in
@@ -1208,7 +1273,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     if ρ === nothing
         r = RootRhoResult{T}(nanT, nanT, nanT, (nanT, nanT), cs, touches, length(cs) > 1,
             level, fill(nanT, kx), vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
-            vp, nanT, false, bnds, nanT, _no_bias(T)...)
+            vp, nanT, false, bnds, nanT, nanT, _no_bias(T)...)
         return bias === nothing ? r : _with_bias(r, bias.ℛ, nanT, (nanT, nanT), T[], T[];
                                                  refK = bias.refK)
     end
@@ -1217,7 +1282,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     β = kx > 0 ? (F \ (Z' * (y .- ρ .* Wy)))[1:kx] : T[]
     r = RootRhoResult{T}(ρ, nanT, se, (ρ - z * se, ρ + z * se), cs, touches,
         length(cs) > 1, level, β, vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
-        vp, V, true, bnds, nanT, _no_bias(T)...)
+        vp, V, true, bnds, nanT, nanT, _no_bias(T)...)
     bias === nothing && return r
     lin, χ = _bias_parts(M, d, Z, Ws, bias)
     bbar = bias.ℛ * lin + bias.ℛ^2 * χ

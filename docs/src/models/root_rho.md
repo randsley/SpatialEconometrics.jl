@@ -125,6 +125,24 @@ Proposition 6″ shows that `CS` then covers `2Φ(z√(1 + β_V)) − 1` for lar
   patterns about halve that. At those patterns `CS` still covered
   0.937–0.953. So `vhat_worst_bias` is the worst case only when all units
   share one error variance (research/trace_cfe/tc_hc2_hetero.jl).
+- **Skewed errors.** With one error law for all units and a stated bound
+  on its skewness, the worst case can still be computed from the design
+  (Lemma 12). Skewness enters through the signal `C′f`, so the worst `f`
+  is not 0. Pearson's bound (excess kurtosis ≥ skewness² − 2) fixes the
+  worst kurtosis, and the worst `f` solves a 2 × 2 eigenvalue problem.
+  Pass the bound as `skewness`:
+
+  ```julia
+  r = root_rho(y, X, W; basis = B, skewness = 2)
+  r.vhat_worst_bias       # the worst case over laws with |skewness| ≤ 2
+  ```
+
+  It changes only this diagnostic, not the estimate or the intervals. At
+  `skewness = 2` it was up to 2.7 times the symmetric worst case in the
+  designs measured, and it grows with the number of neighbours in `W`. On a
+  rook lattice it was no worse, because the kurtosis that skewness forces
+  outweighs it. A different skewness for each unit can be 1.6 to 2 times
+  worse again, and is not covered.
   It is `NaN` for the penalised smoother, where Lemma 8 does not apply.
 
 ## Choosing the basis

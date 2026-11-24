@@ -5871,3 +5871,79 @@ All five were met in every cell:
 Not measured: heteroskedastic or skewed errors through the package (the
 research run `tc_hc2_bias.jl` covers them with a fixed `C`), other `W`,
 other `n`.
+
+## `root_rho`: the HC2 `V̂`'s worst case with skewed errors
+
+Added on 2026-11-24. Lemma 8 assumes symmetric errors. THEORY.md now has:
+- Lemma 11: under unequal variances (ratio at most `q`), the bias is
+  `O(q²K/n)`. The bound is 155–3,052 times loose, and is measured, not built.
+- Lemma 12: with equal variances and one law of skewness `|γ| ≤ γ̄`, the
+  exact worst case over laws and over `f ∈ span[X, basis]`. Pearson's bound
+  `κ ≥ γ² − 2` fixes the kurtosis, the worst `f` is a 2 × 2 eigenvalue
+  problem, and a two-point law attains it.
+
+`root_rho(...; skewness = γ̄)` makes `vhat_worst_bias` Lemma 12's value. The
+default `skewness = 0` is Lemma 8, unchanged. The result gains a field
+`skewness` (`NaN` for the smoother). The option changes no estimate or
+interval. Its extra cost is an SVD of the `n × K` matrix `C′[X, basis]`.
+
+**Testset 52** (19 assertions; testset 51's layout with kNN-10 and
+`tensor_pspline` `k = 5`, where skewness doubles the worst case; testset
+51's own design has worst `γ = 0`):
+- **Against brute force.** At REsd's final `C`, a dense reimplementation
+  searches the skewness and the size of the signal on a grid, without the
+  eigenvalue formula. They agree to 1e-5, and to 2e-8 in the prototype. With
+  `skewness = 0` the value is Lemma 8's, to 1e-9.
+- **Power and bounds.** The value is more than 1.5 times Lemma 8's, and
+  above Lemma 12(c)'s lower bound. The estimate, `cs` and `ci_wald` are
+  identical with and without the option.
+- **Guards.** `NaN` for the smoother; `ArgumentError` for `skewness = −1`
+  and `Inf`.
+- **Two-point errors at the worst `f`, R = 20000.** `E V̂/V` equals
+  `1 + β_skew` within 4 SE: z = +1.02 on 1.13 and +2.09 on 1.10. The two
+  versions draw different designs, with worst cases −0.0367 and −0.0345.
+  Power: dropping the skewness term `L₂` fails, at z = −21.9 and −25.9
+  against 5. On 1.13, seeds 52_002 and 52_003 gave z = +0.30 and +0.82.
+
+**Monte Carlo** (`validation/mc_root_rho_hc2_skew.jl`, output committed).
+Three cells through the released function: n = 196 (`k = 5`, kNN-10),
+n = 400 (`k = 5`, kNN-10) and n = 400 (`k = 8`, kNN-6), each at Lemma 12's
+worst law and `f` for `γ̄ = 2`, with R = 4000. Four criteria were set before
+the run.
+- **Criterion 1 failed in all three cells.** It required the mean of
+  `V̂(ρ₀)/V`, with `V` at `C(ρ₀)`, to be within 4 SE of `1 + β_skew`. The
+  observed z was +9.3, +5.0 and +4.8. Criterion 2 (power: the prediction
+  without `L₂` fails) then failed in the second cell (z = −0.1).
+- **Why.** The criterion was wrong, not the lemma. `V̂` from `r.vpoly` uses
+  REsd's final `C(ρ̃)`, which varies with the data. With the worst-case
+  signal (`‖b‖² = 1.6–3.0 V₀`), the variance of `y₀′C(ρ̃)y₀` is larger than
+  `V` at `C(ρ₀)`, by 2–11% at the draws' own `C(ρ̃)`. So criterion 1
+  compared `V̂` with the wrong variance. Testset 51's validation had
+  `f = 0` and so did not meet this.
+- **Criteria 3 and 4 passed.** `CS` covered `ρ₀` at 0.9495, 0.9497 and
+  0.9493, against predictions of 0.9448, 0.9475 and 0.9468 (+1.3, +0.6 and
+  +0.7 binomial SE). The mean of `vhat_worst_bias` was within 0.0011 of
+  `β_skew` at `C(ρ₀)`.
+- **Part 2 was added after the failure.** It is labelled so in the script
+  and does not replace criterion 1. On 1,000 fresh draws per cell:
+  - `V̂` at the fixed `C(ρ₀)` matches `1 + β_skew`, at z = −0.54, +0.17 and
+    +1.67;
+  - `V̂` divided by the variance at each draw's own `C(ρ̃)` averages 0.9494,
+    0.9765 and 0.9826, against `1 + mean(vhat_worst_bias)` = 0.9562, 0.9791
+    and 0.9731 (criterion: within 0.01).
+
+  Three draws (n = 196) had no first-step root and were skipped.
+- **An open observation.** The variance of `y₀′C(ρ̃)y₀` over the draws
+  differs from the variance at a fixed `C(ρ̃)`: 1.41 against 1.11, 1.11
+  against 1.02, and 0.94 against 1.02 (in units of `V`). That gap is the
+  first step's dependence on the same data, which `V̂` does not account for.
+  The coverage of `CS` still matched its prediction, so at these `n` the gap
+  did not reach the test. It is not covered by Proposition 6″, which holds
+  `C` fixed.
+- **Warnings.** 11 of the 15,000 fits warned that the moment's slope was
+  positive at the preliminary 2SLS estimate. That is the weak-identification
+  warning, and `CS` does not use the root rule.
+
+Not measured: unit-specific skewness through the package (1.6 to 2 times
+worse in the research search, and not covered), skewness together with
+heteroskedasticity.

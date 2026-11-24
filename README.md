@@ -12,9 +12,9 @@ semiparametric spatial models, short-panel dynamic models with correlated
 random effects or common shocks, spatial log-GARCH for the variance, Monte Carlo simulation and publication-ready output — with a
 unified formula interface and optional Bayesian and visualization extensions.
 
-> **Version 0.7.0** — 4,372 test assertions across 68 top-level testsets
+> **Version 0.7.0** — 4,391 test assertions across 69 top-level testsets
 > with both package extensions installed, measured on Julia 1.13.4. Without
-> them, 4,337 pass and two broken markers stand in for the extension testsets,
+> them, 4,356 pass and two broken markers stand in for the extension testsets,
 > measured on Julia 1.10.14. See [Validation Status](#validation-status) for
 > Monte Carlo results.
 
@@ -124,7 +124,7 @@ exported name.
 | [Common Factors & Spatio-Temporal](https://randsley.github.io/SpatialEconometrics.jl/dev/models/common_factors/) | CD and `α` tests, SP-CCE, STAR, interactive fixed effects |
 | [Spatial VAR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spvar/) | Multivariate space-time systems, STIR, the nested panel VAR |
 | [Semiparametric Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/semiparametric/) | Partially linear SAR, closed-form `ρ`, `β(τ)` |
-| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis, or with a penalised smoother and a bias-aware interval under a stated roughness bound, also for `f` outside the basis through a finer reference basis, with the basis chosen by the data; a test-inversion set valid under weak identification, and when `K/n` does not vanish, with a design-only bound on its coverage |
+| [Root Estimator of ρ](https://randsley.github.io/SpatialEconometrics.jl/dev/models/root_rho/) | `ρ` without a log-determinant, unbiased for a large basis, or with a penalised smoother and a bias-aware interval under a stated roughness bound, also for `f` outside the basis through a finer reference basis, with the basis chosen by the data; a test-inversion set valid under weak identification, and when `K/n` does not vanish, with a design-only bound on its coverage under symmetric or skewed errors |
 | [Spatial log-GARCH](https://randsley.github.io/SpatialEconometrics.jl/dev/models/spatial_garch/) | Spatial dependence in the conditional variance; covariate-distance `W` for unknown locations |
 | [GWR & MGWR](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gwr/) | Coefficient surfaces, multiscale backfitting |
 | [Gravity Models](https://randsley.github.io/SpatialEconometrics.jl/dev/models/gravity/) | PPML and negative binomial with high-dimensional FE |
@@ -248,7 +248,7 @@ our own because:
 SpatialEconometrics/
 ├── src/            # 34 modules: the umbrella plus 33 submodules
 ├── ext/            # Makie and Turing package extensions (see ext/README.md)
-├── test/           # runtests.jl + testsets/: 68 top-level testsets, one file each (see test/README.md)
+├── test/           # runtests.jl + testsets/: 69 top-level testsets, one file each (see test/README.md)
 ├── skills/         # a Claude Code skill for the package (see skills/README.md)
 ├── examples/       # 34 runnable examples, one per topic
 ├── docs/           # Documenter source for the manual and API reference

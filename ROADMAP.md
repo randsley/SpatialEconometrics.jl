@@ -10,8 +10,8 @@
 > entries). Docstring references are completed, and the test suite is one
 > file per testset. No tag is registered.
 >
-> 33 submodules, 4,372 test assertions in 68 top-level testsets with both
-> package extensions installed and 4,337 (plus 2 broken markers) without
+> 33 submodules, 4,391 test assertions in 69 top-level testsets with both
+> package extensions installed and 4,356 (plus 2 broken markers) without
 > them, measured on 2026-11-24 on Julia 1.13.4, and without them on 1.10.14.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
 > 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
@@ -1347,8 +1347,19 @@ and the method are in `research/trace_cfe/`.
   `root_rho` reports `β_min` as `vhat_worst_bias` for a projection (testset
   51). `validation/mc_root_rho_hc2_worst.jl`: `CS` covers 0.944–0.966 at
   `K/n` up to 0.29, within 0.012 of the prediction in 12 cells. AUDIT, "the
-  HC2 `V̂`'s worst-case bias". Open: a design-only bound with
-  heteroskedastic or skewed errors.
+  HC2 `V̂`'s worst-case bias".
+- **Built (2026-11-24): `root_rho(...; skewness)`, and Lemmas 11–12.**
+  Lemma 11: under unequal variances (ratio ≤ q) the bias is `O(q²K/n)`,
+  with a loose bound and a measured constant of about 0.35 at q = 4.
+  Lemma 12: with equal variances and skewness `|γ| ≤ γ̄`, the exact worst
+  case over laws and signals, in closed form. `skewness = γ̄` makes
+  `vhat_worst_bias` report it (testset 52). `validation/mc_root_rho_hc2_skew.jl`:
+  `CS` covers 0.949–0.950 against predictions of 0.945–0.948 and the
+  diagnostic tracks its target; its criterion 1 failed as written, because
+  the final `C(ρ̃)` varies with the data (AUDIT, "the HC2 `V̂`'s worst case
+  with skewed errors"). Open: a usable constant under heteroskedasticity
+  (leave-out variance estimators, to read), unit-specific skewness, and
+  the first step's effect on `Var g̃(ρ₀)` with a strong signal.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
@@ -1794,6 +1805,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ `root_rho`'s basis grid, Corollary 7′, and Proposition 1′) | 33 | 4,355 ¶¹³ | 30,203 |
 | **v0.7.0** (tagged 2026-11-24, = the row above) | 33 | 4,355 ¶¹³ | 30,203 |
 | **master** (+ `root_rho`'s `vhat_worst_bias`, Lemmas 7–10 and Proposition 6″) | 33 | 4,372 ¶¹⁴ | 30,275 |
+| **master** (+ `root_rho(...; skewness)`, Lemmas 11–12) | 33 | 4,391 ¶¹⁵ | 30,345 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1965,8 +1977,17 @@ bound as `z → 0`. What bounds the risk of a failure is
 `P(|N(0, 1)| > 4) ≈ 6e-5` per stream. The `src/` count rose by 72, all in
 `RootRho.jl`.
 
-Measured on master: 33 submodules plus the umbrella across 30,275 lines of
-`src/`, 12,154 lines of tests, 5,397 lines of examples across 34 scripts,
+¶¹⁵ Measured locally on 2026-11-24: 4,391 passed on Julia 1.13.4 with both
+extensions, and 4,356 plus 2 broken on 1.10.14 without them, both 19 above
+¶¹⁴: testset 52 (the HC2 `V̂`'s worst case with skewed errors). Its Monte
+Carlo agreement statistic is z = +1.02 on 1.13 and +2.09 on 1.10 against a
+bound of 4. Its power statistic is −21.9 and −25.9 against 5. The two
+versions draw different designs from the same seed (worst case −0.0367 and
+−0.0345). On 1.13, seeds 52_002 and 52_003 gave z = +0.30 and +0.82. The
+`src/` count rose by 70, all in `RootRho.jl`.
+
+Measured on master: 33 submodules plus the umbrella across 30,345 lines of
+`src/`, 12,248 lines of tests, 5,397 lines of examples across 34 scripts,
 398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 

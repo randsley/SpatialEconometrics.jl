@@ -47,7 +47,12 @@ The result of [`root_rho`](@ref).
   `0` when the bias cannot be negative, `-Inf` when it has no worst case,
   and `NaN` for a penalised smoother, where Lemma 8 does not apply. The
   HC2 `V̂` is not consistent when `K/n` does not tend to 0, and this is the
-  price.
+  price. With `skewness = γ̄ > 0` it is the worst case over homoskedastic
+  laws whose skewness is at most `γ̄` in size, and over every `f` in
+  span`[X, basis]` (Lemma 12). Skewness raises the bias through the signal
+  `C′f`, so the worst `f` is then not 0.
+- `skewness` — the bound `γ̄` used for `vhat_worst_bias` (0: symmetric
+  errors; `NaN` for the smoother).
 - `roughness` — the bound `ℛ` given for the bias-aware interval (`NaN`
   when none was asked for).
 - `bias_bound` — `b̄`, the bound on the moment's bias `|E g(ρ₀)|` over the
@@ -96,7 +101,7 @@ for `order = 2`) give 0.
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
              roughness = nothing, bonferroni = false, reference = nothing,
              varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
-             max_dense_n = 4000)
+             max_dense_n = 4000, skewness = 0)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -134,8 +139,22 @@ with the largest variance up to 4 times the smallest, it found −4% to −12%
 (3 to 6 times `vhat_worst_bias`), and up to 10 times, −8% to −21%. The set
 still covered 0.937–0.953 at those patterns (research/trace_cfe/
 tc_hc2_hetero.jl). So `vhat_worst_bias` is the worst case only when all
-units share one error variance. The computation adds two `n × n × n` products, about 1.8 s at
-n = 4000.
+units share one error variance.
+
+With skewed errors (one law for all units, `|skewness| ≤ γ̄`), the worst
+case can still be computed from the design alone (Lemma 12). Skewness
+enters through the signal `C′f`, so the worst `f` is not 0, and Pearson's
+bound (excess kurtosis ≥ skewness² − 2) fixes the worst kurtosis. Pass
+`skewness = γ̄` to have `vhat_worst_bias` report it. At `γ̄ = 2` it was up to
+2.7 times the symmetric worst case in the designs measured, and no worse
+on a rook lattice, where the kurtosis that skewness forces outweighs it
+(research/trace_cfe/tc_hc2_skew.jl). It grows with the number of
+neighbours in `W`. With a different
+skewness for each unit it can be 1.6 to 2 times worse again, which is not
+covered.
+
+The computation adds two `n × n × n` products, about 1.8 s at n = 4000,
+and with `skewness > 0` an SVD of the `n × K` matrix `C′[X, basis]`.
 
 ### Arguments
 
@@ -163,6 +182,9 @@ n = 4000.
   [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
   so that `f` need not lie in `span(basis)` (see below). Then `roughness`
   may be given without `penalty`, for the projection alone.
+- `skewness` — a bound `γ̄ ≥ 0` on the errors' `|skewness|`, used only for
+  `vhat_worst_bias` (0 by default: symmetric errors). It does not change
+  the estimate or the intervals.
 
 ### With a penalised smoother
 
