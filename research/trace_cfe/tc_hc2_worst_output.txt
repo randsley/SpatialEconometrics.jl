@@ -1,0 +1,65 @@
+Worst case of HC2's bias at ρ₀ over symmetric error laws, homoskedastic (Lemma 8); n = 900, R = 4000
+MC SE of a coverage near 0.95: 0.0034.
+
+jittered k =  9: K/n 0.091, max leverage 0.503 | min cₖ +3.04e-05 (all ≥ 0: yes) | Q₂/V 0.0074 L₅ᴳ/V -0.0021 −2Σcₖ/V -0.0125 | β_min -0.0073 → coverage ≥ 0.9492
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V +0.00e+00; β_min(κ̄ = 4) -0.0073, β_min(κ̄ = 20) -0.0073
+    rademacher κ = -2.0: E V̂/V predicted 0.9927, simulated 0.9932 (z +1.3) | CS at ρ₀ 0.9510, oracle 0.9530, 2Φ(1.96√(1+β)) − 1 = 0.9492
+    uniform    κ = -1.2: E V̂/V predicted 0.9977, simulated 0.9981 (z +0.4) | CS at ρ₀ 0.9437, oracle 0.9445, 2Φ(1.96√(1+β)) − 1 = 0.9497
+    normal     κ = +0.0: E V̂/V predicted 1.0053, simulated 1.0057 (z +0.2) | CS at ρ₀ 0.9463, oracle 0.9480, 2Φ(1.96√(1+β)) − 1 = 0.9506
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+jittered k = 13: K/n 0.189, max leverage 0.783 | min cₖ -9.41e-05 (all ≥ 0: NO) | Q₂/V 0.0183 L₅ᴳ/V -0.0067 −2Σcₖ/V -0.0260 | β_min -0.0144 → coverage ≥ 0.9483
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V -9.30e-07; β_min(κ̄ = 4) -0.0144, β_min(κ̄ = 20) -0.0144
+    rademacher κ = -2.0: E V̂/V predicted 0.9856, simulated 0.9850 (z -1.1) | CS at ρ₀ 0.9443, oracle 0.9455, 2Φ(1.96√(1+β)) − 1 = 0.9483
+    uniform    κ = -1.2: E V̂/V predicted 0.9960, simulated 0.9963 (z +0.2) | CS at ρ₀ 0.9480, oracle 0.9463, 2Φ(1.96√(1+β)) − 1 = 0.9495
+    normal     κ = +0.0: E V̂/V predicted 1.0116, simulated 1.0126 (z +0.5) | CS at ρ₀ 0.9487, oracle 0.9505, 2Φ(1.96√(1+β)) − 1 = 0.9513
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+jittered k = 16: K/n 0.286, max leverage 0.951 | min cₖ -8.38e-04 (all ≥ 0: NO) | Q₂/V 0.0320 L₅ᴳ/V -0.0163 −2Σcₖ/V -0.0362 | β_min -0.0205 → coverage ≥ 0.9476
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V -2.43e-05; β_min(κ̄ = 4) -0.0206, β_min(κ̄ = 20) -0.0210
+    rademacher κ = -2.0: E V̂/V predicted 0.9795, simulated 0.9799 (z +0.6) | CS at ρ₀ 0.9357, oracle 0.9395, 2Φ(1.96√(1+β)) − 1 = 0.9476
+    uniform    κ = -1.2: E V̂/V predicted 0.9940, simulated 0.9940 (z +0.1) | CS at ρ₀ 0.9470, oracle 0.9460, 2Φ(1.96√(1+β)) − 1 = 0.9493
+    normal     κ = +0.0: E V̂/V predicted 1.0157, simulated 1.0161 (z +0.2) | CS at ρ₀ 0.9525, oracle 0.9473, 2Φ(1.96√(1+β)) − 1 = 0.9518
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+jittered k = 19: K/n 0.402, max leverage 0.999 | min cₖ -8.09e-04 (all ≥ 0: NO) | Q₂/V 0.0573 L₅ᴳ/V -0.0342 −2Σcₖ/V -0.0463 | β_min -0.0232 → coverage ≥ 0.9473
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V -5.13e-05; β_min(κ̄ = 4) -0.0235, β_min(κ̄ = 20) -0.0243
+    rademacher κ = -2.0: E V̂/V predicted 0.9768, simulated 0.9778 (z +1.2) | CS at ρ₀ 0.9495, oracle 0.9515, 2Φ(1.96√(1+β)) − 1 = 0.9473
+    uniform    κ = -1.2: E V̂/V predicted 0.9953, simulated 0.9934 (z -1.4) | CS at ρ₀ 0.9510, oracle 0.9510, 2Φ(1.96√(1+β)) − 1 = 0.9495
+    normal     κ = +0.0: E V̂/V predicted 1.0231, simulated 1.0223 (z -0.4) | CS at ρ₀ 0.9570, oracle 0.9547, 2Φ(1.96√(1+β)) − 1 = 0.9526
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+random   k =  7: K/n 0.056, max leverage 0.540 | min cₖ +9.66e-05 (all ≥ 0: yes) | Q₂/V 0.0038 L₅ᴳ/V -0.0010 −2Σcₖ/V -0.0067 | β_min -0.0039 → coverage ≥ 0.9496
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V +0.00e+00; β_min(κ̄ = 4) -0.0039, β_min(κ̄ = 20) -0.0039
+    rademacher κ = -2.0: E V̂/V predicted 0.9961, simulated 0.9961 (z -0.1) | CS at ρ₀ 0.9497, oracle 0.9497, 2Φ(1.96√(1+β)) − 1 = 0.9496
+    uniform    κ = -1.2: E V̂/V predicted 0.9988, simulated 0.9987 (z -0.1) | CS at ρ₀ 0.9505, oracle 0.9510, 2Φ(1.96√(1+β)) − 1 = 0.9499
+    normal     κ = +0.0: E V̂/V predicted 1.0028, simulated 1.0026 (z -0.1) | CS at ρ₀ 0.9490, oracle 0.9497, 2Φ(1.96√(1+β)) − 1 = 0.9503
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+random   k = 10: K/n 0.112, max leverage 0.807 | min cₖ -6.00e-04 (all ≥ 0: NO) | Q₂/V 0.0096 L₅ᴳ/V -0.0040 −2Σcₖ/V -0.0156 | β_min -0.0100 → coverage ≥ 0.9488
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V -3.84e-06; β_min(κ̄ = 4) -0.0100, β_min(κ̄ = 20) -0.0100
+    rademacher κ = -2.0: E V̂/V predicted 0.9900, simulated 0.9899 (z -0.4) | CS at ρ₀ 0.9460, oracle 0.9473, 2Φ(1.96√(1+β)) − 1 = 0.9488
+    uniform    κ = -1.2: E V̂/V predicted 0.9963, simulated 0.9960 (z -0.2) | CS at ρ₀ 0.9483, oracle 0.9465, 2Φ(1.96√(1+β)) − 1 = 0.9496
+    normal     κ = +0.0: E V̂/V predicted 1.0056, simulated 1.0045 (z -0.6) | CS at ρ₀ 0.9475, oracle 0.9463, 2Φ(1.96√(1+β)) − 1 = 0.9506
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+random   k = 12: K/n 0.161, max leverage 0.933 | min cₖ -2.00e-04 (all ≥ 0: NO) | Q₂/V 0.0150 L₅ᴳ/V -0.0081 −2Σcₖ/V -0.0223 | β_min -0.0154 → coverage ≥ 0.9482
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V -2.81e-06; β_min(κ̄ = 4) -0.0154, β_min(κ̄ = 20) -0.0155
+    rademacher κ = -2.0: E V̂/V predicted 0.9846, simulated 0.9854 (z +1.7) | CS at ρ₀ 0.9545, oracle 0.9550, 2Φ(1.96√(1+β)) − 1 = 0.9482
+    uniform    κ = -1.2: E V̂/V predicted 0.9935, simulated 0.9936 (z +0.1) | CS at ρ₀ 0.9480, oracle 0.9503, 2Φ(1.96√(1+β)) − 1 = 0.9493
+    normal     κ = +0.0: E V̂/V predicted 1.0069, simulated 1.0057 (z -0.7) | CS at ρ₀ 0.9487, oracle 0.9460, 2Φ(1.96√(1+β)) − 1 = 0.9508
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+rook     k =  9: K/n 0.091, max leverage 0.441 | min cₖ +7.80e-04 (all ≥ 0: yes) | Q₂/V 0.0120 L₅ᴳ/V -0.0004 −2Σcₖ/V -0.0190 | β_min -0.0073 → coverage ≥ 0.9492
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V +0.00e+00; β_min(κ̄ = 4) -0.0073, β_min(κ̄ = 20) -0.0073
+    rademacher κ = -2.0: E V̂/V predicted 0.9927, simulated 0.9929 (z +0.6) | CS at ρ₀ 0.9497, oracle 0.9523, 2Φ(1.96√(1+β)) − 1 = 0.9492
+    uniform    κ = -1.2: E V̂/V predicted 1.0002, simulated 1.0008 (z +0.5) | CS at ρ₀ 0.9537, oracle 0.9525, 2Φ(1.96√(1+β)) − 1 = 0.9500
+    normal     κ = +0.0: E V̂/V predicted 1.0116, simulated 1.0116 (z -0.0) | CS at ρ₀ 0.9543, oracle 0.9525, 2Φ(1.96√(1+β)) − 1 = 0.9513
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+rook     k = 13: K/n 0.189, max leverage 0.684 | min cₖ +2.02e-03 (all ≥ 0: yes) | Q₂/V 0.0276 L₅ᴳ/V -0.0008 −2Σcₖ/V -0.0383 | β_min -0.0115 → coverage ≥ 0.9487
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V +0.00e+00; β_min(κ̄ = 4) -0.0115, β_min(κ̄ = 20) -0.0115
+    rademacher κ = -2.0: E V̂/V predicted 0.9885, simulated 0.9878 (z -1.1) | CS at ρ₀ 0.9440, oracle 0.9473, 2Φ(1.96√(1+β)) − 1 = 0.9487
+    uniform    κ = -1.2: E V̂/V predicted 1.0038, simulated 1.0037 (z -0.1) | CS at ρ₀ 0.9487, oracle 0.9467, 2Φ(1.96√(1+β)) − 1 = 0.9504
+    normal     κ = +0.0: E V̂/V predicted 1.0267, simulated 1.0278 (z +0.6) | CS at ρ₀ 0.9523, oracle 0.9485, 2Φ(1.96√(1+β)) − 1 = 0.9530
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+rook     k = 16: K/n 0.286, max leverage 0.893 | min cₖ +7.25e-05 (all ≥ 0: yes) | Q₂/V 0.0582 L₅ᴳ/V -0.0017 −2Σcₖ/V -0.0690 | β_min -0.0125 → coverage ≥ 0.9485
+    unit-by-unit κₖ ∈ [−2, κ̄]: Σ_{cₖ<0} cₖ/V +0.00e+00; β_min(κ̄ = 4) -0.0125, β_min(κ̄ = 20) -0.0125
+    rademacher κ = -2.0: E V̂/V predicted 0.9875, simulated 0.9886 (z +1.3) | CS at ρ₀ 0.9373, oracle 0.9395, 2Φ(1.96√(1+β)) − 1 = 0.9485
+    uniform    κ = -1.2: E V̂/V predicted 1.0151, simulated 1.0140 (z -0.8) | CS at ρ₀ 0.9545, oracle 0.9513, 2Φ(1.96√(1+β)) − 1 = 0.9517
+    normal     κ = +0.0: E V̂/V predicted 1.0565, simulated 1.0562 (z -0.1) | CS at ρ₀ 0.9520, oracle 0.9443, 2Φ(1.96√(1+β)) − 1 = 0.9561
+    power: Rademacher ≤ uniform ≤ normal in E V̂/V: yes
+
+largest |z| 1.7; iid worst case β_min -0.0232 to -0.0039 (coverage ≥ 0.9473); CS minus its predicted coverage -0.0118 to +0.0063; CS minus the oracle -0.0038 to +0.0077; ordering held in every design: yes (2.3 min)

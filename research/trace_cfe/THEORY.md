@@ -2545,12 +2545,86 @@ concentration lemma that is still to be proved for a dense `M`), then
 
     P(ρ₀ ∈ CS) − [2Φ(1.96√(1 + β_V)) − 1] → 0.
 
-At `β_V = −0.01`, the worst value measured, this is 0.949. Still to do:
-- the orders of the terms under `K/n → θ` with a local basis (bounds on
-  `Q₃` and `L₅` relative to `V`, in terms of the leverage);
-- the concentration lemma;
-- the proposition, then a check through `root_rho`, whose `C(ρ̃)` is
+At `β_V = −0.01`, the worst value measured, this is 0.949.
+
+**Lemma 8 (the worst case over error laws, homoskedastic; proved).** In
+Lemma 7, let `σᵢ² = σ²` (by scale, `σ² = 1`) and `μ₃ = 0`. Write
+`uₖ = (Mᵢₖ²/Mᵢᵢ)ᵢ` and
+
+    Q₂ = 4Σᵢⱼ ΩᵢⱼMᵢⱼ²/(MᵢᵢMⱼⱼ),   L₅ᴳ = −2Σᵢⱼ Hᵢⱼ²Mᵢⱼ²/(MᵢᵢMⱼⱼ),
+    cₖ = 2uₖ′Ωuₖ + Σᵢ Hᵢₖ²Mᵢₖ²/Mᵢᵢ − uₖ′(H∘H)uₖ.
+
+These depend on `W`, the basis and `ρ₀` alone. Then:
+
+(a) `E V̂ − V = Q₂ + L₅ᴳ + Σₖ cₖκₖ`, whatever `f`.
+
+(b) For iid errors (one `κ`) with `Σₖcₖ ≥ 0`, and over all `f ∈ span(B)`,
+
+    β_V ≥ β_min = min(0, Q₂ + L₅ᴳ − 2Σₖcₖ) / (2Σᵢⱼ Ωᵢⱼ),
+
+with equality at `f = 0` and Rademacher (`±σ`) errors.
+
+(c) For unit-specific `κₖ ∈ [−2, κ̄]`, the same holds with `−2Σₖcₖ`
+replaced by `−2Σ_{cₖ>0} cₖ + κ̄Σ_{cₖ<0} cₖ`.
+
+*Proof.* (a) Under homoskedasticity Lemma 7(d) gives
+`Q₁ = L₁ = L₄ = 0` and `HΣM = 0`. `μ₃ = 0` gives `L₂ = 0`. What remains is
+`Q₂`, `Q₃`, the `κ` part of `L₃`, and `L₅`, which splits into its Gaussian
+part `L₅ᴳ` and a `κ` part. Here `𝒳 = M∘M`, because `MM = M`, so `Q₂` is as
+stated. The three `κ` terms are `Σₖκₖ` times `2uₖ′Ωuₖ`,
+`Σᵢ Hᵢₖ²Mᵢₖ²/Mᵢᵢ` and `−uₖ′(H∘H)uₖ`. None of them contains `b`.
+(b) Every law has `E ε⁴ ≥ (E ε²)²`, so `κ ≥ −2σ⁴`, with equality only for
+the two-point law `±σ`. (a) is linear in `κ` with slope `Σₖcₖ ≥ 0`, so it
+is smallest at `κ = −2`. `V = 2Σᵢⱼ Ωᵢⱼ + ‖b‖²`, and the bias does not depend
+on `b`, so a negative `β_V` is most negative at `b = 0`, which is `f = 0`.
+(c) The same argument, unit by unit. ∎
+
+So under homoskedastic symmetric errors, `β_min` and the coverage it
+implies, `2Φ(1.96√(1 + β_min)) − 1`, can be computed before seeing `y`.
+Heteroskedasticity and skewness are outside the lemma. They add `Q₁`,
+`L₁`, `L₄` (of either sign) and `L₂` (linear in `b`).
+`tc_hc2_bias.jl`'s smooth and rough variances gave no bias below −1%.
+
+**Numerical check (`tc_hc2_worst.jl`).** There are ten designs:
+- the jittered grid of `tc_hc2_bias.jl`, with `k` = 9, 13, 16, 19;
+- uniform random locations, with `k` = 7, 10, 12;
+- a 30 × 30 rook lattice, with `k` = 9, 13, 16.
+
+All have `n` = 900, the basis `[hats, x]` and `f = 0`. Each design is
+run with Rademacher, uniform and normal errors, at R = 4000.
+- **(a) is exact.** Simulated against predicted `E V̂/V`: `|z|` ≤ 1.7 in
+  all 30 cells.
+- **The power check holds.** In every design the order is Rademacher <
+  uniform < normal, so (b)'s minimiser is the one predicted.
+- **(b)'s condition holds.** `Σₖcₖ > 0` in every design. Some `cₖ` are
+  negative, but their sum is at most 5e-5 of `V`. So (c) with `κ̄ = 20`
+  moves `β_min` by at most 0.001.
+- **The worst case is small.** `β_min` is −0.004 to −0.023 and grows with
+  the leverage:
+
+  | design | K/n | max leverage | `β_min` | coverage bound |
+  |---|---|---|---|---|
+  | jittered, k = 9 | 0.09 | 0.50 | −0.007 | 0.949 |
+  | jittered, k = 16 | 0.29 | 0.95 | −0.021 | 0.948 |
+  | jittered, k = 19 | 0.40 | 0.999 | −0.023 | 0.947 |
+  | random, k = 12 | 0.16 | 0.93 | −0.015 | 0.948 |
+  | rook, k = 16 | 0.29 | 0.89 | −0.013 | 0.948 |
+
+- **`CS` at `ρ₀`** covers 0.936–0.957 and differs from the oracle (the
+  true `V`) by −0.004 to +0.008. The lowest cells (0.936 and 0.937, both
+  Rademacher at `k = 16`) have oracles of 0.940. So the remaining shortfall
+  at `n` = 900 is the normal approximation of `g`, not `V̂`.
+
+So in these designs, the HC2 `V̂`'s bias costs at most 0.003 of coverage,
+whatever the symmetric law. Still to do:
+- **a bound on `β_min` from the leverage alone**, so that the lemma gives
+  a rate without computing `Q₂`, `L₅ᴳ` and `cₖ`;
+- **the concentration lemma**;
+- **the proposition**, then a check through `root_rho`, whose `C(ρ̃)` is
   random, unlike the fixed `C(ρ₀)` here.
+
+`β_min` could also be reported by `root_rho` as a diagnostic. It costs
+`O(n³)`, as the HC2 `V̂` already does. It is not built.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
@@ -2715,8 +2789,11 @@ linear in `y`.
    test-inversion set when K/n → θ > 0": Lemma 7 gives the HC2 `V̂(ρ₀)`'s
    exact bias for any error law (`tc_hc2_bias.jl`). It is −1% to +20% up
    to K/n = 0.40, and `CS` covers 0.931–0.971 there, as the oracle does.
-   Still to do: the terms' orders, a concentration lemma, the
-   proposition.
+   Lemma 8 gives its worst case over symmetric homoskedastic laws, which
+   is Rademacher errors at `f = 0`, computable from the design. In ten
+   designs it is −0.4% to −2.3%, a coverage of at least 0.947
+   (`tc_hc2_worst.jl`). Still to do: a leverage bound on that worst case,
+   a concentration lemma, and the proposition.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
