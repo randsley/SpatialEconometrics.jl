@@ -119,6 +119,12 @@ Proposition 6″ shows that `CS` then covers `2Φ(z√(1 + β_V)) − 1` for lar
   It was −0.4% to −2.7% in the designs measured (`K/n` = 0.06–0.40), a
   coverage of at least 94.7%. With heteroskedastic or skewed errors there
   is no design-only bound, and the bias was −1% to +20% where measured.
+  An adversarial search over variance patterns does worse: with the
+  largest variance up to 4 times the smallest, it found −4% to −12%, 3 to 6
+  times `vhat_worst_bias`, and −8% to −21% up to 10 times. Smooth variance
+  patterns about halve that. At those patterns `CS` still covered
+  0.937–0.953. So `vhat_worst_bias` is the worst case only when all units
+  share one error variance (research/trace_cfe/tc_hc2_hetero.jl).
   It is `NaN` for the penalised smoother, where Lemma 8 does not apply.
 
 ## Choosing the basis

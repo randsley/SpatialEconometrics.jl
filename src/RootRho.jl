@@ -692,7 +692,12 @@ computed from the design alone (Lemma 8) and reported as
 to −2.7% at `K/n` = 0.06–0.40 in the designs measured, so the set's
 coverage stays at or above about 94.7%. With heteroskedastic or skewed
 errors the bias has no such design-only bound. It was −1% to +20% where
-measured. The computation adds two `n × n × n` products, about 1.8 s at
+measured. An adversarial search over variance patterns gives a worse case:
+with the largest variance up to 4 times the smallest, it found −4% to −12%
+(3 to 6 times `vhat_worst_bias`), and up to 10 times, −8% to −21%. The set
+still covered 0.937–0.953 at those patterns (research/trace_cfe/
+tc_hc2_hetero.jl). So `vhat_worst_bias` is the worst case only when all
+units share one error variance. The computation adds two `n × n × n` products, about 1.8 s at
 n = 4000.
 
 # Arguments
