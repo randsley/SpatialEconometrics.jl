@@ -89,6 +89,13 @@ practice:
   quantity is run on Julia 1.13 and 1.10, whose random streams differ, and
   its distance from the bound is recorded. The smallest margin in the suite
   is 1.47×, in 42c (the size-table notes in `ROADMAP.md` keep the record).
+  For an assertion that a z-statistic stays below a bound (agreement of a
+  Monte Carlo mean with a formula, as in 51b), record the statistic itself
+  on both versions, not `bound/z`. Under a correct formula `z` is about
+  `|N(0, 1)|` and changes from stream to stream, so the ratio says nothing
+  stable. Choose the bound and `R` so that `P(|N(0, 1)| > bound)` is
+  negligible, and so that any real discrepancy found with a much larger
+  `R` is small against the SE.
 - **No `@test` sits inside a guard that a random draw can switch off.**
   Assert the implication, `@test !guard || claim`, so that a failed guard
   cannot silently remove coverage.

@@ -1955,9 +1955,15 @@ extensions, and 4,320 plus 2 broken on 1.10.13 without them, both 27 above
 
 ¶¹⁴ Measured locally on 2026-11-24: 4,372 passed on Julia 1.13.4 with both
 extensions, and 4,337 plus 2 broken on 1.10.14 without them, both 17 above
-¶¹³: testset 51 (the HC2 `V̂`'s worst case). Its Monte Carlo assertion has
-margins of 2.07× on 1.13 and 20× on 1.10 against its bound. The `src/` count
-rose by 72, all in `RootRho.jl`.
+¶¹³: testset 51 (the HC2 `V̂`'s worst case). Its Monte Carlo agreement
+check is a z-statistic against a bound of 4: 1.93 on 1.13 and 0.2 on 1.10.
+Its power check is 27.8 and 31.1 against 5. These are not margins in the
+usual sense. Under a correct formula the agreement statistic is about
+`|N(0, 1)|`, and the two versions simulate different data from the same
+seed. So `4/z` (2.07× and 20×) is one random draw each, and it grows without
+bound as `z → 0`. What bounds the risk of a failure is
+`P(|N(0, 1)| > 4) ≈ 6e-5` per stream. The `src/` count rose by 72, all in
+`RootRho.jl`.
 
 Measured on master: 33 submodules plus the umbrella across 30,275 lines of
 `src/`, 12,154 lines of tests, 5,397 lines of examples across 34 scripts,

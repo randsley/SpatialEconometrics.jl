@@ -5834,6 +5834,13 @@ two `n × n × n` products, 0.04 s at `n` = 900 and 1.8 s at `n` = 3969.
   R = 4000 the agreement statistic was 3.2 SE on 1.13. R = 200000 on
   another seed gave 1.5 SE, so the formula holds and that seed's first
   4000 draws were unlucky. R was raised; the bound was not moved.
+  The statistics are reported themselves, not as `bound/z`. The two
+  versions draw different designs from the same seed (the worst case is
+  −0.0206 on 1.13 and −0.0191 on 1.10). Under a correct formula `z` is
+  about `|N(0, 1)|`, so `4/z` is one draw of an unbounded ratio. The risk
+  of a spurious failure is `P(|N(0, 1)| > 4) ≈ 6e-5` per stream. The
+  difference measured at R = 200000, 3e-4, would add about 0.4 SE at
+  R = 20000 if it were real.
 - **The coverage formula** against Distributions, to 1e-6. The package's
   `Φ` is Abramowitz & Stegun 26.2.17.
 - **`show`** prints the line for a projection, and not for the smoother.
