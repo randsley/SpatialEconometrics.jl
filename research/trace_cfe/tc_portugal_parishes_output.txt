@@ -1,0 +1,47 @@
+n = 2882 mainland parishes; extent 273 km (E–W) × 569 km (N–S)
+y = log income 2021: median 9.265, range 8.712–10.421 (max: Belém); skewness 0.81
+  W queen : links 16818, neighbours per unit 1–17 (mean 5.84)
+  W kNN-6 : links 17292, neighbours per unit 6–6 (mean 6.00)
+
+W = queen
+  ML SAR, no surface       ρ̂ +0.697 (se 0.015), β̂ +0.02054, -0.003536, -0.008359, +0.6974
+  root_rho, no surface     K    4 df    4.0 hmax 0.020 | ρ̂ +0.624 se 0.016 Wald [+0.592, +0.657] | CS [0.592, 0.657] | wb -0.0000 | β̂ +3.462, +0.02386, -0.00376, -0.00897 | 1s
+  projection k=6 (-4)      K   35 df   35.0 hmax 0.983 | ρ̂ +0.474 se 0.028 Wald [+0.420, +0.528] | CS [0.419, 0.528] | wb -0.0004 | β̂ +0.05278, -0.004012, -0.01007 | 1s
+  projection k=8 (-10)     ERROR (0s): ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is ill-posed …
+  projection k=10 (-19)    ERROR (0s): ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is ill-posed …
+  projection k=12 (-32)    ERROR (0s): ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is ill-posed …
+  penalised k=16 λ=0.1     K  259 df  126.1 hmax 0.551 | ρ̂ +0.447 se 0.025 Wald [+0.398, +0.496] | CS [0.398, 0.497] | wb +NaN | β̂ +0.0668, -0.004788, -0.009956 | 1s
+  penalised k=16 λ=1       K  259 df   71.3 hmax 0.298 | ρ̂ +0.459 se 0.023 Wald [+0.413, +0.504] | CS [0.414, 0.504] | wb +NaN | β̂ +0.06154, -0.004562, -0.009968 | 1s
+  penalised k=16 λ=10      K  259 df   32.7 hmax 0.132 | ρ̂ +0.486 se 0.021 Wald [+0.444, +0.527] | CS [0.445, 0.528] | wb +NaN | β̂ +0.0539, -0.004607, -0.009809 | 1s
+  penalised k=16 λ=100     K  259 df   15.5 hmax 0.052 | ρ̂ +0.518 se 0.020 Wald [+0.479, +0.556] | CS [0.480, 0.557] | wb +NaN | β̂ +0.04647, -0.005193, -0.009361 | 1s
+  penalised k=24 λ=0.1     K  579 df  225.6 hmax 0.660 | ρ̂ +0.428 se 0.027 Wald [+0.375, +0.482] | CS [0.375, 0.483] | wb +NaN | β̂ +0.07141, -0.005145, -0.009584 | 2s
+  penalised k=24 λ=1       K  579 df  112.7 hmax 0.391 | ρ̂ +0.446 se 0.024 Wald [+0.399, +0.493] | CS [0.399, 0.494] | wb +NaN | β̂ +0.06537, -0.004844, -0.009742 | 1s
+  penalised k=24 λ=10      K  579 df   47.3 hmax 0.189 | ρ̂ +0.473 se 0.022 Wald [+0.430, +0.516] | CS [0.431, 0.516] | wb +NaN | β̂ +0.0572, -0.004609, -0.009857 | 1s
+  penalised k=24 λ=100     K  579 df   20.6 hmax 0.077 | ρ̂ +0.505 se 0.020 Wald [+0.466, +0.545] | CS [0.466, 0.545] | wb +NaN | β̂ +0.04929, -0.004947, -0.009509 | 1s
+
+W = kNN-6
+  ML SAR, no surface       ρ̂ +0.712 (se 0.014), β̂ +0.01986, -0.003681, -0.007763, +0.7116
+  root_rho, no surface     K    4 df    4.0 hmax 0.020 | ρ̂ +0.726 se 0.016 Wald [+0.695, +0.757] | CS [0.695, 0.757] | wb -0.0000 | β̂ +2.527, +0.0192, -0.003641, -0.007631 | 1s
+  projection k=6 (-4)      K   35 df   35.0 hmax 0.983 | ρ̂ +0.612 se 0.024 Wald [+0.565, +0.660] | CS [0.564, 0.659] | wb -0.0003 | β̂ +0.04567, -0.004114, -0.008851 | 1s
+  projection k=8 (-10)     ERROR (0s): ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is ill-posed …
+  projection k=10 (-19)    ERROR (0s): ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is ill-posed …
+  projection k=12 (-32)    ERROR (0s): ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is ill-posed …
+  penalised k=16 λ=0.1     K  259 df  126.1 hmax 0.551 | ρ̂ +0.486 se 0.026 Wald [+0.435, +0.536] | CS [0.436, 0.537] | wb +NaN | β̂ +0.06413, -0.004949, -0.009484 | 1s
+  penalised k=16 λ=1       K  259 df   71.3 hmax 0.298 | ρ̂ +0.493 se 0.023 Wald [+0.447, +0.538] | CS [0.448, 0.539] | wb +NaN | β̂ +0.05887, -0.004698, -0.009461 | 1s
+  penalised k=16 λ=10      K  259 df   32.7 hmax 0.132 | ρ̂ +0.517 se 0.021 Wald [+0.475, +0.558] | CS [0.476, 0.559] | wb +NaN | β̂ +0.0514, -0.004703, -0.009253 | 1s
+  penalised k=16 λ=100     K  259 df   15.5 hmax 0.052 | ρ̂ +0.548 se 0.020 Wald [+0.509, +0.586] | CS [0.510, 0.586] | wb +NaN | β̂ +0.04445, -0.005229, -0.00878 | 1s
+  penalised k=24 λ=0.1     K  579 df  225.6 hmax 0.660 | ρ̂ +0.477 se 0.028 Wald [+0.421, +0.532] | CS [0.422, 0.533] | wb +NaN | β̂ +0.06868, -0.0053, -0.00912 | 1s
+  penalised k=24 λ=1       K  579 df  112.7 hmax 0.391 | ρ̂ +0.484 se 0.024 Wald [+0.437, +0.532] | CS [0.437, 0.533] | wb +NaN | β̂ +0.06273, -0.004974, -0.009267 | 1s
+  penalised k=24 λ=10      K  579 df   47.3 hmax 0.189 | ρ̂ +0.505 se 0.022 Wald [+0.463, +0.548] | CS [0.463, 0.548] | wb +NaN | β̂ +0.0546, -0.004712, -0.00932 | 1s
+  penalised k=24 λ=100     K  579 df   20.6 hmax 0.077 | ρ̂ +0.535 se 0.020 Wald [+0.496, +0.575] | CS [0.497, 0.575] | wb +NaN | β̂ +0.04706, -0.005003, -0.008938 | 1s
+
+Residual diagnostics: queen, penalised k = 24, λ = 1
+  residual skewness 0.36, excess kurtosis 2.10
+  e² on log density: slope 0.00144 (mean e² 0.01127)
+  Moran's I of e: Global Moran's I Test (asymptotic)
+  I = -0.033934    E[I] = -0.000347    z = -3.0186    p = 0.0025
+
+  Moran's I of e²: Global Moran's I Test (asymptotic)
+  I = 0.085143    E[I] = -0.000347    z = 7.7876    p = 0.0000
+
+  largest |standardised residuals|: Parque das Nações +6.0, Belém +5.6, União das freguesias de Nogueiró e Tenões +5.2, Santo Estêvão +4.9, União das freguesias de Aldoar, Foz do Douro e Nevogilde +4.8, Costa +4.5
