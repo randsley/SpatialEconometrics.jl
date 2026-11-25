@@ -1,0 +1,64 @@
+Leave-three-out V̂ at ρ₀ (Anatolyev & Sølvsten 2023), threads = 16
+
+Part 1: the fast formulas against explicit OLS with rows removed (n = 36, basis 3 × 3 hats + x)
+  K = 10, max leverage 0.702, min Dᵢⱼₖ 2.533e-02
+  max |error|: leave-two-out residual 6.2e-15, leave-three-out residual 1.9e-14
+  V̂_L3O: by definition 2.413687663, fast 2.413687663 (relative difference 8.1e-15)
+  (11) is symmetric in i, j: max |P̂ᵢⱼ − P̂ⱼᵢ| over 30 pairs 5.8e-15
+
+Part 2: E V̂/V at n = 36 (exact unbiasedness claimed at every n), R = 200000
+  constant normal a= 1 | L3O E V̂/V 0.9992 (z vs 1  -0.5) sd 0.679 | HC2 0.9972 pred 0.9964 (z vs pred  +0.7, vs 1   -2.4) sd 0.518
+  rough    chisq3 a= 1 | L3O E V̂/V 1.0002 (z vs 1  +0.0) sd 1.827 | HC2 1.0980 pred 1.0972 (z vs pred  +0.2, vs 1  +24.8) sd 1.767
+  rough    chisq3 a= 4 | L3O E V̂/V 1.0006 (z vs 1  +0.2) sd 1.576 | HC2 1.0490 pred 1.0468 (z vs pred  +0.7, vs 1  +15.2) sd 1.445
+
+Part 3: n = 400, jittered 20 × 20 grid, kNN-6, hat basis + x, R = 1000
+lin = the linear part's share of V. MC SE of a coverage near 0.95: 0.007.
+
+(one V̂_L3O at n = 400: 0.08 s)
+
+k = 6: K = 37, K/n = 0.092, max leverage 0.561, min Dᵢⱼₖ 1.513e-01
+  constant normal a= 1 | lin 0.31 | L3O 1.0016 (z vs 1  +0.3) sd 0.191 | HC2 1.0089 pred 1.0030 (z  +1.3) sd 0.145 | CS L3O 0.949 HC2 0.945 oracle 0.944
+  constant chisq3 a= 1 | lin 0.31 | L3O 1.0111 (z vs 1  +1.1) sd 0.330 | HC2 1.0325 pred 1.0224 (z  +1.2) sd 0.262 | CS L3O 0.955 HC2 0.950 oracle 0.951
+  rough    normal a= 1 | lin 0.33 | L3O 0.9922 (z vs 1  -0.9) sd 0.275 | HC2 1.0247 pred 1.0237 (z  +0.1) sd 0.233 | CS L3O 0.953 HC2 0.955 oracle 0.951
+  rough    chisq3 a= 1 | lin 0.33 | L3O 0.9934 (z vs 1  -0.5) sd 0.457 | HC2 1.0508 pred 1.0744 (z  -1.8) sd 0.416 | CS L3O 0.956 HC2 0.953 oracle 0.945
+  constant normal a= 4 | lin 0.43 | L3O 0.9931 (z vs 1  -0.9) sd 0.238 | HC2 1.0063 pred 1.0025 (z  +0.9) sd 0.139 | CS L3O 0.938 HC2 0.943 oracle 0.942
+  constant chisq3 a= 4 | lin 0.43 | L3O 1.0240 (z vs 1  +2.2) sd 0.352 | HC2 1.0276 pred 1.0176 (z  +1.3) sd 0.240 | CS L3O 0.948 HC2 0.959 oracle 0.950
+  rough    normal a= 4 | lin 0.44 | L3O 0.9857 (z vs 1  -1.4) sd 0.331 | HC2 1.0184 pred 1.0247 (z  -0.9) sd 0.214 | CS L3O 0.953 HC2 0.952 oracle 0.945
+  rough    chisq3 a= 4 | lin 0.44 | L3O 1.0021 (z vs 1  +0.1) sd 0.558 | HC2 1.0722 pred 1.0602 (z  +0.7) sd 0.535 | CS L3O 0.947 HC2 0.958 oracle 0.954
+  constant normal a=16 | lin 0.85 | L3O 1.0605 (z vs 1  +2.8) sd 0.674 | HC2 1.0038 pred 1.0007 (z  +0.8) sd 0.129 | CS L3O 0.885 HC2 0.964 oracle 0.960 (V̂_L3O ≤ 0 in 40)
+  constant chisq3 a=16 | lin 0.85 | L3O 0.9872 (z vs 1  -0.6) sd 0.701 | HC2 1.0121 pred 1.0036 (z  +1.3) sd 0.205 | CS L3O 0.835 HC2 0.951 oracle 0.943 (V̂_L3O ≤ 0 in 62)
+  rough    normal a=16 | lin 0.85 | L3O 0.9693 (z vs 1  -1.4) sd 0.687 | HC2 1.0242 pred 1.0303 (z  -1.2) sd 0.163 | CS L3O 0.839 HC2 0.962 oracle 0.963 (V̂_L3O ≤ 0 in 71)
+  rough    chisq3 a=16 | lin 0.85 | L3O 0.9908 (z vs 1  -0.3) sd 0.869 | HC2 1.0471 pred 1.0326 (z  +1.4) sd 0.319 | CS L3O 0.841 HC2 0.950 oracle 0.947 (V̂_L3O ≤ 0 in 83)
+  (16.5 min so far)
+
+k = 9: K = 82, K/n = 0.205, max leverage 0.887, min Dᵢⱼₖ 3.624e-03
+  constant normal a= 1 | lin 0.39 | L3O 1.0123 (z vs 1  +1.8) sd 0.211 | HC2 1.0093 pred 1.0059 (z  +0.7) sd 0.150 | CS L3O 0.963 HC2 0.959 oracle 0.955
+  constant chisq3 a= 1 | lin 0.39 | L3O 1.0123 (z vs 1  +1.1) sd 0.342 | HC2 1.0471 pred 1.0376 (z  +1.1) sd 0.277 | CS L3O 0.955 HC2 0.962 oracle 0.956
+  rough    normal a= 1 | lin 0.39 | L3O 1.0144 (z vs 1  +1.6) sd 0.287 | HC2 1.0424 pred 1.0351 (z  +0.8) sd 0.269 | CS L3O 0.939 HC2 0.937 oracle 0.938
+  rough    chisq3 a= 1 | lin 0.39 | L3O 0.9914 (z vs 1  -0.6) sd 0.449 | HC2 1.1128 pred 1.1296 (z  -0.9) sd 0.606 | CS L3O 0.955 HC2 0.960 oracle 0.956
+  constant normal a= 4 | lin 0.54 | L3O 0.9976 (z vs 1  -0.3) sd 0.261 | HC2 1.0030 pred 1.0045 (z  -0.3) sd 0.139 | CS L3O 0.943 HC2 0.945 oracle 0.950
+  constant chisq3 a= 4 | lin 0.54 | L3O 1.0039 (z vs 1  +0.4) sd 0.336 | HC2 1.0316 pred 1.0295 (z  +0.3) sd 0.246 | CS L3O 0.952 HC2 0.961 oracle 0.956
+  rough    normal a= 4 | lin 0.52 | L3O 0.9919 (z vs 1  -0.8) sd 0.323 | HC2 1.0290 pred 1.0382 (z  -1.3) sd 0.222 | CS L3O 0.952 HC2 0.957 oracle 0.951
+  rough    chisq3 a= 4 | lin 0.52 | L3O 0.9748 (z vs 1  -2.0) sd 0.399 | HC2 1.1050 pred 1.1126 (z  -0.4) sd 0.570 | CS L3O 0.938 HC2 0.958 oracle 0.951
+  constant normal a=16 | lin 0.90 | L3O 1.0257 (z vs 1  +1.0) sd 0.822 | HC2 0.9976 pred 1.0010 (z  -0.7) sd 0.142 | CS L3O 0.835 HC2 0.960 oracle 0.957 (V̂_L3O ≤ 0 in 107)
+  constant chisq3 a=16 | lin 0.90 | L3O 0.9713 (z vs 1  -1.1) sd 0.830 | HC2 1.0105 pred 1.0076 (z  +0.4) sd 0.229 | CS L3O 0.799 HC2 0.965 oracle 0.962 (V̂_L3O ≤ 0 in 117)
+  rough    normal a=16 | lin 0.90 | L3O 0.9944 (z vs 1  -0.2) sd 0.718 | HC2 1.0273 pred 1.0254 (z  +0.3) sd 0.193 | CS L3O 0.832 HC2 0.949 oracle 0.944 (V̂_L3O ≤ 0 in 76)
+  rough    chisq3 a=16 | lin 0.90 | L3O 1.0209 (z vs 1  +0.9) sd 0.762 | HC2 1.0441 pred 1.0426 (z  +0.1) sd 0.342 | CS L3O 0.832 HC2 0.962 oracle 0.953 (V̂_L3O ≤ 0 in 86)
+  (31.4 min so far)
+
+k = 11: K = 122, K/n = 0.305, max leverage 0.978, min Dᵢⱼₖ 4.212e-06
+  constant normal a= 1 | lin 0.41 | L3O 0.9967 (z vs 1  -0.5) sd 0.213 | HC2 1.0040 pred 1.0108 (z  -1.4) sd 0.157 | CS L3O 0.956 HC2 0.953 oracle 0.956
+  constant chisq3 a= 1 | lin 0.41 | L3O 1.0072 (z vs 1  +0.7) sd 0.319 | HC2 1.0593 pred 1.0620 (z  -0.3) sd 0.277 | CS L3O 0.957 HC2 0.961 oracle 0.954
+  rough    normal a= 1 | lin 0.39 | L3O 1.0110 (z vs 1  +1.3) sd 0.278 | HC2 1.0607 pred 1.0519 (z  +1.1) sd 0.254 | CS L3O 0.962 HC2 0.965 oracle 0.955
+  rough    chisq3 a= 1 | lin 0.39 | L3O 0.9999 (z vs 1  -0.0) sd 0.433 | HC2 1.1682 pred 1.1803 (z  -0.7) sd 0.574 | CS L3O 0.943 HC2 0.959 oracle 0.940
+  constant normal a= 4 | lin 0.56 | L3O 0.9945 (z vs 1  -0.6) sd 0.274 | HC2 1.0079 pred 1.0081 (z  -0.1) sd 0.153 | CS L3O 0.946 HC2 0.955 oracle 0.951
+  constant chisq3 a= 4 | lin 0.56 | L3O 0.9972 (z vs 1  -0.3) sd 0.350 | HC2 1.0283 pred 1.0448 (z  -2.0) sd 0.260 | CS L3O 0.950 HC2 0.949 oracle 0.953
+  rough    normal a= 4 | lin 0.56 | L3O 0.9992 (z vs 1  -0.1) sd 0.335 | HC2 1.0395 pred 1.0324 (z  +1.0) sd 0.233 | CS L3O 0.945 HC2 0.955 oracle 0.945
+  rough    chisq3 a= 4 | lin 0.56 | L3O 0.9952 (z vs 1  -0.3) sd 0.495 | HC2 1.1071 pred 1.1179 (z  -0.7) sd 0.468 | CS L3O 0.946 HC2 0.957 oracle 0.950 (V̂_L3O ≤ 0 in 1)
+  constant normal a=16 | lin 0.91 | L3O 1.0302 (z vs 1  +1.1) sd 0.858 | HC2 1.0078 pred 1.0017 (z  +1.3) sd 0.147 | CS L3O 0.805 HC2 0.952 oracle 0.953 (V̂_L3O ≤ 0 in 120)
+  constant chisq3 a=16 | lin 0.91 | L3O 1.0148 (z vs 1  +0.5) sd 0.885 | HC2 1.0118 pred 1.0078 (z  +0.6) sd 0.218 | CS L3O 0.776 HC2 0.948 oracle 0.949 (V̂_L3O ≤ 0 in 136)
+  rough    normal a=16 | lin 0.92 | L3O 0.9508 (z vs 1  -2.0) sd 0.788 | HC2 0.9756 pred 0.9856 (z  -1.5) sd 0.208 | CS L3O 0.794 HC2 0.949 oracle 0.947 (V̂_L3O ≤ 0 in 109)
+  rough    chisq3 a=16 | lin 0.92 | L3O 1.0532 (z vs 1  +2.0) sd 0.850 | HC2 1.0062 pred 0.9963 (z  +0.9) sd 0.349 | CS L3O 0.822 HC2 0.942 oracle 0.949 (V̂_L3O ≤ 0 in 95)
+  (46.0 min so far)
+
+Summary over 36 cells: L3O |z vs 1| ≤ 2.8; HC2 |z vs Lemma 7| ≤ 2.0; CS coverage L3O 0.776–0.963, HC2 0.937–0.965, oracle 0.938–0.963

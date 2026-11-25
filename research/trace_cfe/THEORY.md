@@ -3055,10 +3055,51 @@ regressors. They state that "the product `x′ⱼβ x′ₖβ σ²ᵢ`" in their
   weak-instrument-robust tests, and are the nearest neighbour for our
   test-inversion set. They are not read yet.
 
-The next step is measurement, not a build. Implement (10)–(11) and the
-linear part densely at `ρ₀`, in `tc_hc2_bias.jl`'s designs. Check
-unbiasedness against Lemma 7 (power: HC2's bias is detected). Then measure
-coverage against HC2's at K/n up to 0.29, with strong and weak signals.
+**Measured 2026-11-25 (`tc_l3o.jl`): unbiased, but too noisy with a strong
+signal. Not to be built.** Formulas (10)–(11) and the leave-out recursions
+of their §2.7 were checked against the page images (pp. 13, 16, 18). For our
+moment, the linear-part estimate `L̂ = Σᵢ Σⱼₖ CⱼᵢCₖᵢ yⱼyₖ σ̂²ᵢ,₋ⱼₖ` (with
+`σ̂²ᵢ,₋ⱼ` where `j = k`) has mean `Σᵢbᵢ²σᵢ² + Σ_{i≠j} Cⱼᵢ²σᵢ²σⱼ²`, so the
+quadratic weights become `wᵢⱼ = 2Ωᵢⱼ − (Cⱼᵢ² + Cᵢⱼ²)/2`. This is their
+`U − V²` in (12). Then
+
+    V̂_L3O = Σ_{i≠j} wᵢⱼ (σᵢ²σⱼ²)^ + L̂
+
+is exactly unbiased at every `n` when every `Dᵢⱼₖ > 0`. Grouped by one pivot,
+every term is an `n × n` object, so the cost is `O(n³)` per evaluation
+(0.08 s at `n` = 400 on 16 threads).
+- **The algebra is right.** At `n` = 36, the fast leave-two-out and
+  leave-three-out residuals match explicit OLS with rows removed to 2e-14,
+  and `V̂_L3O` matches its definition to 8e-15.
+- **It is unbiased.** At `n` = 36 with R = 200000, `E V̂_L3O/V` is
+  0.9992–1.0006 (`|z|` ≤ 0.5), including rough variances with `χ²₃`
+  errors. In the same draws HC2 matches Lemma 7 (`|z|` ≤ 0.7) and is
+  rejected against 1 at `z` = +24.8. At `n` = 400, `|z|` ≤ 2.8 over 36
+  cells.
+- **`Dᵢⱼₖ > 0` holds for the hat basis**, but gets small: min `Dᵢⱼₖ` is
+  0.15, 3.6e-3 and 4.2e-6 at K/n = 0.09, 0.21 and 0.31.
+- **With a strong signal it fails as an interval.** The design is
+  `n` = 400 (jittered 20 × 20 grid, kNN-6, hats + `x`, R = 1000). At
+  `a` = 16, where the linear part is 85–92% of `V`, the sd of `V̂_L3O/V`
+  is 0.67–0.89, against HC2's 0.13–0.35. `V̂_L3O ≤ 0` in 4–14% of draws,
+  and `CS` covers 0.776–0.885. HC2 covers 0.942–0.965 and the oracle
+  0.943–0.963. The cause is the one found in step 2 for leave-one-out
+  products: `L̂` multiplies `yⱼyₖ`, so its variance grows like `‖f‖⁴`.
+  Their fallback for `V̂ ≤ 0` (squared outcomes, biased upward) would
+  remove the negative values, not the noise.
+- **With a weak signal it gains nothing.** At `a` = 1 and 4, `CS` with
+  `V̂_L3O` covers 0.938–0.963, HC2 0.937–0.965 and the oracle 0.938–0.956.
+  HC2's bias in these cells reaches +18% (rough variances, `χ²₃`,
+  K/n = 0.31) and makes it slightly conservative, not wrong.
+  Cell by cell, `V̂_L3O`'s coverage is at most 1.6 points closer to the
+  oracle's than HC2's is, and it is farther in some cells. Both are within
+  the Monte Carlo error of a difference, about 1 point.
+
+So in these designs, removing HC2's bias costs more in variance than the
+bias costs in coverage. A hybrid estimator, `V̂_L3O`'s quadratic part
+with HC2's linear part, would keep HC2's linear terms `L₁`–`L₅` and remove
+`Q₁`–`Q₃`. It is not measured. Its quadratic part also uses `y`, so it is
+not free of `f` either.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
@@ -3237,10 +3278,11 @@ linear in `y`.
    ratio `q`, with a bound that holds but is 155–3,052 times loose. The
    measured constant is about 0.35 at `q = 4` (`tc_hc2_hetero_rate.jl`).
    Lemma 12 gives the exact worst case with skewed errors (one law,
-   `|γ| ≤ γ̄`), and its order `O(γ̄h̄)` (`tc_hc2_skew.jl`). Lead: Anatolyev &
-   Sølvsten's leave-three-out estimator would give an unbiased `V̂` under
-   heteroskedasticity, to be measured against HC2's coverage. Open: a usable
-   constant with heteroskedastic errors.
+   `|γ| ≤ γ̄`), and its order `O(γ̄h̄)` (`tc_hc2_skew.jl`). Anatolyev &
+   Sølvsten's leave-three-out `V̂` was measured (`tc_l3o.jl`). It is
+   unbiased, but with a strong signal its `CS` covers 0.78–0.89, against
+   HC2's 0.94–0.97, so it is not to be built. Open: a usable constant with
+   heteroskedastic errors.
 4. Proposition 4(c) proves the smoother's `V̂` consistent. Choosing λ is
    measured, not solved (`tc_lambda.jl`): GCV over-smooths (coverage 0.888
    and 0.320), the RMSE-best λ is already too large, and a plug-in `ĉ_β` is
