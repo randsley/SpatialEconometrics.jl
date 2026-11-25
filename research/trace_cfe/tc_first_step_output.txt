@@ -1,0 +1,36 @@
+First-step effect in root_rho's projection path (REsd's C(ρ̃)); ρ₀ = 0.4. MC SE of a coverage near 0.95: 0.007 at R = 1000.
+
+Part A: identified (kNN-6, K/n ≈ 0.1, hat basis + x), normal errors
+kNN-6 constant normal a=1          n  196 K/n 0.087 | √n·sd ρ̃  1.48 (no root 0) | n·Var d/V₀    2.34, corr(d, d_lin) 0.958, slope 1.06 | Var g̃/V₀ 1.157, E V_own/V₀ 1.009 | g̃/√V_own: mean -0.023 var 1.081 | CS 0.953, oracle-own 0.954, fixed C(ρ₀) 0.955, fixed C(0) 0.953
+kNN-6 constant normal a=4          n  196 K/n 0.087 | √n·sd ρ̃  1.41 (no root 0) | n·Var d/V₀    2.20, corr(d, d_lin) 0.955, slope 0.96 | Var g̃/V₀ 1.047, E V_own/V₀ 1.007 | g̃/√V_own: mean -0.078 var 0.997 | CS 0.957, oracle-own 0.945, fixed C(ρ₀) 0.956, fixed C(0) 0.958
+kNN-6 rough normal a=1             n  196 K/n 0.087 | √n·sd ρ̃  1.35 (no root 0) | n·Var d/V₀    1.86, corr(d, d_lin) 0.968, slope 1.06 | Var g̃/V₀ 1.044, E V_own/V₀ 1.006 | g̃/√V_own: mean -0.034 var 0.990 | CS 0.955, oracle-own 0.953, fixed C(ρ₀) 0.958, fixed C(0) 0.955
+kNN-6 rough normal a=4             n  196 K/n 0.087 | √n·sd ρ̃  1.35 (no root 0) | n·Var d/V₀    1.87, corr(d, d_lin) 0.955, slope 0.97 | Var g̃/V₀ 1.057, E V_own/V₀ 1.007 | g̃/√V_own: mean -0.078 var 1.027 | CS 0.961, oracle-own 0.943, fixed C(ρ₀) 0.958, fixed C(0) 0.966
+kNN-6 constant normal a=1          n  400 K/n 0.092 | √n·sd ρ̃  1.59 (no root 0) | n·Var d/V₀    2.22, corr(d, d_lin) 0.968, slope 0.98 | Var g̃/V₀ 1.092, E V_own/V₀ 1.005 | g̃/√V_own: mean -0.048 var 1.060 | CS 0.940, oracle-own 0.941, fixed C(ρ₀) 0.939, fixed C(0) 0.942
+kNN-6 constant normal a=4          n  400 K/n 0.092 | √n·sd ρ̃  1.44 (no root 0) | n·Var d/V₀    2.14, corr(d, d_lin) 0.973, slope 0.99 | Var g̃/V₀ 1.005, E V_own/V₀ 1.010 | g̃/√V_own: mean -0.013 var 0.972 | CS 0.957, oracle-own 0.955, fixed C(ρ₀) 0.955, fixed C(0) 0.955
+kNN-6 rough normal a=1             n  400 K/n 0.092 | √n·sd ρ̃  1.57 (no root 0) | n·Var d/V₀    1.83, corr(d, d_lin) 0.971, slope 0.97 | Var g̃/V₀ 1.030, E V_own/V₀ 1.004 | g̃/√V_own: mean -0.060 var 1.012 | CS 0.957, oracle-own 0.945, fixed C(ρ₀) 0.956, fixed C(0) 0.957
+kNN-6 rough normal a=4             n  400 K/n 0.092 | √n·sd ρ̃  1.44 (no root 0) | n·Var d/V₀    2.46, corr(d, d_lin) 0.974, slope 1.01 | Var g̃/V₀ 1.024, E V_own/V₀ 1.008 | g̃/√V_own: mean -0.037 var 0.996 | CS 0.955, oracle-own 0.946, fixed C(ρ₀) 0.958, fixed C(0) 0.952
+kNN-6 constant normal a=1          n  900 K/n 0.091 | √n·sd ρ̃  1.45 (no root 0) | n·Var d/V₀    1.64, corr(d, d_lin) 0.990, slope 1.02 | Var g̃/V₀ 0.970, E V_own/V₀ 1.005 | g̃/√V_own: mean +0.027 var 0.955 | CS 0.959, oracle-own 0.954, fixed C(ρ₀) 0.958, fixed C(0) 0.955
+kNN-6 constant normal a=4          n  900 K/n 0.091 | √n·sd ρ̃  1.44 (no root 0) | n·Var d/V₀    2.20, corr(d, d_lin) 0.989, slope 1.01 | Var g̃/V₀ 1.012, E V_own/V₀ 1.003 | g̃/√V_own: mean -0.011 var 0.999 | CS 0.955, oracle-own 0.955, fixed C(ρ₀) 0.955, fixed C(0) 0.953
+kNN-6 rough normal a=1             n  900 K/n 0.091 | √n·sd ρ̃  1.55 (no root 0) | n·Var d/V₀    2.01, corr(d, d_lin) 0.987, slope 1.01 | Var g̃/V₀ 1.056, E V_own/V₀ 1.005 | g̃/√V_own: mean +0.014 var 1.037 | CS 0.949, oracle-own 0.943, fixed C(ρ₀) 0.948, fixed C(0) 0.944
+kNN-6 rough normal a=4             n  900 K/n 0.091 | √n·sd ρ̃  1.46 (no root 0) | n·Var d/V₀    2.25, corr(d, d_lin) 0.987, slope 1.00 | Var g̃/V₀ 1.025, E V_own/V₀ 1.005 | g̃/√V_own: mean +0.016 var 1.011 | CS 0.952, oracle-own 0.950, fixed C(ρ₀) 0.956, fixed C(0) 0.954
+kNN-6 constant normal a=1          n 1600 K/n 0.091 | √n·sd ρ̃  1.48 (no root 0) | n·Var d/V₀    1.52, corr(d, d_lin) 0.994, slope 0.99 | Var g̃/V₀ 1.012, E V_own/V₀ 1.002 | g̃/√V_own: mean +0.003 var 1.011 | CS 0.950, oracle-own 0.952, fixed C(ρ₀) 0.950, fixed C(0) 0.950
+kNN-6 constant normal a=4          n 1600 K/n 0.091 | √n·sd ρ̃  1.51 (no root 0) | n·Var d/V₀    1.85, corr(d, d_lin) 0.991, slope 0.99 | Var g̃/V₀ 1.083, E V_own/V₀ 1.002 | g̃/√V_own: mean -0.022 var 1.077 | CS 0.940, oracle-own 0.942, fixed C(ρ₀) 0.938, fixed C(0) 0.938
+kNN-6 rough normal a=1             n 1600 K/n 0.091 | √n·sd ρ̃  1.48 (no root 0) | n·Var d/V₀    1.47, corr(d, d_lin) 0.994, slope 1.01 | Var g̃/V₀ 1.074, E V_own/V₀ 1.003 | g̃/√V_own: mean +0.013 var 1.065 | CS 0.946, oracle-own 0.948, fixed C(ρ₀) 0.946, fixed C(0) 0.952
+kNN-6 rough normal a=4             n 1600 K/n 0.091 | √n·sd ρ̃  1.48 (no root 0) | n·Var d/V₀    1.89, corr(d, d_lin) 0.993, slope 0.98 | Var g̃/V₀ 1.049, E V_own/V₀ 1.002 | g̃/√V_own: mean -0.011 var 1.048 | CS 0.958, oracle-own 0.954, fixed C(ρ₀) 0.956, fixed C(0) 0.956
+  (36.4 min)
+
+Part B: weak identification (kNN-20, n = 400), R = 1000
+kNN-20 constant normal a=1         n  400 K/n 0.205 | √n·sd ρ̃  5.25 (no root 20) | n·Var d/V₀    7.39, corr(d, d_lin) 0.787, slope 1.10 | Var g̃/V₀ 1.030, E V_own/V₀ 1.058 | g̃/√V_own: mean -0.031 var 0.928 | CS 0.961, oracle-own 0.959, fixed C(ρ₀) 0.958, fixed C(0) 0.956
+kNN-20 constant chisq3 a=1         n  400 K/n 0.205 | √n·sd ρ̃  5.46 (no root 20) | n·Var d/V₀   13.41, corr(d, d_lin) 0.755, slope 1.18 | Var g̃/V₀ 1.151, E V_own/V₀ 1.071 | g̃/√V_own: mean +0.027 var 1.027 | CS 0.950, oracle-own 0.937, fixed C(ρ₀) 0.954, fixed C(0) 0.952
+kNN-20 rough normal a=1            n  400 K/n 0.205 | √n·sd ρ̃  5.32 (no root 23) | n·Var d/V₀    9.37, corr(d, d_lin) 0.786, slope 1.09 | Var g̃/V₀ 0.988, E V_own/V₀ 1.058 | g̃/√V_own: mean -0.044 var 0.903 | CS 0.963, oracle-own 0.950, fixed C(ρ₀) 0.964, fixed C(0) 0.965
+kNN-20 rough chisq3 a=1            n  400 K/n 0.205 | √n·sd ρ̃  5.54 (no root 18) | n·Var d/V₀   15.26, corr(d, d_lin) 0.775, slope 1.21 | Var g̃/V₀ 1.065, E V_own/V₀ 1.070 | g̃/√V_own: mean +0.015 var 0.940 | CS 0.967, oracle-own 0.954, fixed C(ρ₀) 0.970, fixed C(0) 0.970
+kNN-20 constant normal a=1         n  400 K/n 0.305 | √n·sd ρ̃  6.34 (no root 41) | n·Var d/V₀   15.61, corr(d, d_lin) 0.682, slope 1.23 | Var g̃/V₀ 1.090, E V_own/V₀ 1.064 | g̃/√V_own: mean -0.036 var 0.959 | CS 0.946, oracle-own 0.938, fixed C(ρ₀) 0.949, fixed C(0) 0.959
+kNN-20 constant chisq3 a=1         n  400 K/n 0.305 | √n·sd ρ̃  6.27 (no root 54) | n·Var d/V₀   13.13, corr(d, d_lin) 0.717, slope 1.19 | Var g̃/V₀ 1.115, E V_own/V₀ 1.065 | g̃/√V_own: mean +0.004 var 0.998 | CS 0.952, oracle-own 0.943, fixed C(ρ₀) 0.955, fixed C(0) 0.961
+kNN-20 rough normal a=1            n  400 K/n 0.305 | √n·sd ρ̃  6.39 (no root 49) | n·Var d/V₀   19.18, corr(d, d_lin) 0.740, slope 1.14 | Var g̃/V₀ 1.112, E V_own/V₀ 1.075 | g̃/√V_own: mean -0.041 var 0.973 | CS 0.964, oracle-own 0.944, fixed C(ρ₀) 0.973, fixed C(0) 0.976
+kNN-20 rough chisq3 a=1            n  400 K/n 0.305 | √n·sd ρ̃  6.24 (no root 53) | n·Var d/V₀   22.14, corr(d, d_lin) 0.667, slope 1.13 | Var g̃/V₀ 1.129, E V_own/V₀ 1.069 | g̃/√V_own: mean -0.000 var 0.990 | CS 0.959, oracle-own 0.941, fixed C(ρ₀) 0.964, fixed C(0) 0.965
+  (47.1 min)
+
+Part C: mc_root_rho_hc2_skew.jl's n = 196 cell (Lemma 12's worst f, two-point law γ* = 2), R = 2000
+skew cell, two-point γ*=2          n  196 K/n 0.133 | √n·sd ρ̃  2.74 (no root 4) | n·Var d/V₀   27.90, corr(d, d_lin) 0.782, slope 1.15 | Var g̃/V₀ 1.355, E V_own/V₀ 1.114 | g̃/√V_own: mean -0.060 var 0.969 | CS 0.947, oracle-own 0.954, fixed C(ρ₀) 0.946, fixed C(0) 0.949
+
+total 47.5 min

@@ -2769,7 +2769,8 @@ Outside (b), with heteroskedastic or skewed errors, (a) still holds, but
 `β_V` has no design-only lower bound. The −1% to +20% of `tc_hc2_bias.jl`
 is what was measured there. (a) uses `C` as Proposition 6 does: Theorem 1
 and Lemma 10 are stated for a fixed `C`, while `root_rho`'s `C(ρ̃)` is
-random.
+random. Corollary 6‴ ("The first step in `CS`") closes this when the first
+step is identified.
 
 **Measured through `root_rho` (`validation/mc_root_rho_hc2_worst.jl`).**
 The design is a jittered 30 × 30 grid, with kNN-6 and
@@ -3147,6 +3148,85 @@ statistic `(1/√K) Σᵢ Σ_{j≠i} Pᵢⱼeᵢ(β₀)eⱼ(β₀)`, which is ou
   interval when `ρ` was well identified, so a pre-test would only tell
   the user when the Wald interval may also be reported. The discussion
   after Proposition 6 already treats a wide `CS` as the diagnostic.
+
+## The first step in `CS` (2026-11-25)
+
+Propositions 6 and 6″, and Lemmas 7–12, are stated for a fixed `C`.
+`root_rho`'s projection path tests `ρ` with REsd's `C(ρ̃)`, where `ρ̃` is the
+first-step root, or `C(0)` (the first-step matrix) when there is no
+first-step root. `validation/mc_root_rho_hc2_skew.jl` found that
+`Var y₀′C(ρ̃)y₀` over draws was 1.41 × `V` at `n` = 196.
+
+**Corollary 6‴ (the first step does not change `CS`'s limit; proved, given
+Propositions 1 and 1′).** Assume Proposition 1's conditions, so that
+`ρ̃ − ρ₀ = O_p(n^{−1/2})`, and the conditions of Proposition 6 (`K/n → 0`)
+or 6″ (`K/n → θ > 0`) for `C(ρ₀)`. Then `root_rho`'s `CS`, formed with
+`C(ρ̃)`, has the same limiting coverage as the set formed with `C(ρ₀)`.
+
+*Proof.* `ρ₀ ∈ CS` if and only if `g₀(ρ̃)² ≤ z²V̂_{C(ρ̃)}(ρ₀)`.
+Proposition 1's step 3 gives `g₀(ρ̃) − g₀(ρ₀) = O_p(1)`, which is
+`o_p(√V)` by A5. Proposition 1′(c)'s step 5 gives
+`V̂_{C(ρ̃)} − V̂_{C(ρ₀)} = O_p(n^{3/4}) = o_p(V)`. It is written at `ρ̂`, but
+it uses only `‖C(ρ̃) − C(ρ₀)‖_op = O_p(n^{−1/2})` and the size of `s` and
+`b̂`, which are the same at `ρ₀`. Both statistics therefore differ from
+those at `C(ρ₀)` by `o_p` of their scale, and Slutsky's lemma finishes. ∎
+
+The reason is Proposition 1's step 2: `diag C(ϱ) = 0` and `C(ϱ)f = 0` hold
+for every `ϱ`, so `ġ = y₀′C_ϱ(ρ₀)y₀` has mean 0 and is `O_p(√n)`. If its
+mean were of order `n`, the first step would move `g₀` by `O_p(√n)`, a
+first-order change.
+
+**Not covered: the first step without identification.** Proposition 6 is
+valid without A9 because it uses the moment at `ρ₀` with a fixed `C`. With
+REsd's plug-in, `g₀(ρ̃)/√V_{C(ρ̃)}` is the process `Z(ϱ) = g_ϱ(ρ₀)/√V_ϱ`
+evaluated at a data-dependent `ϱ`. Each `Z(ϱ)` is asymptotically `N(0, 1)`,
+but when `ρ̃` does not converge, `Z(ρ̃)` need not be. The bound
+`P(|Z(ρ̃)| > z) ≤ P(sup_ϱ |Z(ϱ)| > z)` holds, but is not computed. A set
+that tests each candidate `ρ` with `C(ρ)` itself, continuously updated,
+uses the fixed `C(ρ₀)` at `ρ₀`, so Proposition 6 covers it as it stands. It
+would cost an `n × n` solve per grid point, because it is no longer a
+quartic in `ρ`. Its coverage is the "fixed `C(ρ₀)`" column below.
+
+**Measured (`tc_first_step.jl`).** The released `root_rho` is run on
+`y = (I − ρ₀W)⁻¹(f + ε)` with `ρ₀` = 0.4 and the basis `[x, tensor hats]`.
+For each draw, the script compares the moment at `C(ρ̃)` with the moment at
+`C(ρ₀)`. It reports `d = g₀(ρ̃) − g₀(ρ₀)`, its linear term
+`d_lin = (ρ̃ − ρ₀)·y₀′C_ϱ(ρ₀)y₀` (`C_ϱ` by central difference), and
+`V_own`, the exact `V` at the draw's `C(ρ̃)` held fixed. Coverage at `ρ₀`
+is computed on the same draws for four sets: `root_rho`'s `CS`; the oracle
+`|g₀(ρ̃)| ≤ 1.96√V_own`; and the HC2 test at the fixed `C(ρ₀)` and at the
+fixed `C(0)`.
+
+| part | cells | `√n·sd ρ̃` | `n·Var d/V` | corr(`d`, `d_lin`) | `CS` | fixed `C(ρ₀)` | `CS` − fixed `C(ρ₀)`, same draws |
+|---|---|---|---|---|---|---|---|
+| A: kNN-6, n = 196 → 1600, K/n ≈ 0.09 | 16 | 1.35–1.59 | 1.47–2.46 | 0.955 → 0.994 | 0.940–0.961 | 0.938–0.958 | −0.004 to +0.003 |
+| B: kNN-20, n = 400, K/n 0.21 and 0.31 | 8 | 5.25–6.39 | 7.4–22.1 | 0.67–0.79 | 0.946–0.967 | 0.949–0.973 | −0.009 to +0.003 |
+| C: the skew cell, n = 196 | 1 | 2.74 | 27.9 | 0.78 | 0.947 | 0.946 | +0.001 |
+
+- **Identified (A): the corollary's rate is visible.** `n·Var d/V` stays
+  at 1.47–2.46 from `n` = 196 to 1600, with no trend, so `d = O_p(1)`
+  against `√V = O(√n)`. `d_lin` explains `d`: the correlation rises with
+  `n`, from 0.955–0.968 at `n` = 196 to 0.991–0.994 at 1600, and the regression slope
+  is 0.96–1.06. Membership of `ρ₀` in `CS` and in the fixed-`C(ρ₀)` set
+  differs by at most 0.4 points in coverage. `g₀(ρ̃)/√V_own` has variance
+  0.955–1.081 (`a` = 1 and 4, constant and rough variances).
+- **Weakly identified (B): no damage measured.** These are `tc_ar.jl`'s
+  weak cells, with `sd ρ̃` 0.26–0.32. There is no first-step root in 1.8–5.4%
+  of draws. The second-order terms matter here (`corr(d, d_lin)`
+  0.67–0.79), and `Var d` is 2–6% of `V`. `CS` covers 0.946–0.967. The
+  fixed `C(ρ₀)` covers 0.949–0.973 and the fixed `C(0)` 0.952–0.976. So
+  REsd's plug-in lowers coverage by at most 0.9 points against the
+  continuously updated set, and never below 0.946. This is evidence, not
+  proof. The gap above stays open.
+- **The 1.41 is a scale mixture, not a failure (C).** Here
+  `Var g₀(ρ̃)/V` = 1.355 and `E V_own/V` = 1.114, but
+  `g₀(ρ̃)/√V_own` has variance 0.969 and `CS` covers 0.947. Since
+  `g₀(ρ̃) = t√V_own` with `t = g₀(ρ̃)/√V_own`,
+  `E g₀(ρ̃)² = E V_own·E t² + Cov(V_own, t²)`. The covariance is about
+  0.27 `V`: draws whose `C(ρ̃)` carries a larger variance also have larger
+  standardised moments. `V̂` is formed at the same `C(ρ̃)`, so it tracks
+  `V_own`. The right target for a validation is `V_own`, as part 2 of that
+  script already used, not the variance across draws.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 

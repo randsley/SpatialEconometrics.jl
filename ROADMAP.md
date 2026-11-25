@@ -1357,9 +1357,17 @@ and the method are in `research/trace_cfe/`.
   `CS` covers 0.949–0.950 against predictions of 0.945–0.948 and the
   diagnostic tracks its target; its criterion 1 failed as written, because
   the final `C(ρ̃)` varies with the data (AUDIT, "the HC2 `V̂`'s worst case
-  with skewed errors"). Open: a usable constant under heteroskedasticity
-  (leave-out variance estimators, to read), unit-specific skewness, and
-  the first step's effect on `Var g̃(ρ₀)` with a strong signal.
+  with skewed errors"). Leave-out variance estimators, measured 2026-11-25
+  (`tc_l3o.jl`): Anatolyev & Sølvsten's leave-three-out `V̂` is unbiased,
+  but its `CS` covers only 0.78–0.89 with a strong signal, so it is not to
+  be built. The first step, 2026-11-25 (`tc_first_step.jl`, THEORY.md
+  Corollary 6‴): with an identified first step, `C(ρ̃)` does not change
+  `CS`'s limit. The 1.41 was a scale mixture: `g̃/√V_own` has variance
+  0.97 and `CS` covers 0.947. Under weak identification it is measured,
+  not proved (coverage 0.946–0.967; a continuously updated `C(ρ)` would be
+  covered by Proposition 6 as it stands). Open: a usable constant under
+  heteroskedasticity, unit-specific skewness, and a proof for the first
+  step under weak identification.
 
 
 **New file:** `src/SemiparametricSpatial.jl` (1,136 lines against the ~500
