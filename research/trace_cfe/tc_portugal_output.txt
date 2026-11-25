@@ -1,0 +1,158 @@
+n = 278 mainland municipalities; extent 260 km (E–W) × 552 km (N–S)
+purchasing power: median 79.9, range 63.5–181.3 (max: Lisboa); skewness 2.14
+  W queen : links 1478, neighbours per unit 1–10 (mean 5.32)
+  W rook  : links 1474, neighbours per unit 1–10 (mean 5.30)
+  W kNN-6 : links 1668, neighbours per unit 6–6 (mean 6.00)
+
+=== y = purchasing power ===
+W = queen
+  ML SAR, no surface     ρ̂ +0.379 (se 0.068), β̂ +3.572, -0.02441, +0.3786
+  root_rho, no surface   K   3 K/n 0.011 hmax 0.061 | ρ̂ +0.400 (ρ̃ +0.400) se 0.077 Wald [+0.249, +0.551] | CS [0.258, 0.573] | wb -0.0003 (γ̄=2 +NaN) | β̂ +40.68, +3.5, -0.02402
+  projection k=4 (-0)    K  18 K/n 0.065 hmax 0.901 | ρ̂ +0.174 (ρ̃ +0.186) se 0.128 Wald [-0.077, +0.425] | CS [-0.072, 0.454] | wb -0.0043 (γ̄=2 -0.0090) | β̂ +7.235, -0.004652
+  projection k=5 (-0)    ERROR: ArgumentError: root_rho: 2 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=6 (-4)    ERROR: ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=7 (-8)    ERROR: ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=8 (-11)   ERROR: ArgumentError: root_rho: 4 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=9 (-13)   ERROR: ArgumentError: root_rho: `basis58` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  projection k=10 (-19)  ERROR: ArgumentError: root_rho: `basis74` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  k=6 untrimmed          ERROR: ArgumentError: root_rho: `basis6`, `basis31`, `basis32`, `basis33` are linear combinations of the other columns of the design, so the coefficients are…
+  penalised k=12 λ=1     ERROR: ArgumentError: root_rho: `basis1`, `basis2`, `basis3`, `basis8`, `basis9`, `basis10`, `basis11`, `basis12`, `basis14`, `basis15`, `basis21`, `basis22`…
+W = rook
+  ML SAR, no surface     ρ̂ +0.388 (se 0.067), β̂ +3.539, -0.02447, +0.388
+  root_rho, no surface   K   3 K/n 0.011 hmax 0.061 | ρ̂ +0.406 (ρ̃ +0.409) se 0.083 Wald [+0.244, +0.569] | CS [0.254, 0.594] | wb -0.0003 (γ̄=2 +NaN) | β̂ +40.31, +3.479, -0.02415
+  projection k=4 (-0)    K  18 K/n 0.065 hmax 0.901 | ρ̂ +0.184 (ρ̃ +0.198) se 0.139 Wald [-0.090, +0.457] | CS [-0.083, 0.493] | wb -0.0043 (γ̄=2 -0.0091) | β̂ +7.194, -0.004919
+  projection k=5 (-0)    ERROR: ArgumentError: root_rho: 2 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=6 (-4)    ERROR: ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=7 (-8)    ERROR: ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=8 (-11)   ERROR: ArgumentError: root_rho: 4 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=9 (-13)   ERROR: ArgumentError: root_rho: `basis58` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  projection k=10 (-19)  ERROR: ArgumentError: root_rho: `basis74` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  penalised k=12 λ=1     ERROR: ArgumentError: root_rho: `basis1`, `basis2`, `basis3`, `basis8`, `basis9`, `basis10`, `basis11`, `basis12`, `basis14`, `basis15`, `basis21`, `basis22`…
+W = kNN-6
+  ML SAR, no surface     ρ̂ +0.356 (se 0.072), β̂ +3.515, -0.02362, +0.3562
+  root_rho, no surface   K   3 K/n 0.011 hmax 0.061 | ρ̂ +0.407 (ρ̃ +0.391) se 0.078 Wald [+0.255, +0.560] | CS [0.268, 0.591] | wb -0.0003 (γ̄=2 +NaN) | β̂ +40.44, +3.326, -0.02251
+  projection k=4 (-0)    K  18 K/n 0.065 hmax 0.901 | ρ̂ +0.067 (ρ̃ +0.059) se 0.140 Wald [-0.208, +0.342] | CS [-0.201, 0.373] | wb -0.0035 (γ̄=2 -0.0079) | β̂ +7.613, -0.002749
+  projection k=5 (-0)    ERROR: ArgumentError: root_rho: 2 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=6 (-4)    ERROR: ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=7 (-8)    ERROR: ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=8 (-11)   ERROR: ArgumentError: root_rho: 4 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=9 (-13)   ERROR: ArgumentError: root_rho: `basis58` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  projection k=10 (-19)  ERROR: ArgumentError: root_rho: `basis74` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  penalised k=12 λ=1     ERROR: ArgumentError: root_rho: `basis1`, `basis2`, `basis3`, `basis8`, `basis9`, `basis10`, `basis11`, `basis12`, `basis14`, `basis15`, `basis21`, `basis22`…
+
+=== y = log purchasing power ===
+W = queen
+  ML SAR, no surface     ρ̂ +0.387 (se 0.065), β̂ +0.03485, -0.0003632, +0.3872
+  root_rho, no surface   K   3 K/n 0.011 hmax 0.061 | ρ̂ +0.400 (ρ̃ +0.422) se 0.066 Wald [+0.270, +0.530] | CS [0.272, 0.537] | wb -0.0003 (γ̄=2 +NaN) | β̂ +2.584, +0.03443, -0.00036
+  projection k=4 (-0)    K  18 K/n 0.065 hmax 0.901 | ρ̂ +0.199 (ρ̃ +0.234) se 0.197 Wald [-0.187, +0.584] | CS [-0.322, 0.515] | wb -0.0042 (γ̄=2 -0.0090) | β̂ +0.07345, -0.0001665
+  projection k=5 (-0)    ERROR: ArgumentError: root_rho: 2 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=6 (-4)    ERROR: ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=7 (-8)    ERROR: ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=8 (-11)   ERROR: ArgumentError: root_rho: 4 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=9 (-13)   ERROR: ArgumentError: root_rho: `basis58` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  projection k=10 (-19)  ERROR: ArgumentError: root_rho: `basis74` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  k=6 untrimmed          ERROR: ArgumentError: root_rho: `basis6`, `basis31`, `basis32`, `basis33` are linear combinations of the other columns of the design, so the coefficients are…
+  penalised k=12 λ=1     ERROR: ArgumentError: root_rho: `basis1`, `basis2`, `basis3`, `basis8`, `basis9`, `basis10`, `basis11`, `basis12`, `basis14`, `basis15`, `basis21`, `basis22`…
+W = rook
+  ML SAR, no surface     ρ̂ +0.392 (se 0.065), β̂ +0.03468, -0.000364, +0.3919
+  root_rho, no surface   K   3 K/n 0.011 hmax 0.061 | ρ̂ +0.400 (ρ̃ +0.425) se 0.069 Wald [+0.266, +0.534] | CS [0.268, 0.542] | wb -0.0003 (γ̄=2 +NaN) | β̂ +2.585, +0.03441, -0.000362
+  projection k=4 (-0)    K  18 K/n 0.065 hmax 0.901 | ρ̂ +0.195 (ρ̃ +0.233) se 0.201 Wald [-0.199, +0.589] | CS [-0.337, 0.519] | wb -0.0042 (γ̄=2 -0.0090) | β̂ +0.07357, -0.0001668
+  projection k=5 (-0)    ERROR: ArgumentError: root_rho: 2 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=6 (-4)    ERROR: ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=7 (-8)    ERROR: ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=8 (-11)   ERROR: ArgumentError: root_rho: 4 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=9 (-13)   ERROR: ArgumentError: root_rho: `basis58` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  projection k=10 (-19)  ERROR: ArgumentError: root_rho: `basis74` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  penalised k=12 λ=1     ERROR: ArgumentError: root_rho: `basis1`, `basis2`, `basis3`, `basis8`, `basis9`, `basis10`, `basis11`, `basis12`, `basis14`, `basis15`, `basis21`, `basis22`…
+W = kNN-6
+  ML SAR, no surface     ρ̂ +0.384 (se 0.068), β̂ +0.03378, -0.0003466, +0.3844
+  root_rho, no surface   K   3 K/n 0.011 hmax 0.061 | ρ̂ +0.494 (ρ̃ +0.427) se 0.061 Wald [+0.374, +0.613] | CS [0.378, 0.624] | wb -0.0003 (γ̄=2 +NaN) | β̂ +2.18, +0.02981, -0.0003136
+  projection k=4 (-0)    K  18 K/n 0.065 hmax 0.901 | ρ̂ -0.595 (ρ̃ -0.231) se 0.487 Wald [-1.550, +0.359] | CS [-0.990, 0.151] (reaches a bound) | wb -0.0035 (γ̄=2 -0.0082) | β̂ +0.1068, -5.719e-05
+  projection k=5 (-0)    ERROR: ArgumentError: root_rho: 2 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=6 (-4)    ERROR: ArgumentError: root_rho: 3 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=7 (-8)    ERROR: ArgumentError: root_rho: 1 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=8 (-11)   ERROR: ArgumentError: root_rho: 4 unit(s) have leverage above 0.99 in the projection on [X, basis] (max 1.0). The trace correction divides by 1 − hᵢᵢ and is …
+  projection k=9 (-13)   ERROR: ArgumentError: root_rho: `basis58` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  projection k=10 (-19)  ERROR: ArgumentError: root_rho: `basis74` is a linear combination of the other columns of the design, so the coefficients are not identified. A hat or B-spli…
+  penalised k=12 λ=1     ERROR: ArgumentError: root_rho: `basis1`, `basis2`, `basis3`, `basis8`, `basis9`, `basis10`, `basis11`, `basis12`, `basis14`, `basis15`, `basis21`, `basis22`…
+
+Residual diagnostics: y = log purchasing power, queen, projection k = 4 (the only k that runs)
+  residual skewness 0.95, excess kurtosis 2.47
+  e² on log density: slope 0.0038 (mean e² 0.0089); Moran's I of e²: Global Moran's I Test (asymptotic)
+  I = 0.105282    E[I] = -0.003610    z = 3.0404    p = 0.0024
+
+  largest |standardised residuals|: Lisboa +4.3, Porto +3.8, Sines +3.8, Coimbra +3.0, Castro Verde +2.9, Aveiro +2.8
+
+Penalised smoother, rank check bypassed (RootRho._root_rho_penalised, untrimmed tensor_pspline)
+  pp     queen  k= 8 (rank  55 of  66) λ=  0.1 | df  32.3 max Sᵢᵢ 0.593 | ρ̂ +0.148 se 0.151 | CS [-0.131, 0.504]
+  pp     queen  k= 8 (rank  55 of  66) λ=    1 | df  17.6 max Sᵢᵢ 0.361 | ρ̂ +0.171 se 0.124 | CS [-0.060, 0.450]
+  pp     queen  k= 8 (rank  55 of  66) λ=   10 | df   9.5 max Sᵢᵢ 0.178 | ρ̂ +0.222 se 0.112 | CS [0.013, 0.472]
+  pp     queen  k= 8 (rank  55 of  66) λ=  100 | df   6.6 max Sᵢᵢ 0.150 | ρ̂ +0.252 se 0.106 | CS [0.053, 0.490]
+  pp     queen  k=12 (rank 108 of 146) λ=  0.1 | df  53.1 max Sᵢᵢ 0.739 | ρ̂ +0.150 se 0.185 | CS [-0.197, 0.579]
+  pp     queen  k=12 (rank 108 of 146) λ=    1 | df  25.7 max Sᵢᵢ 0.478 | ρ̂ +0.152 se 0.135 | CS [-0.101, 0.457]
+  pp     queen  k=12 (rank 108 of 146) λ=   10 | df  12.4 max Sᵢᵢ 0.251 | ρ̂ +0.200 se 0.116 | CS [-0.017, 0.458]
+  pp     queen  k=12 (rank 108 of 146) λ=  100 | df   7.4 max Sᵢᵢ 0.156 | ρ̂ +0.244 se 0.108 | CS [0.042, 0.484]
+  pp     queen  k=16 (rank 174 of 258) λ=  0.1 | df  72.3 max Sᵢᵢ 0.823 | ρ̂ +0.176 se 0.189 | CS [-0.182, 0.621]
+  pp     queen  k=16 (rank 174 of 258) λ=    1 | df  33.4 max Sᵢᵢ 0.562 | ρ̂ +0.148 se 0.143 | CS [-0.119, 0.476]
+  pp     queen  k=16 (rank 174 of 258) λ=   10 | df  15.3 max Sᵢᵢ 0.309 | ρ̂ +0.184 se 0.119 | CS [-0.040, 0.451]
+  pp     queen  k=16 (rank 174 of 258) λ=  100 | df   8.3 max Sᵢᵢ 0.162 | ρ̂ +0.235 se 0.109 | CS [0.030, 0.479]
+  pp     rook   k= 8 (rank  55 of  66) λ=  0.1 | df  32.3 max Sᵢᵢ 0.593 | ρ̂ +0.169 se 0.172 | CS [-0.150, 0.577]
+  pp     rook   k= 8 (rank  55 of  66) λ=    1 | df  17.6 max Sᵢᵢ 0.361 | ρ̂ +0.188 se 0.138 | CS [-0.071, 0.502]
+  pp     rook   k= 8 (rank  55 of  66) λ=   10 | df   9.5 max Sᵢᵢ 0.178 | ρ̂ +0.236 se 0.123 | CS [0.006, 0.513]
+  pp     rook   k= 8 (rank  55 of  66) λ=  100 | df   6.6 max Sᵢᵢ 0.150 | ρ̂ +0.265 se 0.117 | CS [0.047, 0.528]
+  pp     rook   k=12 (rank 108 of 146) λ=  0.1 | df  53.1 max Sᵢᵢ 0.739 | ρ̂ +0.175 se 0.211 | CS [-0.224, 0.672]
+  pp     rook   k=12 (rank 108 of 146) λ=    1 | df  25.7 max Sᵢᵢ 0.478 | ρ̂ +0.170 se 0.152 | CS [-0.114, 0.517]
+  pp     rook   k=12 (rank 108 of 146) λ=   10 | df  12.4 max Sᵢᵢ 0.251 | ρ̂ +0.214 se 0.128 | CS [-0.026, 0.503]
+  pp     rook   k=12 (rank 108 of 146) λ=  100 | df   7.4 max Sᵢᵢ 0.156 | ρ̂ +0.257 se 0.118 | CS [0.036, 0.523]
+  pp     rook   k=16 (rank 174 of 258) λ=  0.1 | df  72.3 max Sᵢᵢ 0.823 | ρ̂ +0.210 se 0.214 | CS [-0.206, 0.707]
+  pp     rook   k=16 (rank 174 of 258) λ=    1 | df  33.4 max Sᵢᵢ 0.562 | ρ̂ +0.167 se 0.162 | CS [-0.135, 0.543]
+  pp     rook   k=16 (rank 174 of 258) λ=   10 | df  15.3 max Sᵢᵢ 0.309 | ρ̂ +0.199 se 0.133 | CS [-0.049, 0.499]
+  pp     rook   k=16 (rank 174 of 258) λ=  100 | df   8.3 max Sᵢᵢ 0.162 | ρ̂ +0.248 se 0.120 | CS [0.023, 0.519]
+  pp     kNN-6  k= 8 (rank  55 of  66) λ=  0.1 | df  32.3 max Sᵢᵢ 0.593 | ρ̂ +0.050 se 0.166 | CS [-0.250, 0.447]
+  pp     kNN-6  k= 8 (rank  55 of  66) λ=    1 | df  17.6 max Sᵢᵢ 0.361 | ρ̂ +0.104 se 0.130 | CS [-0.135, 0.400]
+  pp     kNN-6  k= 8 (rank  55 of  66) λ=   10 | df   9.5 max Sᵢᵢ 0.178 | ρ̂ +0.179 se 0.115 | CS [-0.032, 0.443]
+  pp     kNN-6  k= 8 (rank  55 of  66) λ=  100 | df   6.6 max Sᵢᵢ 0.150 | ρ̂ +0.218 se 0.110 | CS [0.016, 0.473]
+  pp     kNN-6  k=12 (rank 108 of 146) λ=  0.1 | df  53.1 max Sᵢᵢ 0.739 | ρ̂ -0.004 se 0.215 | CS [-0.379, 0.558]
+  pp     kNN-6  k=12 (rank 108 of 146) λ=    1 | df  25.7 max Sᵢᵢ 0.478 | ρ̂ +0.062 se 0.142 | CS [-0.198, 0.391]
+  pp     kNN-6  k=12 (rank 108 of 146) λ=   10 | df  12.4 max Sᵢᵢ 0.251 | ρ̂ +0.146 se 0.119 | CS [-0.072, 0.418]
+  pp     kNN-6  k=12 (rank 108 of 146) λ=  100 | df   7.4 max Sᵢᵢ 0.156 | ρ̂ +0.208 se 0.111 | CS [0.004, 0.465]
+  pp     kNN-6  k=16 (rank 174 of 258) λ=  0.1 | df  72.3 max Sᵢᵢ 0.823 | ρ̂ +0.034 se 0.212 | CS [-0.351, 0.544]
+  pp     kNN-6  k=16 (rank 174 of 258) λ=    1 | df  33.4 max Sᵢᵢ 0.562 | ρ̂ +0.048 se 0.150 | CS [-0.226, 0.399]
+  pp     kNN-6  k=16 (rank 174 of 258) λ=   10 | df  15.3 max Sᵢᵢ 0.309 | ρ̂ +0.124 se 0.123 | CS [-0.103, 0.403]
+  pp     kNN-6  k=16 (rank 174 of 258) λ=  100 | df   8.3 max Sᵢᵢ 0.162 | ρ̂ +0.196 se 0.113 | CS [-0.010, 0.455]
+  log pp queen  k= 8 (rank  55 of  66) λ=  0.1 | df  32.3 max Sᵢᵢ 0.593 | ρ̂ +0.074 se 0.113 | CS [-0.140, 0.319]
+  log pp queen  k= 8 (rank  55 of  66) λ=    1 | df  17.6 max Sᵢᵢ 0.361 | ρ̂ +0.118 se 0.093 | CS [-0.058, 0.315]
+  log pp queen  k= 8 (rank  55 of  66) λ=   10 | df   9.5 max Sᵢᵢ 0.178 | ρ̂ +0.195 se 0.085 | CS [0.033, 0.374]
+  log pp queen  k= 8 (rank  55 of  66) λ=  100 | df   6.6 max Sᵢᵢ 0.150 | ρ̂ +0.239 se 0.081 | CS [0.083, 0.409]
+  log pp queen  k=12 (rank 108 of 146) λ=  0.1 | df  53.1 max Sᵢᵢ 0.739 | ρ̂ +0.044 se 0.132 | CS [-0.208, 0.328]
+  log pp queen  k=12 (rank 108 of 146) λ=    1 | df  25.7 max Sᵢᵢ 0.478 | ρ̂ +0.083 se 0.099 | CS [-0.105, 0.292]
+  log pp queen  k=12 (rank 108 of 146) λ=   10 | df  12.4 max Sᵢᵢ 0.251 | ρ̂ +0.161 se 0.088 | CS [-0.006, 0.345]
+  log pp queen  k=12 (rank 108 of 146) λ=  100 | df   7.4 max Sᵢᵢ 0.156 | ρ̂ +0.227 se 0.082 | CS [0.070, 0.399]
+  log pp queen  k=16 (rank 174 of 258) λ=  0.1 | df  72.3 max Sᵢᵢ 0.823 | ρ̂ +0.065 se 0.137 | CS [-0.197, 0.363]
+  log pp queen  k=16 (rank 174 of 258) λ=    1 | df  33.4 max Sᵢᵢ 0.562 | ρ̂ +0.072 se 0.104 | CS [-0.125, 0.294]
+  log pp queen  k=16 (rank 174 of 258) λ=   10 | df  15.3 max Sᵢᵢ 0.309 | ρ̂ +0.138 se 0.090 | CS [-0.034, 0.327]
+  log pp queen  k=16 (rank 174 of 258) λ=  100 | df   8.3 max Sᵢᵢ 0.162 | ρ̂ +0.213 se 0.083 | CS [0.054, 0.388]
+  log pp rook   k= 8 (rank  55 of  66) λ=  0.1 | df  32.3 max Sᵢᵢ 0.593 | ρ̂ +0.085 se 0.124 | CS [-0.149, 0.352]
+  log pp rook   k= 8 (rank  55 of  66) λ=    1 | df  17.6 max Sᵢᵢ 0.361 | ρ̂ +0.127 se 0.099 | CS [-0.062, 0.337]
+  log pp rook   k= 8 (rank  55 of  66) λ=   10 | df   9.5 max Sᵢᵢ 0.178 | ρ̂ +0.202 se 0.089 | CS [0.032, 0.391]
+  log pp rook   k= 8 (rank  55 of  66) λ=  100 | df   6.6 max Sᵢᵢ 0.150 | ρ̂ +0.245 se 0.085 | CS [0.082, 0.424]
+  log pp rook   k=12 (rank 108 of 146) λ=  0.1 | df  53.1 max Sᵢᵢ 0.739 | ρ̂ +0.058 se 0.146 | CS [-0.222, 0.372]
+  log pp rook   k=12 (rank 108 of 146) λ=    1 | df  25.7 max Sᵢᵢ 0.478 | ρ̂ +0.093 se 0.106 | CS [-0.110, 0.318]
+  log pp rook   k=12 (rank 108 of 146) λ=   10 | df  12.4 max Sᵢᵢ 0.251 | ρ̂ +0.168 se 0.093 | CS [-0.008, 0.364]
+  log pp rook   k=12 (rank 108 of 146) λ=  100 | df   7.4 max Sᵢᵢ 0.156 | ρ̂ +0.233 se 0.086 | CS [0.069, 0.414]
+  log pp rook   k=16 (rank 174 of 258) λ=  0.1 | df  72.3 max Sᵢᵢ 0.823 | ρ̂ +0.084 se 0.151 | CS [-0.207, 0.408]
+  log pp rook   k=16 (rank 174 of 258) λ=    1 | df  33.4 max Sᵢᵢ 0.562 | ρ̂ +0.083 se 0.113 | CS [-0.132, 0.323]
+  log pp rook   k=16 (rank 174 of 258) λ=   10 | df  15.3 max Sᵢᵢ 0.309 | ρ̂ +0.146 se 0.095 | CS [-0.036, 0.347]
+  log pp rook   k=16 (rank 174 of 258) λ=  100 | df   8.3 max Sᵢᵢ 0.162 | ρ̂ +0.220 se 0.087 | CS [0.053, 0.404]
+  log pp kNN-6  k= 8 (rank  55 of  66) λ=  0.1 | df  32.3 max Sᵢᵢ 0.593 | ρ̂ +0.001 se 0.129 | CS [-0.239, 0.284]
+  log pp kNN-6  k= 8 (rank  55 of  66) λ=    1 | df  17.6 max Sᵢᵢ 0.361 | ρ̂ +0.081 se 0.104 | CS [-0.114, 0.302]
+  log pp kNN-6  k= 8 (rank  55 of  66) λ=   10 | df   9.5 max Sᵢᵢ 0.178 | ρ̂ +0.182 se 0.093 | CS [0.008, 0.380]
+  log pp kNN-6  k= 8 (rank  55 of  66) λ=  100 | df   6.6 max Sᵢᵢ 0.150 | ρ̂ +0.236 se 0.088 | CS [0.069, 0.424]
+  log pp kNN-6  k=12 (rank 108 of 146) λ=  0.1 | df  53.1 max Sᵢᵢ 0.739 | ρ̂ -0.090 se 0.160 | CS [-0.380, 0.272]
+  log pp kNN-6  k=12 (rank 108 of 146) λ=    1 | df  25.7 max Sᵢᵢ 0.478 | ρ̂ +0.025 se 0.111 | CS [-0.183, 0.264]
+  log pp kNN-6  k=12 (rank 108 of 146) λ=   10 | df  12.4 max Sᵢᵢ 0.251 | ρ̂ +0.138 se 0.096 | CS [-0.043, 0.342]
+  log pp kNN-6  k=12 (rank 108 of 146) λ=  100 | df   7.4 max Sᵢᵢ 0.156 | ρ̂ +0.221 se 0.089 | CS [0.053, 0.412]
+  log pp kNN-6  k=16 (rank 174 of 258) λ=  0.1 | df  72.3 max Sᵢᵢ 0.823 | ρ̂ -0.065 se 0.158 | CS [-0.355, 0.286]
+  log pp kNN-6  k=16 (rank 174 of 258) λ=    1 | df  33.4 max Sᵢᵢ 0.562 | ρ̂ +0.005 se 0.116 | CS [-0.212, 0.256]
+  log pp kNN-6  k=16 (rank 174 of 258) λ=   10 | df  15.3 max Sᵢᵢ 0.309 | ρ̂ +0.108 se 0.099 | CS [-0.079, 0.318]
+  log pp kNN-6  k=16 (rank 174 of 258) λ=  100 | df   8.3 max Sᵢᵢ 0.162 | ρ̂ +0.204 se 0.090 | CS [0.034, 0.398]
