@@ -3101,6 +3101,53 @@ with HC2's linear part, would keep HC2's linear terms `L₁`–`L₅` and remove
 `Q₁`–`Q₃`. It is not measured. Its quadratic part also uses `y`, so it is
 not free of `f` either.
 
+**Mikusheva & Sun (2022): read 2026-11-25; their variance estimator does not
+transfer, and their pre-test is a possible addition.** Read from arXiv
+2004.12445v3 (§§1–7), with (4), (6) and Theorem 5 checked against the page
+images (pp. 14, 19, 20). Their setting is linear IV with many instruments,
+`P = Z(Z′Z)⁻¹Z′` and `M = I − P`. Their test inverts the jackknife AR
+statistic `(1/√K) Σᵢ Σ_{j≠i} Pᵢⱼeᵢ(β₀)eⱼ(β₀)`, which is our `CS` with
+`C = P − Diag(P)` and no linear part.
+- **Their variance estimator is step 2's leave-one-out, corrected for pairs.**
+  Their (4) is
+
+      Φ̂ = (2/K) Σᵢ Σ_{j≠i} Pᵢⱼ²/(MᵢᵢMⱼⱼ + Mᵢⱼ²) · [eᵢ(β₀)Mᵢe(β₀)][eⱼ(β₀)Mⱼe(β₀)].
+
+  With `y₀` in place of `e(β₀)`, `eᵢMᵢe/Mᵢᵢ` is the `sᵢ = y₀ᵢûᵢ/Mᵢᵢ` of
+  "Kline, Saggio & Sølvsten's leave-one-out variances" above. Their
+  denominator removes the `σᵢ²σⱼ²Mᵢⱼ²/(MᵢᵢMⱼⱼ)` part of `E[sᵢsⱼ]` exactly,
+  and it is exact for any variances: for `i ≠ j`,
+  `E[εᵢMᵢε εⱼMⱼε] = (MᵢᵢMⱼⱼ + Mᵢⱼ²)σᵢ²σⱼ²`. It does not remove the
+  `fᵢfⱼ(MΣM)ᵢⱼ` and `μ₃` terms. Those terms made the quadratic part collapse
+  with a strong signal (to −42 × its true value at K/n = 0.39). Mikusheva &
+  Sun do not meet them, because under their null `e(β₀)` has mean zero.
+  Under alternatives, the same term is what their Theorem 3 controls with
+  `Δ²·Π′Π/K → 0`. In our moment, `f` is a nuisance that is present at `ρ₀`
+  itself, so this estimator inherits step 2's failure. It is not measured
+  separately.
+- **Weak identification.** Their Theorem 1: with Gaussian errors and
+  known covariance, no test is consistent when `π′Z′Zπ/(σᵥ²√K)` stays
+  bounded. Their AR test is valid without identification for the same
+  reason as Proposition 6: it uses the moment at the null value only.
+  Nothing in it changes Proposition 6.
+- **A pre-test for the Wald interval (possible addition, not done).**
+  Their Theorem 5 gives the joint limit of the JIVE-Wald statistic and of
+  `F̃ = (1/(√K√Υ̂)) Σᵢ Σ_{j≠i} PᵢⱼXᵢXⱼ` (their (6)) as
+  `(ξ²/(1 − 2ϱξ/ν + ξ²/ν²), ν)`, where `ξ` and `ν` are normal with
+  means 0 and `μ²/(√K√Υ)`, unit variances and correlation `ϱ`. Then
+  `S = μ²/(√K√Υ) > 2.5` implies a worst-case size of the 5% Wald test
+  below 10%, and `F̃ > 4.14` is a 5% test of `S ≤ 2.5`. Our Wald interval
+  has the same structure to first order: `ρ̂ − ρ₀ ≈ −g(ρ₀)/g′(ρ₀)`, with
+  `g(ρ₀)/√V` in the role of `ξ`, `g′(ρ₀)/√Var g′` in the role of `ν`, and
+  `J/√Var g′` the strength (A9 is `J/√V → ∞`). Their cut-offs would not
+  carry over, because our `g` is quadratic in `ρ` and the root is confined
+  to (−1, 1). Their method would: compute the worst-case Wald size over
+  `ϱ` as a function of the strength, and test the strength with the
+  standardised `g′`. In `tc_ar.jl`, `CS` was no longer than the Wald
+  interval when `ρ` was well identified, so a pre-test would only tell
+  the user when the Wald interval may also be reported. The discussion
+  after Proposition 6 already treats a wide `CS` as the diagnostic.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -3343,8 +3390,13 @@ from the page images of the copies in `ExtRef/`, Bhansali, Giraitis &
 Kokoszka (2007), all of it; Kelejian & Prucha (2001), §3.1 and the proof of
 Theorem 1; Hall & Heyde (1980), §3.2; and Lee (2004)'s CLT, as restated in
 Lee (2023), ch. 1, §1.8.3 and Appendix 1A; and Armstrong & Kolesár, as
-listed in "Comparison with Armstrong & Kolesár". The others have not been
-read.
+listed in "Comparison with Armstrong & Kolesár"; Anatolyev & Sølvsten
+(2023), §§2.3–2.7 (arXiv 2003.07320v3), and Mikusheva & Sun (2022), §§1–7
+(arXiv 2004.12445v3), from the page images of the copies in `ExtRef/`. The
+others have not been read.
+- Anatolyev, S., & Sølvsten, M. (2023). Testing many restrictions under
+  heteroskedasticity. *Journal of Econometrics*, 236(1), 105473.
+  doi:10.1016/j.jeconom.2023.03.011
 - Anderson, T. W., & Rubin, H. (1949). Estimation of the parameters of a
   single equation in a complete system of stochastic equations. *Annals of
   Mathematical Statistics*, 20(1), 46–63. doi:10.1214/aoms/1177730090
@@ -3383,6 +3435,8 @@ read.
 - Lee, L.-F. (2004). Asymptotic distributions of quasi-maximum likelihood
   estimators for spatial autoregressive models. *Econometrica*, 72(6),
   1899–1925. doi:10.1111/j.1468-0262.2004.00558.x
+- Mikusheva, A., & Sun, L. (2022). Inference with many weak instruments.
+  *Review of Economic Studies*, 89(5), 2663–2686. doi:10.1093/restud/rdab097
 - Rosenthal, H. P. (1970). On the subspaces of Lᵖ (p > 2) spanned by
   sequences of independent random variables. *Israel Journal of
   Mathematics*, 8(3), 273–303. doi:10.1007/BF02771562
