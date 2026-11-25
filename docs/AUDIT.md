@@ -5947,3 +5947,60 @@ the run.
 Not measured: unit-specific skewness through the package (1.6 to 2 times
 worse in the research search, and not covered), skewness together with
 heteroskedasticity.
+
+## `root_rho` on real data: an irregular region and the rank check
+
+### 37. The penalised smoother was refused on an irregular region by a check it does not need — FIXED
+
+Found on 2026-11-25, on the first real-data run of `root_rho`: the 278
+mainland Portuguese municipalities from the committed extract
+(`research/trace_cfe/tc_portugal.jl`, output committed).
+`tensor_pspline` places its knots over the bounding box of the
+coordinates. Mainland Portugal fills only part of that box, so at
+`k = 12` many hat functions have no municipality in their support.
+
+- **The fault.** `root_rho` required `[X, basis]` to have full rank
+  before it chose a path. The penalised smoother takes a Cholesky factor
+  of `Z′Z + λΩ̃`, which the penalty makes positive definite when the
+  basis is rank-deficient. So the smoother, which is the path that suits
+  an irregular region, was refused on every such region. The message
+  spoke only of an intercept, which was not the cause.
+- **Measured before the fix**, with the internal `_root_rho_penalised`
+  called directly: 72 fits (two forms of `y`, queen, rook and kNN-6 `W`,
+  `k` = 8, 12, 16, `λ` = 0.1 to 100) all ran, with `df` 6.6 to 72.3 and
+  max `Sᵢᵢ` 0.15 to 0.82.
+- **The fix.** Without `roughness`, the penalised path checks only the
+  rank of `X`, which is not penalised. `_root_rho_penalised` checks that
+  `Z′Z + λΩ̃` is positive definite (Cholesky succeeds and the eigenvalue
+  ratio exceeds 1e-10), and otherwise names the usual cause: an
+  intercept in `X`, which the penalty's null space already holds.
+  `_prelim_2sls` (the sign-rule check) now uses a basis of the columns of
+  `Z`, because it compared the rank of `[Z, WZ]` with the column count of
+  `Z`. The bias-aware path (with `roughness`) keeps the full-rank check:
+  its pilot is a projection.
+- **The projection.** It ran only at `k = 4`. At `k` = 5 to 8 some
+  municipality was alone in a hat's support (leverage 1, refused by the
+  0.99 guard, correctly); at `k ≥ 9` the basis was rank-deficient even
+  with the empty columns dropped. The rank error now names empty and
+  sparsely supported basis functions and points to the smoother. The
+  docstrings of `tensor_pspline` and `root_rho` and the docs page say so.
+
+**Testset 47h** builds an irregular region (units in the triangle
+`u + v ≤ 1`, `k = 10`, rank 65 of 101 columns, 36 empty) and checks:
+- the fit against a dense reimplementation (the moment's coefficients
+  at `1.6e-15` relative, tolerance `1e-9`);
+- that a zero column with a decoupled penalty leaves `ρ̂`, `se` and
+  `V̂` unchanged (at about `1e-16`);
+- that `_prelim_2sls` is the same with and without the empty columns;
+- as the power checks, that the projection on the same basis is still
+  refused with the new message, that an intercept in `X` gives the
+  singular-`Z′Z + λΩ̃` error, and that a rank-deficient `X` is refused.
+
+**What the data showed.** Without a surface, `ρ̂` is 0.40 to 0.49 (ML SAR
+0.36 to 0.39), and the test-inversion set excludes 0. With a surface,
+`ρ̂` falls as the surface becomes more flexible: 0.20 to 0.27 at `df` 7
+to 9, and −0.09 to +0.21 at `df ≥ 12`, where the set includes 0 in 32
+of 36 fits. Much of the spatial lag in notebook 11's SAR is a smooth
+trend. The residuals are skewed (0.95), heavy-tailed (excess kurtosis
+2.5) and heteroskedastic (Moran's I of `e²` z = 3.0), so the homoskedastic
+`vhat_worst_bias` does not bound the `V̂` bias here.

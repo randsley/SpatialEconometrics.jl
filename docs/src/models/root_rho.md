@@ -159,7 +159,8 @@ fits `f` best:
 - The coverage was measured for `K/n` up to 0.30; beyond that `root_rho`
   warns.
 - A unit whose leverage in `[X, B]` exceeds 0.99 makes `Δ` ill-posed, and the
-  fit is refused. Use fewer basis functions where the data are sparse.
+  fit is refused. Use fewer basis functions where the data are sparse, or
+  the penalised smoother on an irregular region (see below).
 - A hat or B-spline basis sums to one, so do not also put an intercept in `X`.
 
 `β̂` is reported as a point estimate from least squares of `y − ρ̂Wy` on
@@ -198,6 +199,26 @@ Report `ρ̂` across a few `λ`, as section 4 of `examples/34_root_rho.jl`
 does. Or use the bias-aware interval below, which stays valid at a
 larger `λ`. `df/n` above 0.30 gives a warning, and a unit with `Sᵢᵢ` above 0.99
 is refused.
+
+**Irregular regions.** `tensor_pspline` places its knots over the bounding
+box of the coordinates. When the units fill only part of it (a coastline,
+a border), some basis functions have no unit in their support, and others
+have only one or two. As a projection basis, these make `[X, B]`
+rank-deficient or put a unit's leverage at 1, and `root_rho` refuses the
+fit. The penalised smoother needs only `Z′Z + λΩ̃` to be invertible: the
+penalty determines the coefficients that the data leave free. So on an
+irregular region, use the smoother:
+
+```julia
+ps = tensor_pspline(u, v; k = 12)   # some columns are zero at every unit
+r = root_rho(y, X, W; ps..., lambda = 1.0)
+```
+
+On the 278 mainland Portuguese municipalities, the projection ran only at
+`k = 4`, while the smoother ran at `k` = 8 to 16 for every `λ` tried
+(`research/trace_cfe/tc_portugal.jl`). The bias-aware interval (with
+`roughness`) still needs a full-rank `[X, B]`, because its pilot is a
+projection.
 
 ## The bias-aware interval
 

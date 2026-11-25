@@ -288,12 +288,17 @@ end
 function _prelim_2sls(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T},
                       Ws::SparseMatrixCSC{T}) where {T}
     n, K = size(Z)
-    F = qr(hcat(Z, Ws * Z), ColumnNorm())
+    # Z may be rank-deficient on the penalised path: keep a basis of its columns.
+    FZ = qr(Z, ColumnNorm())
+    dz = abs.(diag(FZ.R))
+    rZ = count(>(1e-10 * dz[1]), dz)
+    Zr = Z[:, FZ.p[1:rZ]]
+    F = qr(hcat(Zr, Ws * Zr), ColumnNorm())
     d = abs.(diag(F.R))
     r = count(>(1e-10 * d[1]), d)
-    K < r < n || return nothing
+    rZ < r < n || return nothing
     Qh = Matrix(F.Q)[:, 1:r]
-    Xh = hcat(Wy, Z)
+    Xh = hcat(Wy, Zr)
     ρ = ((Qh * (Qh' * Xh)) \ y)[1]
     return isfinite(ρ) ? ρ : nothing
 end
@@ -641,6 +646,17 @@ r = root_rho(y, X, W; tensor_pspline(u, v; k = 15)..., lambda = 1.0)
 
 `k` must be at least `order + 2`. Used without `penalty`, `basis` is the
 projection basis of the default `root_rho`.
+
+**Irregular regions.** The knots span the bounding box of `(u, v)`. When
+the units fill only part of it (a coastline, a border), some columns are
+zero at every unit and others are supported by one or two units. With the
+penalty, `root_rho` handles this: the penalty determines the coefficients
+the data do not, and only `Z′Z + λΩ̃` must be invertible. As a projection
+basis, such columns make the design rank-deficient or put a unit's
+leverage at 1, which `root_rho` rejects. On the 278 mainland Portuguese
+municipalities (a region about twice as tall as it is wide), the
+projection ran only at `k = 4`, while the penalised smoother ran at
+`k = 8` to `16` for every `λ` tried (research/trace_cfe/tc_portugal.jl).
 """
 function tensor_pspline(u::AbstractVector{<:Real}, v::AbstractVector{<:Real};
                         k::Integer, order::Integer = 2)
@@ -770,6 +786,9 @@ and with `skewness > 0` an SVD of the `n × K` matrix `C′[X, basis]`.
 - `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
   penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
   or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
+  Without `roughness`, `[X, basis]` need not have full rank, only `X` and
+  `Z′Z + λΩ̃`. That is what a [`tensor_pspline`](@ref) on an irregular
+  region needs, where some basis functions have no unit in their support.
   With `roughness`, `lambda` may also be a vector (see below). With a
   vector of bases, `penalty` is a vector too, one per basis, and `lambda`
   applies to each.
@@ -1066,9 +1085,22 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
     Z = hcat(Xm, Bm)
     K = size(Z, 2)
     K > 0 || throw(ArgumentError("root_rho: X and basis together have no columns"))
-    check_design_rank(Z, vcat(vnames, ["basis$j" for j in 1:size(Bm, 2)]), "root_rho";
-        context = "A hat or B-spline basis sums to one, so it is collinear with an " *
-                  "intercept in X: drop one of them.")
+    if penalised && roughness === nothing
+        # The smoother needs Z′Z + λΩ̃ invertible (checked in _root_rho_penalised), not a
+        # full-rank basis: on an irregular region a tensor_pspline has columns with no unit
+        # in their support, and the penalty still determines their coefficients. X is not
+        # penalised, so it must have full rank.
+        kx > 0 && check_design_rank(Xm, vnames, "root_rho";
+            context = "X is not penalised, so its columns must be linearly independent.")
+    else
+        check_design_rank(Z, vcat(vnames, ["basis$j" for j in 1:size(Bm, 2)]), "root_rho";
+            context = "A hat or B-spline basis sums to one, so it is collinear with an " *
+                      "intercept in X: drop one of them. On an irregular region, basis " *
+                      "functions with no unit, or too few units, in their support are " *
+                      "dependent as well: drop the all-zero columns, use a smaller k, or use " *
+                      "the penalised smoother (`penalty` and `lambda`, without `roughness`), " *
+                      "which needs only Z′Z + λΩ̃ to be invertible.")
+    end
     yv = Vector{T}(y)
     penalised || roughness !== nothing ||
         return _root_rho_projection(yv, Z, Ws, kx, vnames, T(level), bnds, γ̄)
@@ -1244,7 +1276,15 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     n, K = size(Z)
     Ωt = zeros(T, K, K)
     Ωt[(kx + 1):K, (kx + 1):K] .= Ω
-    F = cholesky(Symmetric(Z' * Z .+ λ .* Ωt))
+    Gm = Symmetric(Z' * Z .+ λ .* Ωt)
+    F = cholesky(Gm; check = false)
+    ev = eigvals(Gm)
+    (issuccess(F) && ev[1] > 1e-10 * ev[end]) || throw(ArgumentError(
+        "root_rho: Z′Z + λΩ̃ is singular, so the smoother is not defined: some combination " *
+        "of the columns of X and of the basis functions that the penalty leaves free (for " *
+        "tensor_pspline with order = 2, those linear in each coordinate's knot index, the " *
+        "constant among them) is zero at every unit. The usual cause is an intercept in X, " *
+        "which a hat basis already contains: drop it."))
     S = Z * (F \ Z')
     S .= (S .+ S') ./ 2
     Sii = diag(S)

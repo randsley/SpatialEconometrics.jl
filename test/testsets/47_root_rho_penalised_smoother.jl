@@ -196,4 +196,59 @@
         @test_logs root_rho(y, X1, d.W; d.ps..., lambda = λ)
         @test_logs root_rho(y, X1, d.W; basis = d.ps.basis)
     end
+
+    @testset "47h. an irregular region: a rank-deficient basis" begin
+        # Units fill the triangle u + v ≤ 1 of the unit square, so the hats
+        # above the diagonal have no unit in their support and [x, B] is
+        # rank-deficient. The smoother needs only Z′Z + λΩ̃ invertible (found
+        # on the Portuguese municipalities, research/trace_cfe/tc_portugal.jl).
+        rng = MersenneTwister(47_008); g = 24
+        P = hcat(repeat(0:g-1, inner = g), repeat(0:g-1, outer = g)) .+ rand(rng, g^2, 2); P ./= g
+        P = P[P[:, 1] .+ P[:, 2] .<= 1, :]
+        P = vcat(P, [0.0 1.0; 1.0 0.0])        # the box's corners, so the knots span [0, 1]²
+        n = size(P, 1); Wt = knn_weights(P, 6); x = randn(rng, n)
+        ps = tensor_pspline(P[:, 1], P[:, 2]; k = 10)
+        Z = hcat(x, ps.basis); K = size(Z, 2)
+        @test rank(Z) < K - 10                   # many columns are empty or dependent
+        @test count(iszero, vec(maximum(ps.basis; dims = 1))) > 10
+        f = 0.5 .* x .+ sin.(2π .* P[:, 1]) .* cos.(π .* P[:, 2])
+        yt = lu(sparse(I - 0.4 * Wt)) \ (f .+ randn(rng, n))
+        Wyt = Wt * yt; λt = 1.0
+        rt = root_rho(yt, reshape(x, :, 1), Wt; ps..., lambda = λt)
+        # Against a dense reimplementation (as 47b), with G = Z′Z + λΩ̃ positive definite.
+        Ωt = zeros(K, K); Ωt[2:end, 2:end] = ps.penalty
+        G = Z' * Z + λt * Ωt
+        @test isposdef(Symmetric(G))
+        S = Z * (G \ Z'); S = (S + S') / 2; M = I - S
+        dd = (M .* M) \ (-diag(M * Matrix(Wt)))
+        A = M * Matrix(Wt) + M * Diagonal(dd) * M
+        a, b, c = Wyt' * A * Wyt, yt' * A * Wyt + Wyt' * A * yt, yt' * A * yt
+        @test [rt.a, rt.b, rt.c] ≈ [a, b, c] rtol = 1e-9
+        @test rt.rho ≈ (b - sqrt(b^2 - 4a * c)) / (2a) atol = 1e-9
+        @test rt.df ≈ tr(S) atol = 1e-9
+        @test rt.max_leverage < 0.99 && !isempty(rt.cs)
+        # A zero column whose penalty is decoupled (Ω entry 1, no cross terms)
+        # adds a coefficient the penalty sets to 0, so the fit cannot change.
+        kb = size(ps.basis, 2)
+        Ωz = zeros(kb + 1, kb + 1); Ωz[1:kb, 1:kb] = ps.penalty; Ωz[end, end] = 1
+        rz = root_rho(yt, reshape(x, :, 1), Wt; basis = hcat(ps.basis, zeros(n)), penalty = Ωz, lambda = λt)
+        @test rz.rho ≈ rt.rho atol = 1e-9
+        @test rz.se ≈ rt.se atol = 1e-9
+        @test collect(rz.vpoly) ≈ collect(rt.vpoly) rtol = 1e-8
+        # The preliminary 2SLS uses span(Z) only, so dropping the empty columns
+        # cannot change it.
+        used = vec(maximum(ps.basis; dims = 1)) .> 0
+        p_all = RR._prelim_2sls(yt, Wyt, Z, Wt)
+        p_used = RR._prelim_2sls(yt, Wyt, hcat(x, ps.basis[:, used]), Wt)
+        @test p_all !== nothing
+        @test p_all ≈ p_used atol = 1e-8
+        # Power: the projection on the same basis is still refused, and the
+        # message names the cause and the remedy.
+        @test_throws "penalised smoother" root_rho(yt, reshape(x, :, 1), Wt; basis = ps.basis)
+        # An intercept in X is collinear with the constant, which the penalty
+        # leaves free: Z′Z + λΩ̃ is singular.
+        @test_throws "intercept" root_rho(yt, hcat(ones(n), x), Wt; ps..., lambda = λt)
+        # X itself must have full rank: it is not penalised.
+        @test_throws "not penalised" root_rho(yt, hcat(x, 2 .* x), Wt; ps..., lambda = λt)
+    end
 end

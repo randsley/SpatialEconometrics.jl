@@ -169,6 +169,9 @@ and with `skewness > 0` an SVD of the `n × K` matrix `C′[X, basis]`.
 - `penalty`, `lambda` — a symmetric positive semi-definite `K_B × K_B`
   penalty `Ω` on the basis coefficients, and its weight `λ > 0`. Give both
   or neither. [`tensor_pspline`](@ref) returns a basis and a penalty.
+  Without `roughness`, `[X, basis]` need not have full rank, only `X` and
+  `Z′Z + λΩ̃`. That is what a [`tensor_pspline`](@ref) on an irregular
+  region needs, where some basis functions have no unit in their support.
   With `roughness`, `lambda` may also be a vector (see below). With a
   vector of bases, `penalty` is a vector too, one per basis, and `lambda`
   applies to each.
@@ -361,4 +364,15 @@ r = root_rho(y, X, W; tensor_pspline(u, v; k = 15)..., lambda = 1.0)
 
 `k` must be at least `order + 2`. Used without `penalty`, `basis` is the
 projection basis of the default `root_rho`.
+
+**Irregular regions.** The knots span the bounding box of `(u, v)`. When
+the units fill only part of it (a coastline, a border), some columns are
+zero at every unit and others are supported by one or two units. With the
+penalty, `root_rho` handles this: the penalty determines the coefficients
+the data do not, and only `Z′Z + λΩ̃` must be invertible. As a projection
+basis, such columns make the design rank-deficient or put a unit's
+leverage at 1, which `root_rho` rejects. On the 278 mainland Portuguese
+municipalities (a region about twice as tall as it is wide), the
+projection ran only at `k = 4`, while the penalised smoother ran at
+`k = 8` to `16` for every `λ` tried (research/trace_cfe/tc_portugal.jl).
 
