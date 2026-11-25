@@ -3228,6 +3228,83 @@ fixed `C(0)`.
   `V_own`. The right target for a validation is `V_own`, as part 2 of that
   script already used, not the variance across draws.
 
+## Two real-data runs (2026-11-25)
+
+Everything above is checked on simulated designs. These two runs put
+`root_rho` on real `W`, real leverage and real errors, to see which
+assumptions bind and where the guards fire. Both use Portuguese data from
+INE on CAOP boundaries (notebooks/data; the INE and DGT credits are in the
+scripts and the provenance files).
+
+- `tc_portugal.jl`: the 278 mainland municipalities. y = purchasing power
+  (2023), or its log; X = log density and the ageing ratio (notebook 11's
+  SAR).
+- `tc_portugal_parishes.jl`: the 2,882 mainland parishes, on the 2013
+  parish map. y = log mean gross declared income per taxpayer (2021); X =
+  log density, unemployment rate and illiteracy rate (Census 2021).
+
+The surface is `tensor_pspline` on the centroids, in km. W is queen
+contiguity and kNN-6 (rook as well for the municipalities).
+
+**What was found in the code.** The penalised path refused every basis
+with empty columns, which is every `tensor_pspline` on an irregular region,
+because the full-rank check ran before the path was chosen (AUDIT 37,
+fixed). The projection ran only at small `k`: `k = 4` for the
+municipalities, `k = 6` for the parishes. Beyond that some unit is alone
+in a hat's support, its leverage is 1, and the 0.99 guard refuses the fit,
+correctly. So on real regions the penalised smoother is the usable path,
+and the projection is a coarse check on it. At `n` = 2,882 each fit took
+1 to 2 s.
+
+**What was found in the data.** `ρ̂` (queen):
+
+| fit | municipalities, y = pp | parishes, y = log income |
+|---|---|---|
+| ML SAR, no surface | 0.38 | 0.70 |
+| `root_rho`, no surface | 0.40 | 0.62 |
+| projection (k = 4; k = 6) | 0.17, CS includes 0 | 0.47, CS [0.42, 0.53] |
+| smoother, stiffest (λ = 100) | 0.24–0.25 (df 6.6–8.3) | 0.505–0.518 (df 15–21) |
+| smoother, most flexible | −0.09 to +0.21 (df ≥ 12) | 0.428 (df 226) |
+
+- **Municipalities.** Over all 72 smoother fits (two forms of `y`, three
+  `W`, `k` = 8, 12, 16, λ = 0.1–100), `ρ̂` is 0.18 to 0.27 at `df` 6.6 to
+  9.5, where `CS` excludes 0 in 22 of 24, and −0.09 to +0.21 at `df ≥ 12`,
+  where `CS` includes 0 in all 48. With 278 units a surface with more than
+  about 12 degrees of freedom leaves too little to identify `ρ`, and what
+  can be identified is small. The 0.4 of the SAR is mostly the trend.
+- **Parishes.** The lag survives. Over all 16 smoother fits (two `W`,
+  `k` = 16 and 24, λ = 0.1–100), `ρ̂` is 0.43 to 0.55 and every `CS`
+  excludes 0, with a half-width of about 0.05. The surface takes about a
+  third of the no-surface `ρ̂`, not all of it.
+- **The drift.** In both runs `ρ̂` falls as the surface becomes more
+  flexible: at fixed `k` as λ falls, and at fixed λ as `k` grows. On the
+  parishes (queen) it goes from 0.518 at `df` 15 to 0.428 at `df` 226,
+  and it has not levelled off. The theory reads this two ways. The
+  shrinkage bias of the smoother is `f′Af` at the true `ρ`, and it grows
+  with λ (Proposition 4); a stiffer fit leaves part of `f` in the residual,
+  and that part loads on `Wy`. So the stiff fits are biased upwards, and
+  the flexible end is the one to report, as "Choosing the basis" in the
+  docs says. But the flexible end has no plateau, and no result covers
+  that case: Geniaux's appendices A–C, as read here, treat a fixed basis,
+  and give no theory for choosing where `ρ̂` levels off. The
+  bias-aware interval is the principled answer, and here it cannot be used:
+  its pilot is a projection, and the projection does not run past `k = 6`.
+- **The errors.** The parish residuals (queen, `k` = 24, λ = 1) have
+  skewness 0.36, excess kurtosis 2.1, and spatially clustered variance
+  (Moran's I of `e²`, z = 7.8). The largest are rich urban parishes
+  (Parque das Nações +6.0, Belém +5.6 standard deviations). The municipal
+  residuals have skewness 0.95 and Moran's I of `e²` z = 3.0. Both are
+  outside the homoskedastic worst case of Lemma 8, and inside the case
+  Lemma 11 bounds only by a rate: `V̂`'s bias under heteroskedasticity has
+  no usable constant yet (item 3 of "Still to do"). On the smoother path
+  `vhat_worst_bias` is not computed at all.
+
+**What it points to.** Three items, recorded as item 8 of "Still to do":
+a pilot for the bias-aware interval that runs on an irregular region (the
+smoother itself, or a projection on the occupied cells only); a usable
+heteroskedastic constant, since the real errors are heteroskedastic; and a
+rule for the flexible end when `ρ̂` does not level off.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -3456,6 +3533,15 @@ linear in `y`.
 7. A9's sign is assumed, not derived. `J < 0` occurs in 0.7% of the hub
    designs of `tc_sign.jl` and in none of the kNN designs measured. A
    condition on `W` and `f` that rules it out is open.
+8. From the two real-data runs (the section "Two real-data runs"). (a) The
+   bias-aware interval's pilot is a projection, which on an irregular
+   region runs only at small `k` (`k = 6` on 2,882 parishes), so the
+   interval cannot be used where it is most needed; a pilot from the
+   smoother, or a projection on the occupied cells only, is open. (b) Real
+   errors are heteroskedastic with spatially clustered variance, so the
+   heteroskedastic constant of item 3 is the one that matters. (c) `ρ̂`
+   drifted down as `df` grew, with no plateau up to `df` 226; a rule for
+   where to stop is open.
 
 ## References
 

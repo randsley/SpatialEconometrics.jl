@@ -5998,9 +5998,12 @@ coordinates. Mainland Portugal fills only part of that box, so at
 
 **What the data showed.** Without a surface, `ρ̂` is 0.40 to 0.49 (ML SAR
 0.36 to 0.39), and the test-inversion set excludes 0. With a surface,
-`ρ̂` falls as the surface becomes more flexible: 0.20 to 0.27 at `df` 7
-to 9, and −0.09 to +0.21 at `df ≥ 12`, where the set includes 0 in 32
-of 36 fits. Much of the spatial lag in notebook 11's SAR is a smooth
-trend. The residuals are skewed (0.95), heavy-tailed (excess kurtosis
+`ρ̂` falls as the surface becomes more flexible: 0.18 to 0.27 at `df`
+6.6 to 9.5, where the set excludes 0 in 22 of 24 fits, and −0.09 to
++0.21 at `df ≥ 12`, where it includes 0 in all 48. (This entry first said
+"32 of 36"; recounted from the committed output on 2026-11-25.) Much of
+the spatial lag in notebook 11's SAR is a smooth trend at this `n`; at
+the parish level (`n` = 2,882) it survives one, see THEORY.md, "Two
+real-data runs". The residuals are skewed (0.95), heavy-tailed (excess kurtosis
 2.5) and heteroskedastic (Moran's I of `e²` z = 3.0), so the homoskedastic
 `vhat_worst_bias` does not bound the `V̂` bias here.
