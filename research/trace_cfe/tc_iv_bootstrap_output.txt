@@ -1,0 +1,25 @@
+L = 40 km: 38 blocks, units per block 1–298 (median 68)
+L = 20 km: 120 blocks, units per block 1–114 (median 21)
+
+PART 1: placebo, fit k = 24, λ = 0.1, R = 500, B = 399
+cell B: ρ₀ = 0.339, λ_e = 0.0; mean ρ̂_IV +0.332, sd 0.059  (177s)
+  L = 40 km: WRE covers ρ₀ 0.936 (MC se 0.011)   analytic cluster-robust 0.892
+  L = 20 km: WRE covers ρ₀ 0.942 (MC se 0.010)   analytic cluster-robust 0.928
+cell C: ρ₀ = 0.000, λ_e = 0.0; mean ρ̂_IV +0.006, sd 0.072  (167s)
+  L = 40 km: WRE covers ρ₀ 0.942 (MC se 0.010)   analytic cluster-robust 0.872
+  L = 20 km: WRE covers ρ₀ 0.930 (MC se 0.011)   analytic cluster-robust 0.902
+cell D: ρ₀ = 0.300, λ_e = 0.0; mean ρ̂_IV +0.225, sd 0.065  (149s)
+  L = 40 km: WRE covers ρ₀ 0.748 (MC se 0.019)   analytic cluster-robust 0.648
+  L = 20 km: WRE covers ρ₀ 0.790 (MC se 0.018)   analytic cluster-robust 0.740
+cell E2: ρ₀ = 0.000, λ_e = 0.2; mean ρ̂_IV +0.020, sd 0.078  (156s)
+  L = 40 km: WRE covers ρ₀ 0.940 (MC se 0.011)   analytic cluster-robust 0.854
+  L = 20 km: WRE covers ρ₀ 0.924 (MC se 0.012)   analytic cluster-robust 0.866
+cell E5: ρ₀ = 0.000, λ_e = 0.5; mean ρ̂_IV +0.044, sd 0.086  (167s)
+  L = 40 km: WRE covers ρ₀ 0.928 (MC se 0.012)   analytic cluster-robust 0.816
+  L = 20 km: WRE covers ρ₀ 0.908 (MC se 0.013)   analytic cluster-robust 0.838
+
+PART 2: the real data, λ = 0.1, B = 999
+  k = 24, L = 40 km: ρ̂_IV +0.134; WRE 95% set [-0.200, +0.410]; analytic [-0.104, +0.372]; p at 0: 0.517, at root_rho's 0.339: 0.164
+  k = 24, L = 20 km: ρ̂_IV +0.134; WRE 95% set [-0.135, -0.135] ∪ [-0.125, +0.380]; analytic [-0.081, +0.349]; p at 0: 0.327, at root_rho's 0.339: 0.123
+  k = 16, L = 40 km: ρ̂_IV -0.011; WRE 95% set [-0.330, +0.260] ∪ [+0.270, +0.270]; analytic [-0.212, +0.190]; p at 0: 0.965, at root_rho's 0.380: 0.018
+  k = 16, L = 20 km: ρ̂_IV -0.011; WRE 95% set [-0.310, +0.220]; analytic [-0.204, +0.183]; p at 0: 0.922, at root_rho's 0.380: 0.000

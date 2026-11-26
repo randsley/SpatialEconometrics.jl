@@ -3807,6 +3807,77 @@ What this shows, with the rules' verdict that the reading is not formal:
 Open: an interval that covers here (a larger or data-driven cut-off, a
 wild bootstrap of the IV under the null with spatial blocks, or a
 SARAR-type joint moment that estimates `λ_e`). No change to `root_rho`.
+The first of these is the next section.
+
+## A spatial-block bootstrap for the IV (2026-11-26)
+
+`tc_iv_bootstrap.jl` (output committed). It applies a wild restricted
+efficient (WRE) cluster bootstrap (Davidson & MacKinnon, 2010) to the IV of
+the previous section, at `k` = 24 and λ = 0.1. The test of `ρ = r` imposes
+the null, regenerates both the structural and the first-stage equation
+from their residuals, and draws one Rademacher sign per spatial block. The
+`t` statistic uses the cluster-robust variance on the same blocks. The
+interval inverts the test on a grid. The blocks are grid squares of side
+40 km (primary; 38 blocks, median 68 units) and 20 km (120 blocks, median
+21). The bootstrap treats the residualised data as the data and does not
+re-apply `M`. There were 500 placebo draws per cell, with B = 399. The
+rules were fixed in the header before any run. As before, a 4-draw smoke
+test printed Part 2 before the full run. The rules were not changed.
+
+Part 1, the coverage of `ρ₀` (MC se 0.010 to 0.019):
+
+| cell | `ρ₀` | WRE, 40 km | WRE, 20 km | analytic cluster-robust, 40 km | Conley 25 km (previous section) |
+|---|---|---|---|---|---|
+| B rough truth | 0.339 | 0.936 | 0.942 | 0.892 | 0.924 |
+| C no lag | 0 | 0.942 | 0.930 | 0.872 | 0.910 |
+| D outside the basis | 0.300 | 0.748 | 0.790 | 0.648 | 0.708 |
+| E2 SAR errors 0.2 | 0 | 0.940 | 0.924 | 0.854 | 0.882 |
+| E5 SAR errors 0.5 | 0 | **0.928** | 0.908 | 0.816 | 0.856 |
+
+- **Rule 1 failed, narrowly.** It asked for at least 0.93 in each of B,
+  C, E2 and E5 at 40 km. E5 gave 0.928, within one MC se of the bar but
+  below it. So rule 2's reading of the real data is not made. The bar
+  was not moved and the run was not repeated. A confirmatory run with
+  fresh seeds would have to be planned as such, with the rule unchanged.
+- **The bootstrap is a large improvement.** At 40 km it raises coverage
+  by 4 to 11 points over the analytic cluster-robust interval and by 1 to
+  7 points over the Conley HAC, and it is near 0.93 to 0.94 everywhere
+  except D. D stays at 0.75 to 0.79, as expected: its `ρ̂_IV` is biased
+  (−0.075), and no interval centred on it can cover. E5's shortfall is
+  probably its bias too (+0.044, half an sd).
+
+Part 2, the real data, λ = 0.1, B = 999 (descriptive only, as rule 1
+failed):
+
+| `k` | `ρ̂_IV` | WRE 95% set, 40 km | p at 0 | `root_rho`'s `ρ̂` | p there |
+|---|---|---|---|---|---|
+| 24 | 0.134 | [−0.200, 0.410] | 0.517 | 0.339 | 0.164 |
+| 16 | −0.011 | [−0.330, 0.260] (and the single grid point 0.270) | 0.965 | 0.380 | 0.018 |
+
+(At 20 km: [−0.125, 0.380] with an isolated point at −0.135 at `k` = 24,
+and [−0.310, 0.220] at `k` = 16, where `p` at 0.380 is below 0.001. The
+isolated points are bootstrap noise near `p` = 0.05.)
+
+What the numbers say, without the formal reading:
+
+- No bootstrap set excludes 0. So the IV finds no lag that error
+  correlation could not explain.
+- At `k` = 24 the set contains `root_rho`'s 0.339 too, so nothing is
+  decided there. At `k` = 16 it excludes 0.380 (p = 0.018 at 40 km).
+  Part of `root_rho`'s `ρ̂` at `k` = 16 is then not a lag. A bias of the
+  kind seen in D is down, and at about 0.075 it is too small to bridge
+  the gap.
+- The two `k` disagree, as `root_rho`'s did, and the IV sets are 0.5 to
+  0.6 long. On these data, separating a lag from error correlation is
+  possible in principle, but too imprecise to say how much of the
+  dependence is a lag.
+
+Where this leaves the four real-data runs: `root_rho` finds spatial
+dependence that a smooth surface does not absorb. On the Dutch income data,
+the only information that can split it into a lag and error correlation
+gives intervals that contain 0. A sharper answer needs more information
+(a panel, a second outcome, or regressors with more local variation), not
+another estimator of the same moments.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
@@ -4092,6 +4163,10 @@ others have not been read.
   regression models with many covariates and heteroscedasticity. *Journal of
   the American Statistical Association*, 113(523), 1350–1361.
   doi:10.1080/01621459.2017.1328360
+- Davidson, R., & MacKinnon, J. G. (2010). Wild bootstrap tests for IV
+  regression. *Journal of Business & Economic Statistics*, 28(1), 128–144.
+  doi:10.1198/jbes.2009.07221 (cited for the WRE bootstrap; not read for
+  this note)
 - Demko, S., Moss, W. F., & Smith, P. W. (1984). Decay rates for inverses of
   band matrices. *Mathematics of Computation*, 43(168), 491–499.
   doi:10.2307/2008290
