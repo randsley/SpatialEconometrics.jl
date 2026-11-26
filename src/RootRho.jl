@@ -797,9 +797,20 @@ C = (A − Δ)M,\\; Δ = \\mathrm{Diag}(AM)\\,\\mathrm{Diag}(M)^{-1},
 ```
 
 with `M = I − P_Z`, so `diag C = 0` and `CZ = 0`, and `E g(ρ₀) = 0` under
-any heteroskedasticity. The first step uses `A = W′` and gives `ρ̃`; the
+independent errors with any heteroskedasticity. The first step uses `A = W′` and gives `ρ̃`; the
 second (their REsd) uses `A = G(ρ̃)′`, `G(r) = W(I − rW)⁻¹`, and gives `ρ̂`.
 Each is the root of a quadratic at which `g′ < 0`.
+
+**The errors must be independent across units.** `diag C = 0` removes the
+error variances from `E g(ρ₀)`, but not their covariances: with
+`Cov(ε) = Σ`, `E g(ρ₀) = tr(CΣ)`, which is not 0 when the errors are
+spatially correlated, for example `ε = (I − λ_e W)⁻¹η`. `root_rho` then
+reads that dependence as a lag, and none of its intervals allows for it,
+the bias-aware one included. On the 3,027 Dutch districts of 2021, with
+no lag and `λ_e = 0.5`, `ρ̂` was 0.40 and no interval covered 0
+(research/trace_cfe/tc_netherlands_placebo2.jl). So a `ρ̂` away from 0
+means spatial dependence that `f` does not absorb, from the lag or from
+the errors.
 
 Two intervals are returned (see [`RootRhoResult`](@ref)): the Wald interval
 with the HC2 `V̂`, and the test-inversion set `{ρ : g(ρ)² ≤ z²V̂(ρ)}`,

@@ -6050,3 +6050,32 @@ time. The spatial lag survives the national trend in house values, at
 about a third of its size without one. The residuals are skewed (0.77),
 heavy-tailed (excess kurtosis 2.7) and heteroskedastic (Moran's I of `e²`
 z = 15.4).
+
+### 39. `root_rho`'s docstring did not say that the errors must be independent — FIXED
+
+Found on 2026-11-26, by the second placebo on the 2021 Dutch districts
+(`research/trace_cfe/tc_netherlands_placebo2.jl`, THEORY.md "The second
+placebo").
+
+- **The fault.** The docstring said `E g(ρ₀) = 0` "under any
+  heteroskedasticity" and did not state the assumption it rests on:
+  errors independent across units. The theory assumes it (THEORY.md, A4
+  and Lemma 13's setting), and `diag C = 0` removes only the variances.
+  With `Cov(ε) = Σ`, `E g(ρ₀) = tr(CΣ)`, which is not 0 for spatially
+  correlated errors. A reader could take `root_rho` as robust to them.
+- **Measured.** With no lag, a surface the fit can represent, and errors
+  `(I − λ_e W)⁻¹η`: at `λ_e = 0.2`, `ρ̂` = 0.146 at λ = 0.1 and the
+  bias-aware interval at `4ℛ̂` covers 0 in 0.553 of 150 draws; at
+  `λ_e = 0.5`, `ρ̂` = 0.397 and it covers 0 in none. The `λ_e = 0.5` path
+  (0.510, 0.415, 0.397 at λ = 100, 1, 0.1) is close to the real data's
+  (0.490, 0.381, 0.339).
+- **The fix.** The docstring now says "under independent errors with any
+  heteroskedasticity", and a paragraph states that spatially correlated
+  errors are read as a lag, that no interval allows for it, and the
+  measured size. The code is unchanged.
+- **What it changes in earlier entries.** "The lag survives" in AUDIT 37
+  and 38, and in THEORY.md's four real-data runs, holds only under
+  independent errors: `root_rho` shows spatial dependence that the surface
+  does not absorb, from the lag or from the errors. An instrumental-variable
+  check, which can tell the two apart, is the next step (THEORY.md, "The
+  second placebo").
