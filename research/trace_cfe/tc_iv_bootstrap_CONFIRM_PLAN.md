@@ -73,3 +73,9 @@ IVB_R=2000 IVB_SEED=20261127 julia --project=. research/trace_cfe/tc_iv_bootstra
 
 The result is recorded in THEORY.md under the exploratory section,
 pass or fail.
+
+## Outcome (added after the run)
+
+Rule 1 failed: E5 covered 0.926 (MC se 0.006) at 40 km, below 0.93. B,
+C and E2 passed (0.956, 0.939, 0.935). Rule 2's reading is not made. See
+THEORY.md, "A spatial-block bootstrap for the IV".

@@ -3879,6 +3879,29 @@ gives intervals that contain 0. A sharper answer needs more information
 (a panel, a second outcome, or regressors with more local variation), not
 another estimator of the same moments.
 
+**The confirmatory run (2026-11-26): rule 1 fails again.** The plan,
+`tc_iv_bootstrap_CONFIRM_PLAN.md`, was committed before the run (5299df9):
+R = 2,000 draws, fresh seeds (`IVB_SEED=20261127`), rules unchanged, one
+run only. Output: `tc_iv_bootstrap_confirm_output.txt`. At 40 km the WRE
+bootstrap covered ρ₀ in 0.956 (B), 0.939 (C), 0.935 (E2) and **0.926
+(E5)**, MC se 0.005 to 0.006, against the bar of 0.93. D: 0.771. The
+analytic cluster-robust interval: 0.827 to 0.900. So rule 1 fails, and
+under the plan this is final: the formal real-data reading is not made.
+
+- E5's coverage is about 0.926 ± 0.006 in both runs (0.928 at R = 500).
+  The bootstrap undercovers slightly when the errors are strongly
+  correlated (λ_e = 0.5), which is consistent with that cell's bias of
+  +0.041 (about half an sd). The other three cells pass.
+- Part 2 moved only at the grid's resolution: at 40 km, `k` = 24 gives
+  [−0.200, 0.420] (with an isolated point at 0.435) and `k` = 16 gives
+  [−0.325, 0.260] (and 0.270), with `p` = 0.013 at `root_rho`'s 0.380.
+  The descriptive reading of the exploratory run stands as description:
+  no set excludes 0, and the `k` = 16 set excludes `root_rho`'s `ρ̂`.
+- The conclusion of this line of work is unchanged by the failure, as it
+  did not rest on rule 2: `root_rho`'s `ρ̂` is spatial dependence that the
+  surface does not absorb, and on these data the IV cannot split it into
+  a lag and error correlation with a validated interval.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
