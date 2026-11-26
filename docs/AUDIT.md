@@ -6007,3 +6007,46 @@ the parish level (`n` = 2,882) it survives one, see THEORY.md, "Two
 real-data runs". The residuals are skewed (0.95), heavy-tailed (excess kurtosis
 2.5) and heteroskedastic (Moran's I of `e²` z = 3.0), so the homoskedastic
 `vhat_worst_bias` does not bound the `V̂` bias here.
+
+### 38. The smoother's positive-definiteness check depended on the units of X — FIXED
+
+Found on 2026-11-26, on the third real-data run of `root_rho`: the 3,182
+Dutch districts of CBS's Wijk- en Buurtkaart 2023
+(`research/trace_cfe/tc_netherlands_districts.jl`, output committed).
+Two of the three regressors are percentages, from 0 to 100.
+
+- **The fault.** `_root_rho_penalised` (and the smoother pilot,
+  `_bias_pilot_penalised`, 0360778) called `Z′Z + λΩ̃` singular when the ratio of its smallest to
+  its largest eigenvalue was below 1e-10. That ratio depends on the units
+  of `X`'s columns and on the scale of the penalty. A percentage column
+  makes the largest eigenvalue large, and at `k = 16`, `λ = 0.1` the ratio
+  was 3.8e-11, so the fit was refused. The message blamed an intercept in
+  `X`, which was not there.
+- **Measured before the fix.** The same `G` with its diagonal scaled to one
+  (`D⁻¹GD⁻¹`, `D² = diag G`) has a ratio of 1.8e-4, and its Cholesky factor
+  exists. Standardising `X` only moves the point of refusal: the raw ratio
+  is then 5.8e-8, 6.9e-9 and 7.6e-10 at `λ` = 1, 0.1 and 0.01, falling
+  about tenfold with each tenfold fall in `λ`, while the equilibrated ratio
+  stays at 1.8e-4 to 1.9e-4.
+- **The fix.** The check is made on the equilibrated `D⁻¹GD⁻¹`, which does
+  not change when a column of `X` or the penalty is rescaled
+  (`_equilibrated_pd`). A genuine singularity, an intercept with a hat
+  basis, still gives an eigenvalue at rounding level there.
+
+**Testset 47i**: a design whose `x` is multiplied by 1e4 has a raw ratio
+of 8.8e-12, so the old rule refused it (the power check). It now runs, and
+`ρ̂`, `se`, `V̂` and the test-inversion set agree with the unscaled fit to
+4e-16 (tolerance 1e-8), with `β̂` scaled by 1e-4. An intercept in `X` is
+still refused at that scale.
+
+**What the data showed.** Without a surface, `ρ̂` is 0.74 (ML SAR) and
+0.73 (`root_rho`, CS [0.705, 0.754]). With a surface, it falls to 0.51
+and 0.48 at the stiffest fits (`k` = 16, 24, λ = 100) and to 0.31 and 0.27
+at the most flexible (λ = 0.1), without levelling off. The bias-aware
+interval, with the smoother as the pilot and `ℛ` stated as 1, 2 and 4
+times the roughness of the fitted surface, is [0.216, 0.323],
+[0.195, 0.343] and [0.139, 0.400] at `k` = 24, and chooses λ = 0.1 each
+time. The spatial lag survives the national trend in house values, at
+about a third of its size without one. The residuals are skewed (0.77),
+heavy-tailed (excess kurtosis 2.7) and heteroskedastic (Moran's I of `e²`
+z = 15.4).

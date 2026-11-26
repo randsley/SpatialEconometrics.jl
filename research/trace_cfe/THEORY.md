@@ -3481,6 +3481,54 @@ full square, with a 15 × 15 hat basis of full rank, where both pilots run.
   at m = 4 (`examples/34_root_rho.jl`, section 8). It does not give a
   general stopping rule.
 
+## A third real-data run: the Dutch districts (2026-11-26)
+
+`tc_netherlands_districts.jl`: the 3,182 Dutch districts (wijken) of CBS's
+Wijk- en Buurtkaart 2023 (notebooks/data; the CBS credit, CC BY 4.0, is in
+the script and the provenance file). y = log mean WOZ value of a dwelling;
+X = log density, % owner-occupied, % with a country of origin outside
+Europe. W is queen contiguity (5.6 neighbours on average). House values
+have a strong national gradient, so this is a harder test of whether the
+lag is a trend than the Portuguese income data.
+
+**What was found in the code.** The positive-definiteness check of
+`Z′Z + λΩ̃` used the raw eigenvalue ratio, which depends on the units of
+`X`; with two percentage columns it refused the fit at `k = 16`,
+λ = 0.1 (AUDIT 38, fixed: the check is now made on the equilibrated
+matrix). The smoother pilot ran with no unit left out of `𝒪`. Each
+bias-aware fit (four λ) took 6 to 9 s.
+
+**What was found in the data.** `ρ̂` (queen):
+
+| fit | k = 16 | k = 24 |
+|---|---|---|
+| ML SAR, no surface | 0.742 | |
+| `root_rho`, no surface | 0.729, CS [0.705, 0.754] | |
+| smoother, λ = 100 | 0.509 (df 15.5) | 0.478 (df 20.7) |
+| smoother, λ = 10 | 0.421 (df 32.4) | 0.392 (df 46.9) |
+| smoother, λ = 1 | 0.347 (df 69.0) | 0.321 (df 109.3) |
+| smoother, λ = 0.1 | 0.309 (df 116.4) | 0.269 (df 209.8) |
+| bias-aware, `ℛ = ℛ̂` | [0.262, 0.356] | [0.216, 0.323] |
+| bias-aware, `ℛ = 2ℛ̂` | [0.251, 0.367] | [0.195, 0.343] |
+| bias-aware, `ℛ = 4ℛ̂` | [0.216, 0.402] | [0.139, 0.400] |
+
+(`ℛ̂` = 2.01 and 2.16, the roughness of the λ = 1 surface. The bias-aware
+interval chooses λ = 0.1 in all six.)
+
+- **The lag survives, but small.** Every interval excludes 0, at
+  `4ℛ̂` too. The surface takes about 60% of the no-surface `ρ̂`, against
+  about a third on the parishes.
+- **The drift is steeper.** From 0.509 to 0.269 over `df` 15 to 210, with
+  no plateau, and the two `k` disagree at the flexible end by more than
+  the drift on the parishes. The intervals at `k` = 16 and 24 overlap at
+  every m, so they are consistent, but neither `k` is a stopping point:
+  item 8(c) stays open. A larger `k` or a smaller λ was not tried here.
+- **The errors.** Residual skewness 0.77, excess kurtosis 2.7, Moran's I
+  of `e²` z = 15.4, much more clustered than on the parishes (7.8). The
+  largest residuals are rich suburbs (Huizen +5.9, Wassenaar +5.4,
+  Aerdenhout +5.0 standard deviations). So item 3, a usable
+  heteroskedastic constant, binds harder here.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1

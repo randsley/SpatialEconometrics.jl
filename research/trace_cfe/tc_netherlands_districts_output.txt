@@ -1,0 +1,32 @@
+n = 3182 districts; extent 260 km (E–W) × 303 km (N–S)
+y = log house value: median 5.919, range 5.037–7.488 (max: Wijk 02 Buitenwijken (Huizen))
+W queen: links 8853, neighbours per unit 1–22 (mean 5.56)
+
+ML SAR, no surface: ρ̂ 0.742 (se 0.011), β̂ -0.0218, +0.007466, +0.006174
+root_rho, no surface: ρ̂ 0.729, CS [0.705, 0.754]
+
+k = 16: K = 259, rank [X, basis] = 167, 92 basis functions with no unit
+  λ = 100   df   15.5  max Sᵢᵢ 0.029  ρ̂ 0.509  CS [0.474, 0.544]  (4s)
+  λ = 10    df   32.4  max Sᵢᵢ 0.065  ρ̂ 0.421  CS [0.384, 0.459]  (1s)
+  λ = 1     df   69.0  max Sᵢᵢ 0.210  ρ̂ 0.347  CS [0.306, 0.388]  (1s)
+  λ = 0.1   df  116.4  max Sᵢᵢ 0.492  ρ̂ 0.309  CS [0.265, 0.353]  (1s)
+  bias-aware, ℛ̂ = 2.011 (the surface at λ = 1):
+    1·ℛ̂: λ 0.1, ρ̂ 0.309, interval [0.262, 0.356], b̄/√V̂ 0.40, pilot penalised (left out 0); half-lengths 0.047 0.076 0.191 0.547 (9s)
+    2·ℛ̂: λ 0.1, ρ̂ 0.309, interval [0.251, 0.367], b̄/√V̂ 0.96, pilot penalised (left out 0); half-lengths 0.058 0.125 0.367 1.093 (6s)
+    4·ℛ̂: λ 0.1, ρ̂ 0.309, interval [0.216, 0.402], b̄/√V̂ 2.52, pilot penalised (left out 0); half-lengths 0.093 0.251 0.772 2.267 (6s)
+k = 24: K = 579, rank [X, basis] = 346, 232 basis functions with no unit
+  λ = 100   df   20.7  max Sᵢᵢ 0.035  ρ̂ 0.478  CS [0.442, 0.514]  (2s)
+  λ = 10    df   46.9  max Sᵢᵢ 0.109  ρ̂ 0.392  CS [0.353, 0.431]  (2s)
+  λ = 1     df  109.3  max Sᵢᵢ 0.350  ρ̂ 0.321  CS [0.280, 0.363]  (2s)
+  λ = 0.1   df  209.8  max Sᵢᵢ 0.759  ρ̂ 0.269  CS [0.224, 0.315]  (2s)
+  bias-aware, ℛ̂ = 2.157 (the surface at λ = 1):
+    1·ℛ̂: λ 0.1, ρ̂ 0.269, interval [0.216, 0.323], b̄/√V̂ 0.67, pilot penalised (left out 0); half-lengths 0.054 0.090 0.209 0.630 (9s)
+    2·ℛ̂: λ 0.1, ρ̂ 0.269, interval [0.195, 0.343], b̄/√V̂ 1.56, pilot penalised (left out 0); half-lengths 0.074 0.157 0.412 1.283 (9s)
+    4·ℛ̂: λ 0.1, ρ̂ 0.269, interval [0.139, 0.400], b̄/√V̂ 4.00, pilot penalised (left out 0); half-lengths 0.130 0.329 0.904 2.751 (9s)
+
+Residual diagnostics: penalised k = 24, λ = 1
+  residual skewness 0.77, excess kurtosis 2.73
+  Moran's I of e²: Global Moran's I Test (asymptotic)
+  I = 0.169582    E[I] = -0.000314    z = 15.3689    p = 0.0000
+
+  largest |standardised residuals|: Wijk 02 Buitenwijken (Huizen) +5.9, Wijk 00 Zuidwestelijk deel der gemeente (Wassenaar) +5.4, Wijk 02 Aerdenhout (Bloemendaal) +5.0, Wijk 05 Breukeleveen (Wijdemeren) +4.8, Wijk 06 Landelijk gebied (Alblasserdam) +4.6, Museumkwartier (Amsterdam) +4.6

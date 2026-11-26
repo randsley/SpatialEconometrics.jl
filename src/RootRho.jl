@@ -501,6 +501,17 @@ function _bias_pilot(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T}, Ws::SparseMatrix
             Rr2 = zero(T), info = (:projection, zero(T), 0))
 end
 
+# Z′Z + λΩ̃ is positive definite, judged on its equilibrated form D⁻¹GD⁻¹ (D² = diag G):
+# the eigenvalue ratio of G itself depends on the units of X's columns and of the penalty,
+# and refused well-conditioned designs with a column in percent (AUDIT 38).
+function _equilibrated_pd(Gm::Symmetric{T}) where {T}
+    dg = diag(Gm)
+    all(>(zero(T)), dg) || return false
+    Ds = Diagonal(1 ./ sqrt.(dg))
+    ev = eigvals(Symmetric(Ds * Gm * Ds))
+    return ev[1] > 1e-10 * ev[end]
+end
+
 # The smoother as the pilot (THEORY.md, Lemma 13). S_p = ZG_p⁻¹Z′ at λ_p, with its own
 # root ρ̂_p; S_py₀ = Z·(Hy₀) with H = G_p⁻¹Z′; the HC2 plug-in eᵢ²/mᵢ on 𝒪 = {mᵢ ≥ 0.01}
 # and 0 elsewhere; and M_pZN′ = λ_pZG_p⁻¹Ω̃N′, for the constants ω_p and ℛ²r_p².
@@ -510,8 +521,7 @@ function _bias_pilot_penalised(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T},
     n = length(y)
     Gm = Symmetric(Z' * Z .+ λp .* Ωt)
     F = cholesky(Gm; check = false)
-    ev = eigvals(Gm)
-    (issuccess(F) && ev[1] > 1e-10 * ev[end]) || throw(ArgumentError(
+    (issuccess(F) && _equilibrated_pd(Gm)) || throw(ArgumentError(
         "root_rho: Z′Z + λΩ̃ is singular at pilot_lambda = $λp, so the pilot smoother is " *
         "not defined; the message for `lambda` gives the usual cause"))
     H = F \ Matrix(Z')
@@ -1398,8 +1408,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     Ωt[(kx + 1):K, (kx + 1):K] .= Ω
     Gm = Symmetric(Z' * Z .+ λ .* Ωt)
     F = cholesky(Gm; check = false)
-    ev = eigvals(Gm)
-    (issuccess(F) && ev[1] > 1e-10 * ev[end]) || throw(ArgumentError(
+    (issuccess(F) && _equilibrated_pd(Gm)) || throw(ArgumentError(
         "root_rho: Z′Z + λΩ̃ is singular, so the smoother is not defined: some combination " *
         "of the columns of X and of the basis functions that the penalty leaves free (for " *
         "tensor_pspline with order = 2, those linear in each coordinate's knot index, the " *

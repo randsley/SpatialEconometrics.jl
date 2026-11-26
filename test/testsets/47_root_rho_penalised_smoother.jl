@@ -251,4 +251,32 @@
         # X itself must have full rank: it is not penalised.
         @test_throws "not penalised" root_rho(yt, hcat(x, 2 .* x), Wt; ps..., lambda = λt)
     end
+
+    @testset "47i. the positive-definiteness check does not depend on units" begin
+        # The check compared the eigenvalues of Z′Z + λΩ̃ themselves, so a column of X in large
+        # units (a percentage, a price) made a well-conditioned G look singular (AUDIT 38, found
+        # on the Dutch districts). The fit is invariant to the scale of X's columns, and so must
+        # the check be.
+        rng = MersenneTwister(47_009); g = 16; n = g^2
+        P = hcat(repeat(0:g-1, inner = g), repeat(0:g-1, outer = g)) .+ rand(rng, n, 2); P ./= g
+        Wi = knn_weights(P, 6); x = randn(rng, n)
+        ps = tensor_pspline(P[:, 1], P[:, 2]; k = 8)
+        f = 0.5 .* x .+ sin.(2π .* P[:, 1]) .* cos.(π .* P[:, 2])
+        yi = lu(sparse(I - 0.4 * Wi)) \ (f .+ randn(rng, n))
+        c = 1e4; λi = 0.01
+        Z = hcat(c .* x, ps.basis); K = size(Z, 2)
+        Ωt = zeros(K, K); Ωt[2:end, 2:end] = ps.penalty
+        ev = eigvals(Symmetric(Z' * Z + λi * Ωt))
+        @test ev[1] < 1e-10 * ev[end]           # power: the old rule refused this design
+        @test isposdef(Symmetric(Z' * Z + λi * Ωt))
+        r1 = root_rho(yi, reshape(x, :, 1), Wi; ps..., lambda = λi)
+        rc = root_rho(yi, reshape(c .* x, :, 1), Wi; ps..., lambda = λi)
+        @test rc.rho ≈ r1.rho rtol = 1e-8
+        @test rc.se ≈ r1.se rtol = 1e-8
+        @test rc.vhat ≈ r1.vhat rtol = 1e-8
+        @test length(rc.cs) == length(r1.cs) && all(isapprox.(first.(rc.cs), first.(r1.cs); atol = 1e-6))
+        @test rc.beta[1] * c ≈ r1.beta[1] rtol = 1e-6
+        # The genuine case is still refused at any scale: an intercept with the hat basis.
+        @test_throws "intercept" root_rho(yi, hcat(fill(c, n), x), Wi; ps..., lambda = λi)
+    end
 end
