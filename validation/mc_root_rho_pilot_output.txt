@@ -1,0 +1,34 @@
+root_rho's bias-aware interval with the smoother as the pilot (Proposition 7″)
+Julia 1.13.4, 14 threads, R = 300 per cell, λ grid 10^(-2:0.5:2)
+
+Design A: n = 900, K = 226, rank [x, B] = 137, 89 basis functions with no unit
+ a = 1, ℛ* = 4.529
+  ℛ = 0                  cover 0.550  half-length 0.0637  bias +0.0585  sd 0.0327  mean b̄/√V̂ 0.00  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 0, 0, 0, 0, 0, 0, 0, 300]
+  ℛ = ℛ*                 cover 0.953  half-length 0.0912  bias -0.0008  sd 0.0442  mean b̄/√V̂ 0.47  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 0, 41, 247, 12, 0, 0, 0, 0]
+  ℛ = 4ℛ*                cover 0.940  half-length 0.1077  bias -0.0011  sd 0.0562  mean b̄/√V̂ 0.25  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 299, 1, 0, 0, 0, 0, 0, 0, 0]
+ a = 4, ℛ* = 18.115
+  ℛ = 0                  cover 0.000  half-length 0.0360  bias +0.3113  sd 0.0142  mean b̄/√V̂ 0.00  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 0, 0, 0, 0, 0, 0, 0, 300]
+  ℛ = ℛ*                 cover 0.973  half-length 0.1050  bias +0.0016  sd 0.0484  mean b̄/√V̂ 0.26  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 298, 2, 0, 0, 0, 0, 0, 0, 0]
+  ℛ = 4ℛ*                cover 1.000  half-length 0.1617  bias +0.0017  sd 0.0485  mean b̄/√V̂ 1.47  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 300, 0, 0, 0, 0, 0, 0, 0, 0]
+
+Design B: n = 900, K = 226, rank [x, B] = 226 (full)
+ a = 1, ℛ = ℛ* = 1.598
+  pilot = :projection    cover 0.960  half-length 0.1007  bias +0.0055  sd 0.0480  mean b̄/√V̂ 0.40  m 300  pilot projection (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 0, 0, 2, 94, 196, 7, 1, 0]
+  pilot = :penalised     cover 0.960  half-length 0.1009  bias +0.0052  sd 0.0479  mean b̄/√V̂ 0.40  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 0, 0, 2, 95, 199, 4, 0, 0]
+      half-length, smoother pilot / projection pilot: 1.002
+ a = 4, ℛ = ℛ* = 6.393
+  pilot = :projection    cover 0.970  half-length 0.1300  bias +0.0124  sd 0.0565  mean b̄/√V̂ 0.63  m 300  pilot projection (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 10, 216, 74, 0, 0, 0, 0, 0]
+  pilot = :penalised     cover 0.973  half-length 0.1303  bias +0.0129  sd 0.0563  mean b̄/√V̂ 0.63  m 300  pilot penalised (left out ≤ 0)
+      λ picks (0, 10^(-2:0.5:2)): [0, 0, 6, 229, 65, 0, 0, 0, 0, 0]
+      half-length, smoother pilot / projection pilot: 1.003
+
+Pass criteria (1) and (2): FAIL

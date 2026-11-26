@@ -37,7 +37,9 @@ its concentration, and Proposition 6″ gives `CS`'s coverage when K/n → θ > 
 (`tc_hc2_worst.jl`, `tc_hc2_rate.jl`). Lemma 11 extends the rate to
 heteroskedastic errors with a bounded variance ratio (`tc_hc2_hetero.jl`,
 `tc_hc2_hetero_rate.jl`), and Lemma 12 gives the exact worst case with
-skewed errors (`tc_hc2_skew.jl`). The
+skewed errors (`tc_hc2_skew.jl`). On 2026-11-26, Lemma 13 and
+Proposition 7″ make the smoother the bias-aware interval's pilot, so the
+interval runs on irregular regions (`validation/mc_root_rho_pilot.jl`). The
 bias-aware interval is compared with Armstrong & Kolesár's, and their
 optimal combination of moments is measured (`tc_combine.jl`).
 The numerical checks are in `tc_clt.jl`, `tc_schatten.jl`, `tc_clt_moments.jl`
@@ -100,6 +102,7 @@ line to line; named constants carry a subscript (`c_W`, `c_G`, `c_L`, `c_𝔭`, 
 | `B_k`, `𝒦`, `𝒢_𝒦` | Corollary 7′: a set of bases, its index set, and the grid of (basis, λ) pairs |
 | `z̃`, `ã`, `H̃`, `TR`, `b_TR`, `b̂_min` | Lemma 6 and Proposition 8: `Π̃^{1/2}ψ̃₁`; `Π̃^{+1/2}ṽ`; `Π̃^{+1/2}sym(Q̃)Π̃^{+1/2}`; the trust-region maximum; the joint bound; the smaller of the two plug-in bounds |
 | `β(ϱ)`, `β*`, `c_β*`, `r̄` | Proposition 1′: `f′C(ϱ)f`; `β(ρ₀)`; `β*/√V*`; Proposition 7′: `ℛ̃‖MB̃Π̃^{+1/2}‖_op`, the largest `‖Mf‖` over `F̃(ℛ̃)` |
+| `S_p`, `λ_p`, `M_p`, `mᵢ`, `Υ_p`, `𝒪`, `ω_p`, `r_p`, `c̄_p`, `q̂_p` | Lemma 13: the pilot smoother and its λ; `I − S_p`; `(M_p²)ᵢᵢ`; `NTS_p`; the units with `mᵢ ≥ m̲`; `‖NTM_pZN′‖_op`; `‖M_pZN′‖_op`; `max_{𝒪} cᵢ/mᵢ`; the pilot's plug-in |
 | `θ` | the limit of `K/n` |
 | `κ_W`, `n_W`, `X`, `ωⱼ`, `φⱼ`, `πⱼ` | Proposition 5: `‖W‖_F² ≥ κ_W n`; neighbours per row; `Ws + D`; its eigenvalues and eigenvectors; their overlaps with `B` |
 | `Y` | a generic matrix (Lemmas 2 and 3, and the bound after Lemma 3) |
@@ -3305,6 +3308,179 @@ smoother itself, or a projection on the occupied cells only); a usable
 heteroskedastic constant, since the real errors are heteroskedastic; and a
 rule for the flexible end when `ρ̂` does not level off.
 
+## A smoother as the pilot (2026-11-25)
+
+Proposition 7's plug-in estimates `q = v′Π⁺v` from the projection
+`P_Zy₀(ρ̂₀)`. On an irregular region the projection does not run at the `k`
+the smoother needs ("Two real-data runs"): a unit alone in the support of a
+basis function has leverage 1, and `Z` is rank-deficient. Here the pilot is
+a second smoother, `S_p = Z G_p⁻¹Z′` with `G_p = Z′Z + λ_pΩ̃`, `λ_p > 0` and
+the candidates' own penalty `Ω̃`. It needs only `G_p ≻ 0`, as the smoother
+itself does (AUDIT 37). The price is that it shrinks `f`, so it estimates
+`‖Υ_pf‖`, not `‖Υf‖`. Lemma 13 bounds the gap by two constants that the
+data do not enter.
+
+Notation, in `root_rho`'s terms. `Z = [X, B]`, and `Ω̃` is the penalty on
+`Z` (zero on the `X` block). `N` has rows spanning `range(Ω̃)` and
+`N′N = Ω̃⁺` (`_penalty_parts`). For a candidate `λ`, `T = Z′M_λW`, so
+Lemma 4's linear term is `ℛ‖NTf‖` and `q = ‖NTf‖²`. For the pilot,
+`M_p = I − S_p`, `mᵢ = (M_p²)ᵢᵢ`, `Υ_p = NTS_p` and `cᵢ = ‖Υ_peᵢ‖²`. Fix
+`m̲ ∈ (0, 1)` (0.01 in the package), let `𝒪 = {i : mᵢ ≥ m̲}`, and
+
+- `ω_p = ‖NTM_pZN′‖_op`, the pilot's shrinkage seen through the candidate;
+- `r_p = ‖M_pZN′‖_op`, the largest `‖M_pf‖/ℛ` over the class;
+- `c̄_p = max_{i∈𝒪} cᵢ/mᵢ`.
+
+`M_pZ = λ_pZG_p⁻¹Ω̃`, so both norms are of `K`-column matrices.
+
+**Lemma 13 (a smoother as the pilot; proved).** Let `f = Zψ` with
+`ψ′Ω̃ψ ≤ ℛ²`, and `y₀ = f + ε` with independent errors, `E εᵢ = 0`,
+`E εᵢ² = σᵢ² ≤ σ̄²`. Let `e = M_py₀`, `ŝᵢ = eᵢ²/mᵢ` for `i ∈ 𝒪` and
+`ŝᵢ = 0` otherwise, and
+
+    q̂_p = ‖Υ_py₀‖² − Σᵢ cᵢŝᵢ + c̄_p ℛ²r_p².
+
+Then:
+
+(a) `‖NTf‖ ≤ ‖NTS_pf‖ + ℛω_p`, and `‖M_pf‖ ≤ ℛr_p`.
+
+(b) `E‖Υ_py₀‖² = ‖NTS_pf‖² + Σᵢ σᵢ²cᵢ`.
+
+(c) `E Σᵢ cᵢŝᵢ = Σ_{i∈𝒪} cᵢ((M_pf)ᵢ² + Σⱼ(M_p)ᵢⱼ²σⱼ²)/mᵢ`.
+
+(d) `E q̂_p ≥ ‖NTS_pf‖² + Σ_{i∉𝒪} σᵢ²cᵢ − Δ`, with
+`|Δ| ≤ σ̄²m̲⁻¹ Σᵢ cᵢ(S_p²)ᵢᵢ ≤ σ̄²m̲⁻¹‖Υ_p‖_op‖Υ_p‖_F (tr S_p²)^{1/2}`. With
+equal variances, `Δ = 0`.
+
+*Proof.* (a) Split `ψ = ψ₀ + ψ₁` with `ψ₀ ∈ null(Ω̃)` and
+`ψ₁ ∈ range(Ω̃)`. As in Lemma 4(a), `G_pψ₀ = Z′Zψ₀`, so `S_pZψ₀ = Zψ₀` and
+`M_pf = M_pZψ₁`. With `N = Λ^{−1/2}E′` (`E` the eigenvectors of `Ω̃` on its
+range, `Λ` their eigenvalues), `z = Λ^{1/2}E′ψ₁` gives `N′z = EE′ψ₁ = ψ₁`
+and `‖z‖² = ψ′Ω̃ψ ≤ ℛ²`. So `M_pf = M_pZN′z`, which gives the second
+claim, and `NTf = NTS_pf + NTM_pZN′z`, which gives the first.
+(b) `Υ_pf = NTS_pf`, and `E ε′Υ_p′Υ_pε = Σᵢ σᵢ²cᵢ` for independent,
+mean-zero errors.
+(c) `eᵢ = (M_pf)ᵢ + (M_pε)ᵢ`, so `E eᵢ² = (M_pf)ᵢ² + Σⱼ(M_p)ᵢⱼ²σⱼ²`.
+(d) By (b) and (c), `E q̂_p − ‖NTS_pf‖²` is the sum of three parts.
+- `c̄_pℛ²r_p² − Σ_{i∈𝒪} cᵢ(M_pf)ᵢ²/mᵢ ≥ c̄_pℛ²r_p² − c̄_p‖M_pf‖² ≥ 0`, by (a).
+- `Σ_{i∉𝒪} σᵢ²cᵢ`.
+- `Σ_{i∈𝒪} cᵢ(σᵢ² − Σⱼ(M_p)ᵢⱼ²σⱼ²/mᵢ) =: −Δ`. Since `mᵢ = Σⱼ(M_p)ᵢⱼ²`,
+  the bracket is `Σ_{j≠i}(S_p)ᵢⱼ²(σᵢ² − σⱼ²)/mᵢ`, which is 0 with equal
+  variances and at most `σ̄²(S_p²)ᵢᵢ/m̲` in absolute value. The eigenvalues
+  of `S_p` are in `[0, 1]`, so `(S_p²)ᵢᵢ ≤ 1` and
+  `Σᵢ(S_p²)ᵢᵢ² ≤ tr S_p²`. Cauchy–Schwarz with
+  `Σcᵢ² ≤ maxᵢcᵢ · Σcᵢ ≤ ‖Υ_p‖_op²‖Υ_p‖_F²` gives the last bound. ∎
+
+So the plug-in errs upwards, except for `Δ`. Units outside `𝒪` are not
+dropped: their `σᵢ²cᵢ` stays in `q̂_p`, which makes it larger. Nothing in
+(d) needs `Z` to have full rank, or a unit to have leverage below 1 in a
+projection.
+
+**Proposition 7″ (the bias-aware interval with a smoother as the pilot;
+proved, given Proposition 7 and Lemma 13).** In Proposition 7, replace
+`ρ̂₀` by the root `ρ̂_p` of the pilot smoother's moment `A_p` (the sign
+rule), the debiased `q̂_λ` by `q̂_p` of Lemma 13 at `y₀(ρ̂_p)` (with
+`e = M_py₀(ρ̂_p)`), and the bound by
+
+    b̂_λ = ℛ(q̂_p)₊^{1/2} + ℛ²(χ̄_λ + ω_{p,λ}),   t̂_λ = b̂_λ/√V̂_λ.
+
+Assume, along `f = f_n ∈ F(ℛ)`:
+- (i″) the conditions of Proposition 4(c) and of the Corollary for `A_p`,
+  with `|f′A_pf|/√V_p = O(1)`, so that `ρ̂_p − ρ₀ = O_p(n^{−1/2})`;
+- (ii) and (iii) of Proposition 7;
+- (iv″) (iv) with `Υ_p` in place of `Υ_λ` and `tr S_p²` in place of `K`:
+  `u_p = ℛ‖Υ_p‖_op/√V_λ → 0`, `w_p = ℛ‖Υ_p‖_F/√V_λ = O(1)`, and
+  `u_p(tr S_p²)^{1/2} → 0`;
+- (v″) `u_pℛr_p = O(1)`.
+
+Then (a), (c) and (d) of Proposition 7 hold, and so does (b) with
+`ℓ⁺_λ = cv(t̄⁺_λ)√V_λ/J_λ`, where
+`t̄⁺_λ = (ℛ(q⁺)₊^{1/2} + ℛ²(χ̄_λ + ω_{p,λ}))/√V_λ` and `q⁺ = E q̂_p` at
+`ρ₀`.
+
+*Proof.* Follow Proposition 7, step 2, with `Υ_p` for `Υ`.
+- **The square.** `‖Υ_py₀(ρ̂_p)‖²` expands as in step 2, with `t₀ = ρ̂_p − ρ₀`.
+  Its terms beyond `‖Υ_pf‖² + ‖Υ_pε‖²` are `o_p(V/ℛ²)` under (iv″).
+- **The correction.** `Σ_{i∈𝒪} cᵢeᵢ²/mᵢ = y₀′M_pDM_py₀`, with
+  `D = diag(cᵢ/mᵢ)` on `𝒪` and 0 elsewhere.
+  - Its quadratic part in `ε` has variance at most `c‖M_pDM_p‖_F² ≤ c‖D‖_F²`,
+    since `‖M_p‖_op ≤ 1`. Also `‖D‖_F² ≤ m̲⁻²Σcᵢ² ≤ m̲⁻²‖Υ_p‖_op²‖Υ_p‖_F²`.
+    Scaled by `ℛ²/V`, it is `O_p(u_pw_p) → 0`.
+  - Its linear part, `2f′M_pDM_pε`, has variance at most
+    `4σ̄²c̄_p²‖M_pf‖² ≤ 4σ̄²c̄_p²ℛ²r_p²`. With `c̄_p ≤ ‖Υ_p‖_op²/m̲`, it is
+    `O_p(u_p²ℛr_p) = O_p(u_p) → 0` when scaled, by (v″).
+  - Moving from `ρ₀` to `ρ̂_p` changes `eᵢ` by `−t₀(M_pWy)ᵢ`. With `mᵢ ≥ m̲`
+    on `𝒪`, step 2's bound applies with `M_p` for `M₀`.
+- **The constant.** `ℛ²c̄_pℛ²r_p²/V ≤ (u_pℛr_p)²/m̲ = O(1)` by (v″). So it is
+  bounded, and it is not random.
+- **Lemma 13(d).** `ℛ²|Δ|/V ≤ σ̄²m̲⁻¹·w_p·u_p(tr S_p²)^{1/2} → 0` by (iv″).
+
+So `ℛ²(q̂_p − q⁺)/V → 0` in probability, and `t̂_λ − t̄⁺_λ → 0`. By
+Lemma 13(a) and (d), `ℛ√q ≤ ℛ‖NTS_pf‖ + ℛ²ω_p ≤ ℛ(q⁺ + |Δ|)^{1/2} + ℛ²ω_p`,
+since `‖NTS_pf‖² ≤ q⁺ + |Δ|` by Lemma 13(d). So `t̄⁺_λ ≥ t̄_λ − o(1)`. `cv` is increasing and 1-Lipschitz (step 1), so
+`cv(t̂_λ) ≥ cv(t̄_λ) − o_p(1)`, and steps 3 and 4 apply unchanged. For (b),
+the half-lengths converge to `ℓ⁺_λ`, which is deterministic. ∎
+
+**What the pilot costs, and how to choose `λ_p`.** `ω_p` and `c̄_pr_p²`
+are paid at every `ℛ`. As `λ_p → 0`, `S_p` tends to `P_Z` when
+`G_p ≻ 0`, so `M_pZ → 0` and both constants vanish: the pilot becomes the
+projection, and Proposition 7's plug-in is recovered where the projection
+runs. But on an irregular region the units of leverage 1 then have
+`mᵢ → 0`. They leave `𝒪` and add their `σᵢ²cᵢ` to `q̂_p`. A larger `λ_p`
+keeps them in `𝒪` and makes `q̂_p` less noisy, but `ω_p` and `r_p` grow.
+Neither end is always better, so `λ_p` is a tuning constant, not an
+estimate. Any fixed `λ_p` gives valid intervals. Choosing it from the data
+by the length of the interval needs Bonferroni, as in Proposition 7(c).
+The package uses the smallest candidate λ by default.
+
+**Measured** (`validation/mc_root_rho_pilot.jl`, through `root_rho`, R = 300
+per cell, λ on `10^(-2:0.5:2)`, the pilot at `λ_p = 0.01`). Design A: n = 900
+uniform on the triangle `u + v ≤ 1`, `tensor_pspline(u, v; k = 15)` over the
+box (89 of 225 columns empty, rank 137 of 226), kNN-6, heteroskedastic
+normal errors, `f = x + a·sin(2πu)cos(πv)`. Design B: the same `f` on the
+full square, with a 15 × 15 hat basis of full rank, where both pilots run.
+
+| design | `a` | `ℛ` | coverage | half-length | mean `b̂/√V̂` |
+|---|---|---|---|---|---|
+| A | 1 | 0 | 0.550 | 0.064 | 0 |
+| A | 1 | `ℛ*` | 0.953 | 0.091 | 0.47 |
+| A | 1 | `4ℛ*` | 0.940 | 0.108 | 0.25 |
+| A | 4 | 0 | 0.000 | 0.036 | 0 |
+| A | 4 | `ℛ*` | 0.973 | 0.105 | 0.26 |
+| A | 4 | `4ℛ*` | 1.000 | 0.162 | 1.47 |
+| B, projection pilot | 1 | `ℛ*` | 0.960 | 0.1007 | 0.40 |
+| B, smoother pilot | 1 | `ℛ*` | 0.960 | 0.1009 | 0.40 |
+| B, projection pilot | 4 | `ℛ*` | 0.970 | 0.1300 | 0.63 |
+| B, smoother pilot | 4 | `ℛ*` | 0.973 | 0.1303 | 0.63 |
+
+- **Validity holds in every cell.** No cell with `ℛ ≥ ℛ*` covers below
+  0.940 (Monte Carlo SE 0.013). The criterion set before the run was
+  0.93–0.99, and one cell is above it: A, `a = 4`, `4ℛ*`, at 1.000. That is
+  the conservative side, and it has a cause. `ω_p` and `c̄_pℛ²r_p²` grow with
+  `ℛ²`, and the chosen λ is then the pilot's own (0.01), where `b̂/√V̂` is
+  1.47 against 0.26 at `ℛ*`. So an `ℛ` that is too large costs more length
+  with this pilot than with the projection. The criterion is recorded as
+  failed in the output, and not moved.
+- **Power.** Without a bias allowance the shrinkage bias is not covered
+  (0.550 and 0.000), so the constants are doing work.
+- **Where both pilots run, the smoother costs nothing.** In design B the
+  half-lengths agree to 0.3%, and the coverages to one draw in 300. At
+  `λ_p = 0.01` the pilot is close to the projection, as the remark above
+  predicts.
+- **No unit left `𝒪`** in any draw of either design.
+- **Real data.** On the 2,882 Portuguese parishes (queen, `k` = 24,
+  λ ∈ {0.1, 1, 10, 100}), with `ℛ` stated as m times the roughness `ℛ̂` of
+  the smoother's own surface at λ = 1, the chosen interval is
+  [0.370, 0.487], [0.355, 0.502] and [0.310, 0.547] for m = 1, 2 and 4, and
+  λ = 0.1 is chosen each time. On the 278 municipalities (`k` = 12) it is
+  [−0.16, 0.47] to [−0.34, 0.64]. The stiff fits, whose `ρ̂` is near 0.5 on
+  the parishes, get half-lengths from 0.34 (m = 1) to 1.7 (m = 4), so their
+  upward bias is priced and they are not chosen. That answers item 8(c) for
+  this data set: the drift of `ρ̂` with `df` is within what the bound allows
+  for the stiff fits, and the interval at the flexible end excludes 0 even
+  at m = 4 (`examples/34_root_rho.jl`, section 8). It does not give a
+  general stopping rule.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
@@ -3533,11 +3709,11 @@ linear in `y`.
 7. A9's sign is assumed, not derived. `J < 0` occurs in 0.7% of the hub
    designs of `tc_sign.jl` and in none of the kNN designs measured. A
    condition on `W` and `f` that rules it out is open.
-8. From the two real-data runs (the section "Two real-data runs"). (a) The
-   bias-aware interval's pilot is a projection, which on an irregular
-   region runs only at small `k` (`k = 6` on 2,882 parishes), so the
-   interval cannot be used where it is most needed; a pilot from the
-   smoother, or a projection on the occupied cells only, is open. (b) Real
+8. From the two real-data runs (the section "Two real-data runs"). (a)
+   Done 2026-11-26: the smoother as the pilot (Lemma 13, Proposition 7″,
+   "A smoother as the pilot"), with `pilot = :auto` in `root_rho`. Not done:
+   the smoother pilot with a `reference` basis (Lemma 5's split uses the
+   projection), and a data-driven `λ_p`. (b) Real
    errors are heteroskedastic with spatially clustered variance, so the
    heteroskedastic constant of item 3 is the one that matters. (c) `ρ̂`
    drifted down as `df` grew, with no plateau up to `df` 226; a rule for

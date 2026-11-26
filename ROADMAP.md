@@ -8,8 +8,8 @@
 > the 2,882 mainland Portuguese parishes in `notebooks/data`, with
 > notebook 11's section 7. No tag is registered.
 >
-> 33 submodules, 4,406 test assertions in 69 top-level testsets with both
-> package extensions installed and 4,371 (plus 2 broken markers) without
+> 33 submodules, 4,480 test assertions in 70 top-level testsets with both
+> package extensions installed and 4,445 (plus 2 broken markers) without
 > them, measured on 2026-11-26 on Julia 1.13.4, and without them on 1.10.14.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
 > 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
@@ -1813,6 +1813,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **master** (+ `root_rho`'s `vhat_worst_bias`, Lemmas 7–10 and Proposition 6″) | 33 | 4,372 ¶¹⁴ | 30,275 |
 | **master** (+ `root_rho(...; skewness)`, Lemmas 11–12) | 33 | 4,391 ¶¹⁵ | 30,345 |
 | **v0.8.0** (tagged 2026-11-26; + the smoother without a full-rank basis, AUDIT 37) | 33 | 4,406 ¶¹⁶ | 30,385 |
+| **master** (+ the smoother as the bias-aware interval's pilot, Lemma 13 and Proposition 7″) | 33 | 4,480 ¶¹⁷ | 30,505 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1999,8 +2000,17 @@ with both extensions, and 4,371 plus 2 broken on 1.10.14 without them, both
 basis is rank-deficient; AUDIT 37). Its assertions hold with margins of at
 least 1e6×. The `src/` count rose by 40, all in `RootRho.jl`.
 
-Measured on `v0.8.0`: 33 submodules plus the umbrella across 30,385 lines of
-`src/`, 12,303 lines of tests, 5,397 lines of examples across 34 scripts,
+¶¹⁷ Measured locally on 2026-11-26: 4,480 passed on Julia 1.13.4 with both
+extensions, and 4,445 plus 2 broken on 1.10.14 without them, both 74 above
+¶¹⁶: testset 53 (the smoother as the pilot, on a triangle where the basis is
+rank-deficient). Its comparisons with a dense reference agree to 3e-15
+against a tolerance of 1e-8. Its Monte Carlo statistic (`E q̂_p`, Lemma
+13(d)) is z = +0.25 on 1.13 and +2.27 on 1.10 against a bound of 4; the two
+versions draw different errors from the same seed. The `src/` count rose by
+120, all in `RootRho.jl`.
+
+Measured on master: 33 submodules plus the umbrella across 30,505 lines of
+`src/`, 12,441 lines of tests, 5,464 lines of examples across 34 scripts,
 398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 

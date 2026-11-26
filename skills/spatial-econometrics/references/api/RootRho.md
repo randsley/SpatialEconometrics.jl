@@ -67,6 +67,12 @@ The result of [`root_rho`](@ref).
 - `basis_grid`, `basis_index` — with a vector of bases, the basis of each
   candidate in `lambda_grid` (an index into the vector), and the index of
   the chosen one. Empty and 0 otherwise.
+- `pilot`, `pilot_lambda`, `pilot_left_out` — the fit from which the
+  bias-aware interval estimates `f`: `:projection` (on `[X, basis]`),
+  `:penalised` (the smoother at `λ_p = pilot_lambda`; THEORY.md, Lemma 13),
+  or `:none` when no bias-aware interval was asked for. `pilot_left_out` is
+  the number of units with `(M_p²)ᵢᵢ < 0.01`, left out of the pilot's
+  variance correction; leaving them out makes the bound larger, not smaller.
 
 ## `basis_roughness`
 
@@ -101,7 +107,7 @@ for `order = 2`) give 0.
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
              roughness = nothing, bonferroni = false, reference = nothing,
              varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
-             max_dense_n = 4000, skewness = 0)
+             max_dense_n = 4000, skewness = 0, pilot = :auto, pilot_lambda = nothing)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -185,6 +191,12 @@ and with `skewness > 0` an SVD of the `n × K` matrix `C′[X, basis]`.
   [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
   so that `f` need not lie in `span(basis)` (see below). Then `roughness`
   may be given without `penalty`, for the projection alone.
+- `pilot`, `pilot_lambda` — the fit from which the bias-aware interval
+  estimates `f` (see "On an irregular region"): `:projection` (on
+  `[X, basis]`), `:penalised` (the smoother at `λ_p = pilot_lambda`, by
+  default the smallest of `lambda`), or `:auto` (the default): the projection
+  if it runs, else the smoother. The smoother as the pilot needs `penalty`
+  and no `reference`.
 - `skewness` — a bound `γ̄ ≥ 0` on the errors' `|skewness|`, used only for
   `vhat_worst_bias` (0 by default: symmetric errors). It does not change
   the estimate or the intervals.
@@ -223,8 +235,9 @@ result also holds the interval
 ```
 
 where `b̄` bounds `|β|` for every `f = [X, basis]ψ` with `ψ′Πψ ≤ ℛ²`
-(THEORY.md, Lemma 4), `v = (MZ)′Wf` is estimated from the projection (at Jin
-& Lee's first-step root, and debiased), `χ̄` bounds the quadratic part, and
+(THEORY.md, Lemma 4), `v = (MZ)′Wf` is estimated from a pilot fit (by default
+the projection, at Jin & Lee's first-step root, and debiased), `χ̄` bounds the
+quadratic part, and
 `cv(t)` is the `level` quantile of `|N(t, 1)|`. Its coverage holds uniformly
 over that class, whatever `λ` (Proposition 7), so `λ` no longer has to be
 small for the interval to be valid. With `ℛ = 0` it is the Wald interval.
@@ -235,6 +248,27 @@ shortest bias-aware interval; `lambda_grid` and `halflength_grid` record
 them all. Proposition 7 covers that choice when one candidate is clearly the
 shortest; `bonferroni = true` covers any choice, at a cost in length (about
 46% at `b̄ = 0` with 12 candidates).
+
+**On an irregular region.** The projection pilot needs `[X, basis]` of full
+rank and every leverage below 0.99. A [`tensor_pspline`](@ref) over a region
+that does not fill its bounding box (a coastline, a border) has basis
+functions with no unit, or a single unit, in their support, and fails both.
+Then the smoother at `λ_p` is the pilot (`pilot = :penalised`, or `:auto`):
+it needs only `Z′Z + λ_pΩ̃` invertible, as the smoother does. It shrinks `f`
+too, and the bound pays for that with two terms that depend on the design
+alone (THEORY.md, Lemma 13 and Proposition 7″): `ω_p`, added to `χ̄`, and
+`c̄_pℛ²r_p²`, added under the square root of the linear part. Units with
+`(M_p²)ᵢᵢ < 0.01` are left out of the pilot's variance correction, which
+makes the bound larger (`pilot_left_out` counts them). The projection is
+then not among the candidates. Any fixed `λ_p` gives a valid interval: a
+small one makes the two terms small but the plug-in noisier. In
+`validation/mc_root_rho_pilot.jl` (n = 900 on a triangle, 89 of the 225
+basis functions empty, R = 300), the chosen interval covered 0.953 and 0.973
+with `ℛ = ℛ*`, and 0.940 and 1.000 with `ℛ = 4ℛ*`: the pilot's two terms grow
+with `ℛ²`, so a too-large `ℛ` costs more length than with the projection
+pilot. Without a bias allowance (`ℛ = 0`) it covered 0.550 and 0.000. On the
+full square, where both pilots run, the smoother pilot covered 0.960 and
+0.973 and its interval was within 0.3% of the projection pilot's length.
 
 **`ℛ` is an assumption, not an estimate.** The data cannot certify an upper
 bound on the roughness, and every rule that estimated it under-covered

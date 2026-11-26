@@ -217,8 +217,8 @@ r = root_rho(y, X, W; ps..., lambda = 1.0)
 On the 278 mainland Portuguese municipalities, the projection ran only at
 `k = 4`, while the smoother ran at `k` = 8 to 16 for every `λ` tried
 (`research/trace_cfe/tc_portugal.jl`). The bias-aware interval (with
-`roughness`) still needs a full-rank `[X, B]`, because its pilot is a
-projection.
+`roughness`) then uses the smoother itself as its pilot, as described
+below.
 
 ## The bias-aware interval
 
@@ -226,8 +226,8 @@ Choosing `λ` small trades precision for validity. The bias-aware interval
 avoids that trade under one assumption: a bound `ℛ` on the roughness of `f`.
 Over the class `{f = [X, B]ψ : ψ′Πψ ≤ ℛ²}`, with `Π` the penalty, the
 shrinkage bias satisfies `|f′Af| ≤ b̄ = ℛ√(v′Π⁺v) + ℛ²χ̄`, where
-`v = (MZ)′Wf` is estimated from the projection and `χ̄` bounds the quadratic
-part (THEORY.md, Lemma 4). The interval widens the critical value by that
+`v = (MZ)′Wf` is estimated from a pilot fit (the projection where it runs)
+and `χ̄` bounds the quadratic part (THEORY.md, Lemma 4). The interval widens the critical value by that
 bound:
 
 ```julia
@@ -315,6 +315,29 @@ r.basis_index, r.basis_grid      # the chosen basis, and the basis of each candi
 `bonferroni = true` counts every pair. Without `reference` this is refused:
 each basis would then have its own class, and a coarse basis would look
 short only because its class is small.
+
+
+**On an irregular region: the smoother as the pilot.** The projection pilot
+needs `[X, B]` of full rank and every leverage below 0.99, which a
+`tensor_pspline` over a coastline or a border does not give. With
+`pilot = :auto` (the default), `root_rho` then uses the smoother at
+`λ_p = pilot_lambda` (by default the smallest `lambda`) as the pilot. It
+shrinks `f` too, and the bound adds two terms that depend on the design
+alone, `ω_p` and `c̄_pℛ²r_p²` (THEORY.md, Lemma 13 and Proposition 7″).
+`r.pilot` says which pilot was used.
+
+```julia
+ps = tensor_pspline(u, v; k = 24)
+r = root_rho(y, X, W; ps..., lambda = [0.1, 1.0, 10.0, 100.0], roughness = ℛ)
+r.pilot          # :penalised on an irregular region
+```
+
+In `validation/mc_root_rho_pilot.jl` (n = 900 on a triangle, 89 of 225 basis
+functions empty), the chosen interval covered 0.953 and 0.973 with `ℛ = ℛ*`,
+and 0.940 and 1.000 with `ℛ = 4ℛ*`; on the full square the two pilots gave
+intervals of the same length to within 0.3%. On the 2,882 Portuguese parishes
+the interval for the spatial lag is [0.31, 0.55] even with `ℛ` four times the
+roughness of the fitted surface (`examples/34_root_rho.jl`, section 8).
 
 ## Cost
 

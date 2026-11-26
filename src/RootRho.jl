@@ -138,6 +138,12 @@ The result of [`root_rho`](@ref).
 - `basis_grid`, `basis_index` — with a vector of bases, the basis of each
   candidate in `lambda_grid` (an index into the vector), and the index of
   the chosen one. Empty and 0 otherwise.
+- `pilot`, `pilot_lambda`, `pilot_left_out` — the fit from which the
+  bias-aware interval estimates `f`: `:projection` (on `[X, basis]`),
+  `:penalised` (the smoother at `λ_p = pilot_lambda`; THEORY.md, Lemma 13),
+  or `:none` when no bias-aware interval was asked for. `pilot_left_out` is
+  the number of units with `(M_p²)ᵢᵢ < 0.01`, left out of the pilot's
+  variance correction; leaving them out makes the bound larger, not smaller.
 """
 struct RootRhoResult{T<:AbstractFloat}
     rho::T
@@ -173,18 +179,23 @@ struct RootRhoResult{T<:AbstractFloat}
     reference_K::Int
     basis_grid::Vector{Int}
     basis_index::Int
+    pilot::Symbol
+    pilot_lambda::T
+    pilot_left_out::Int
 end
 
 # The fields of a result without the bias-aware interval.
-_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[], 0, Int[], 0)
+_no_bias(::Type{T}) where {T} = (T(NaN), T(NaN), (T(NaN), T(NaN)), T[], T[], 0, Int[], 0,
+                                  :none, T(NaN), 0)
 
 # A copy of r with the bias-aware fields replaced.
 function _with_bias(r::RootRhoResult{T}, ℛ, bbar, ci, grid, hl;
                     refK::Int = r.reference_K, bgrid::Vector{Int} = r.basis_grid,
-                    bidx::Int = r.basis_index) where {T}
+                    bidx::Int = r.basis_index,
+                    pil = (r.pilot, r.pilot_lambda, r.pilot_left_out)) where {T}
     f = [getfield(r, k) for k in fieldnames(RootRhoResult)]
-    f[end-7:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl), refK,
-                       bgrid, bidx]
+    f[end-10:end] = Any[T(ℛ), T(bbar), (T(ci[1]), T(ci[2])), Vector{T}(grid), Vector{T}(hl), refK,
+                        bgrid, bidx, pil[1], T(pil[2]), pil[3]]
     return RootRhoResult{T}(f...)
 end
 
@@ -216,12 +227,15 @@ function Base.show(io::IO, r::RootRhoResult)
                 pct, r.ci_bias_aware..., r.roughness, r.bias_bound / sqrt(r.vhat))
         r.reference_K > 0 && @printf(io,
             "  ℛ on a reference basis with K̃ = %d columns (Lemma 5)\n", r.reference_K)
+        r.pilot === :penalised && @printf(io,
+            "  pilot: the smoother at λ_p = %.4g (Lemma 13), %d unit(s) left out of its variance correction\n",
+            r.pilot_lambda, r.pilot_left_out)
         if r.basis_index > 0
             @printf(io, "  basis %d of %d (K = %d) and λ chosen by the interval's length from %d candidates\n",
                     r.basis_index, maximum(r.basis_grid), r.K, length(r.lambda_grid))
         elseif !isempty(r.lambda_grid)
-            @printf(io, "  λ chosen by the interval's length from %d candidates (λ = 0 is the projection)\n",
-                    length(r.lambda_grid))
+            @printf(io, "  λ chosen by the interval's length from %d candidates%s\n",
+                    length(r.lambda_grid), r.pilot === :penalised ? "" : " (λ = 0 is the projection)")
         end
     end
     if isempty(r.cs)
@@ -483,20 +497,63 @@ function _bias_pilot(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T}, Ws::SparseMatrix
     y0 = y .- ρ0 .* Wy
     qy = Q' * y0
     s0 = (y0 .- Q * qy) .^ 2 ./ Mii
-    return (; Q, qy, s0)
+    return (; Q, H = Q', qy, s0, m = Mii, good = trues(length(y)), MpZN = nothing,
+            Rr2 = zero(T), info = (:projection, zero(T), 0))
 end
 
-# The ℛ-free parts of the bound, for a linear coefficient ṽ = Tm·f_B and a
-# quadratic matrix Qq: √(debiased v̂′Π⁺v̂), with v̂ = Tm·P_Z y₀(ρ̂₀), and χ̄, the
-# largest |eigenvalue| of N·sym(Qq)·N′.
+# The smoother as the pilot (THEORY.md, Lemma 13). S_p = ZG_p⁻¹Z′ at λ_p, with its own
+# root ρ̂_p; S_py₀ = Z·(Hy₀) with H = G_p⁻¹Z′; the HC2 plug-in eᵢ²/mᵢ on 𝒪 = {mᵢ ≥ 0.01}
+# and 0 elsewhere; and M_pZN′ = λ_pZG_p⁻¹Ω̃N′, for the constants ω_p and ℛ²r_p².
+function _bias_pilot_penalised(y::Vector{T}, Wy::Vector{T}, Z::Matrix{T},
+                               Ws::SparseMatrixCSC{T}, Ωt::Matrix{T}, λp::T, bnds, ℛ::T,
+                               N::Matrix{T}) where {T}
+    n = length(y)
+    Gm = Symmetric(Z' * Z .+ λp .* Ωt)
+    F = cholesky(Gm; check = false)
+    ev = eigvals(Gm)
+    (issuccess(F) && ev[1] > 1e-10 * ev[end]) || throw(ArgumentError(
+        "root_rho: Z′Z + λΩ̃ is singular at pilot_lambda = $λp, so the pilot smoother is " *
+        "not defined; the message for `lambda` gives the usual cause"))
+    H = F \ Matrix(Z')
+    S = Z * H
+    S .= (S .+ S') ./ 2
+    nbad = count(>(0.99), diag(S))
+    nbad > 0 && throw(ArgumentError(
+        "root_rho: $nbad unit(s) have Sᵢᵢ above 0.99 in the pilot smoother at " *
+        "pilot_lambda = $λp; use a larger pilot_lambda"))
+    M = Matrix{T}(I, n, n) .- S
+    m = vec(sum(abs2, M; dims = 1))                  # (M_p²)ᵢᵢ
+    A, _ = _exact_diag_moment_d(M, Ws)
+    ρp = _sign_rule_root(_quadratic(A, y, Wy)..., bnds)
+    ρp === nothing && return nothing
+    y0 = y .- ρp .* Wy
+    qy = H * y0
+    e = y0 .- Z * qy
+    good = m .>= T(0.01)
+    s0 = [good[i] ? e[i]^2 / m[i] : zero(T) for i in 1:n]
+    MpZN = λp .* (Z * (F \ (Ωt * N')))
+    return (; Q = Z, H, qy, s0, m, good, MpZN, Rr2 = ℛ^2 * opnorm(MpZN)^2,
+            info = (:penalised, λp, count(!, good)))
+end
+
+# The parts of the bound, for a linear coefficient ṽ = Tm·f_B and a quadratic matrix Qq:
+# √(debiased v̂′Π⁺v̂), with v̂ = Tm·P y₀(ρ̂₀) and P the pilot's fit, and χ̄, the largest
+# |eigenvalue| of N·sym(Qq)·N′, so that b̄ = ℛ·lin + ℛ²·χ̄. With the projection as the
+# pilot both are ℛ-free; with the smoother (Lemma 13), lin also holds c̄_pℛ²r_p² and χ̄
+# also holds ω_p.
 function _bias_lin_chi(Tm::AbstractMatrix{T}, Qq::AbstractMatrix{T}, N::AbstractMatrix{T},
                        pilot) where {T}
     R1 = N * (Tm * pilot.Q)
-    colsq = vec(sum(abs2, R1 * pilot.Q'; dims = 1))  # ‖Υeᵢ‖²
+    colsq = vec(sum(abs2, R1 * pilot.H; dims = 1))   # cᵢ = ‖Υeᵢ‖²
     nv = R1 * pilot.qy
-    lin = sqrt(max(dot(nv, nv) - dot(colsq, pilot.s0), zero(T)))
+    extra = zero(T); ω = zero(T)
+    if pilot.MpZN !== nothing                        # Lemma 13: the pilot's own shrinkage
+        any(pilot.good) && (extra = maximum(colsq[pilot.good] ./ pilot.m[pilot.good]) * pilot.Rr2)
+        ω = opnorm(N * (Tm * pilot.MpZN))
+    end
+    lin = sqrt(max(dot(nv, nv) - dot(colsq, pilot.s0) + extra, zero(T)))
     χ = maximum(abs, eigvals(Symmetric(N * ((Qq .+ Qq') ./ 2) * N')))
-    return lin, χ
+    return lin, χ + ω
 end
 
 # Lemma 4 (the class on [X, basis]) or Lemma 5 (on a reference basis Z̃) for the
@@ -718,7 +775,7 @@ end
     root_rho(y, X, W; basis = nothing, penalty = nothing, lambda = nothing,
              roughness = nothing, bonferroni = false, reference = nothing,
              varnames = nothing, level = 0.95, rho_bounds = (-0.99, 0.99),
-             max_dense_n = 4000, skewness = 0)
+             max_dense_n = 4000, skewness = 0, pilot = :auto, pilot_lambda = nothing)
 
 Jin & Lee's (2012) two-step root estimator of `ρ` in
 `y = ρWy + Xβ + f + ε`, with the first stage a projection on
@@ -802,6 +859,12 @@ and with `skewness > 0` an SVD of the `n × K` matrix `C′[X, basis]`.
   [`tensor_pspline`](@ref) returns, on which `roughness` states the class,
   so that `f` need not lie in `span(basis)` (see below). Then `roughness`
   may be given without `penalty`, for the projection alone.
+- `pilot`, `pilot_lambda` — the fit from which the bias-aware interval
+  estimates `f` (see "On an irregular region"): `:projection` (on
+  `[X, basis]`), `:penalised` (the smoother at `λ_p = pilot_lambda`, by
+  default the smallest of `lambda`), or `:auto` (the default): the projection
+  if it runs, else the smoother. The smoother as the pilot needs `penalty`
+  and no `reference`.
 - `skewness` — a bound `γ̄ ≥ 0` on the errors' `|skewness|`, used only for
   `vhat_worst_bias` (0 by default: symmetric errors). It does not change
   the estimate or the intervals.
@@ -840,8 +903,9 @@ result also holds the interval
 ```
 
 where `b̄` bounds `|β|` for every `f = [X, basis]ψ` with `ψ′Πψ ≤ ℛ²`
-(THEORY.md, Lemma 4), `v = (MZ)′Wf` is estimated from the projection (at Jin
-& Lee's first-step root, and debiased), `χ̄` bounds the quadratic part, and
+(THEORY.md, Lemma 4), `v = (MZ)′Wf` is estimated from a pilot fit (by default
+the projection, at Jin & Lee's first-step root, and debiased), `χ̄` bounds the
+quadratic part, and
 `cv(t)` is the `level` quantile of `|N(t, 1)|`. Its coverage holds uniformly
 over that class, whatever `λ` (Proposition 7), so `λ` no longer has to be
 small for the interval to be valid. With `ℛ = 0` it is the Wald interval.
@@ -852,6 +916,27 @@ shortest bias-aware interval; `lambda_grid` and `halflength_grid` record
 them all. Proposition 7 covers that choice when one candidate is clearly the
 shortest; `bonferroni = true` covers any choice, at a cost in length (about
 46% at `b̄ = 0` with 12 candidates).
+
+**On an irregular region.** The projection pilot needs `[X, basis]` of full
+rank and every leverage below 0.99. A [`tensor_pspline`](@ref) over a region
+that does not fill its bounding box (a coastline, a border) has basis
+functions with no unit, or a single unit, in their support, and fails both.
+Then the smoother at `λ_p` is the pilot (`pilot = :penalised`, or `:auto`):
+it needs only `Z′Z + λ_pΩ̃` invertible, as the smoother does. It shrinks `f`
+too, and the bound pays for that with two terms that depend on the design
+alone (THEORY.md, Lemma 13 and Proposition 7″): `ω_p`, added to `χ̄`, and
+`c̄_pℛ²r_p²`, added under the square root of the linear part. Units with
+`(M_p²)ᵢᵢ < 0.01` are left out of the pilot's variance correction, which
+makes the bound larger (`pilot_left_out` counts them). The projection is
+then not among the candidates. Any fixed `λ_p` gives a valid interval: a
+small one makes the two terms small but the plug-in noisier. In
+`validation/mc_root_rho_pilot.jl` (n = 900 on a triangle, 89 of the 225
+basis functions empty, R = 300), the chosen interval covered 0.953 and 0.973
+with `ℛ = ℛ*`, and 0.940 and 1.000 with `ℛ = 4ℛ*`: the pilot's two terms grow
+with `ℛ²`, so a too-large `ℛ` costs more length than with the projection
+pilot. Without a bias allowance (`ℛ = 0`) it covered 0.550 and 0.000. On the
+full square, where both pilots run, the smoother pilot covered 0.960 and
+0.973 and its interval was within 0.3% of the projection pilot's length.
 
 **`ℛ` is an assumption, not an estimate.** The data cannot certify an upper
 bound on the roughness, and every rule that estimated it under-covered
@@ -1018,7 +1103,8 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
                        roughness::Union{Nothing, Real} = nothing, bonferroni::Bool = false,
                        nbonf::Int = 0, reference = nothing, varnames = nothing,
                        level::Real = 0.95, rho_bounds = (-0.99, 0.99),
-                       max_dense_n::Integer = 4000, skewness::Real = 0)
+                       max_dense_n::Integer = 4000, skewness::Real = 0,
+                       pilot::Symbol = :auto, pilot_lambda::Union{Nothing, Real} = nothing)
     T = Float64
     n = length(y)
     (isfinite(skewness) && skewness >= 0) || throw(ArgumentError(
@@ -1049,6 +1135,20 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
         "bias-aware interval, and without a roughness bound there is none"))
     bonferroni && !(lambda isa AbstractVector) && throw(ArgumentError(
         "root_rho: `bonferroni` applies only to a vector of lambdas"))
+    pilot in (:auto, :projection, :penalised) || throw(ArgumentError(
+        "root_rho: pilot must be :auto, :projection or :penalised, got :$pilot"))
+    if pilot === :penalised
+        (penalised && roughness !== nothing) || throw(ArgumentError(
+            "root_rho: pilot = :penalised needs `penalty`, `lambda` and `roughness`: the " *
+            "pilot is used only by the bias-aware interval of the smoother"))
+        reference === nothing || throw(ArgumentError(
+            "root_rho: pilot = :penalised is not available with `reference`: Lemma 5's " *
+            "split of f uses the projection on [X, basis]"))
+    end
+    pilot_lambda === nothing || pilot !== :projection || throw(ArgumentError(
+        "root_rho: pilot_lambda applies to the smoother as the pilot, not to pilot = :projection"))
+    pilot_lambda === nothing || (isfinite(pilot_lambda) && pilot_lambda > 0) || throw(ArgumentError(
+        "root_rho: pilot_lambda must be positive and finite, got $pilot_lambda"))
     if penalised
         basis === nothing && throw(ArgumentError("root_rho: a penalty needs a basis"))
         lambda isa AbstractVector && isempty(lambda) && throw(ArgumentError(
@@ -1085,7 +1185,12 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
     Z = hcat(Xm, Bm)
     K = size(Z, 2)
     K > 0 || throw(ArgumentError("root_rho: X and basis together have no columns"))
-    if penalised && roughness === nothing
+    # The smoother can be the bias-aware interval's pilot (Lemma 13) when there is no reference.
+    # With pilot = :auto it is used when [X, basis] is rank-deficient, or when the projection
+    # pilot fails below; then, as for the smoother alone, only X needs full rank.
+    pen_pilot_ok = penalised && roughness !== nothing && reference === nothing && pilot !== :projection
+    zdef = pen_pilot_ok && pilot === :auto && rank(Z) < K
+    if penalised && (roughness === nothing || (pilot === :penalised && pen_pilot_ok) || zdef)
         # The smoother needs Z′Z + λΩ̃ invertible (checked in _root_rho_penalised), not a
         # full-rank basis: on an irregular region a tensor_pspline has columns with no unit
         # in their support, and the penalty still determines their coefficients. X is not
@@ -1098,8 +1203,9 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
                       "intercept in X: drop one of them. On an irregular region, basis " *
                       "functions with no unit, or too few units, in their support are " *
                       "dependent as well: drop the all-zero columns, use a smaller k, or use " *
-                      "the penalised smoother (`penalty` and `lambda`, without `roughness`), " *
-                      "which needs only Z′Z + λΩ̃ to be invertible.")
+                      "the penalised smoother (`penalty` and `lambda`), which needs only " *
+                      "Z′Z + λΩ̃ to be invertible; with `roughness`, its bias-aware interval " *
+                      "then uses the smoother as the pilot (pilot = :penalised).")
     end
     yv = Vector{T}(y)
     penalised || roughness !== nothing ||
@@ -1108,17 +1214,29 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
                                                         T(level), bnds, nothing)
     # The bias-aware interval: one λ, or λ chosen by length with the projection as λ = 0.
     Wy = Ws * yv
-    pilot = _bias_pilot(yv, Wy, Z, Ws, bnds)
-    pilot === nothing && throw(ArgumentError(
-        "root_rho: the projection pilot has no admissible root, so the bias bound cannot " *
-        "be estimated; the test-inversion sets of root_rho without `roughness` still apply"))
-    N, N0 = if penalised
-        Πt = zeros(T, K, K)
-        Πt[(kx + 1):K, (kx + 1):K] .= Pm
-        _penalty_parts(Πt)
-    else
-        zeros(T, 0, K), Matrix{T}(I, K, K)           # a projection: everything is free
+    Πt = zeros(T, K, K)
+    penalised && (Πt[(kx + 1):K, (kx + 1):K] .= Pm)
+    N, N0 = penalised ? _penalty_parts(Πt) :
+        (zeros(T, 0, K), Matrix{T}(I, K, K))         # a projection: everything is free
+    λs = !penalised ? T[] : lambda isa AbstractVector ? T.(collect(lambda)) : [T(lambda)]
+    pen_pilot() = _bias_pilot_penalised(yv, Wy, Z, Ws, Πt,
+        T(pilot_lambda === nothing ? minimum(λs) : pilot_lambda), bnds, T(roughness), N)
+    pil = if !pen_pilot_ok
+        _bias_pilot(yv, Wy, Z, Ws, bnds)
+    elseif pilot === :penalised || zdef
+        pen_pilot()
+    else                                             # :auto, [X, basis] of full rank
+        p0 = try
+            _bias_pilot(yv, Wy, Z, Ws, bnds)
+        catch e
+            e isa ArgumentError || rethrow()
+            nothing
+        end
+        p0 === nothing ? pen_pilot() : p0
     end
+    pil === nothing && throw(ArgumentError(
+        "root_rho: the pilot has no admissible root, so the bias bound cannot be estimated; " *
+        "the test-inversion sets of root_rho without `roughness` still apply"))
     refK = 0
     Zt = Nt = MZZt = nothing
     if reference !== nothing
@@ -1130,21 +1248,23 @@ function _root_rho_one(y::AbstractVector{<:Real}, X::AbstractMatrix{<:Real}, W::
         _check_reference_null(Zt * N0t, Z * N0)
         refK > 2n && @warn "root_rho: the reference basis has $refK columns for n = $n; " *
             "each candidate costs O(n²K̃ + K̃³)"
-        MZZt = Zt .- pilot.Q * (pilot.Q' * Zt)
+        MZZt = Zt .- pil.Q * (pil.Q' * Zt)
     end
     α0 = 1 - T(level)
     if !penalised                                   # the projection alone, with a reference
         proj, C = _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds, γ̄)
-        bias = (; ℛ = T(roughness), N, pilot, α = α0 / max(nbonf, 1), Zt, Nt, MZZt, refK)
+        bias = (; ℛ = T(roughness), N, pilot = pil, α = α0 / max(nbonf, 1), Zt, Nt, MZZt, refK)
         return _projection_with_bias(proj, C, bias)
     end
-    λs = lambda isa AbstractVector ? T.(collect(lambda)) : [T(lambda)]
-    ncand = lambda isa AbstractVector ? length(λs) + 1 : 1
+    smooth_pilot = pil.info[1] === :penalised
+    ncand = lambda isa AbstractVector ? length(λs) + !smooth_pilot : 1
     α = α0 / (nbonf > 0 ? nbonf : bonferroni ? ncand : 1)
-    bias = (; ℛ = T(roughness), N, pilot, α, Zt, Nt, MZZt, refK)
+    bias = (; ℛ = T(roughness), N, pilot = pil, α, Zt, Nt, MZZt, refK)
     fits = [_root_rho_penalised(yv, Z, Ws, kx, Pm, λ, vnames, T(level), bnds, bias) for λ in λs]
     lambda isa AbstractVector || return fits[1]
-    proj = try
+    # With the smoother as the pilot, [X, basis] need not have full rank, and the projection
+    # is not a candidate.
+    proj = smooth_pilot ? nothing : try
         _root_rho_projection_C(yv, Z, Ws, kx, vnames, T(level), bnds, γ̄)
     catch e
         e isa ArgumentError || rethrow()
@@ -1167,7 +1287,7 @@ end
 # assumed (Lemma 4's class), Lemma 5(c) on a reference basis.
 function _projection_with_bias(proj::RootRhoResult{T}, C::Matrix{T}, bias) where {T}
     proj.root_found || return _with_bias(proj, bias.ℛ, T(NaN), (T(NaN), T(NaN)), T[], T[];
-                                         refK = bias.refK)
+                                         refK = bias.refK, pil = bias.pilot.info)
     bbar = if bias.Zt === nothing
         zero(T)
     else
@@ -1175,7 +1295,7 @@ function _projection_with_bias(proj::RootRhoResult{T}, C::Matrix{T}, bias) where
         bias.ℛ * lin + bias.ℛ^2 * χ
     end
     return _with_bias(proj, bias.ℛ, bbar, _bias_ci(proj.rho, proj.se, proj.vhat, bbar, bias.α),
-                      T[], T[]; refK = bias.refK)
+                      T[], T[]; refK = bias.refK, pil = bias.pilot.info)
 end
 
 # `reference = (; basis, penalty)`: the checks applied to `penalty`, and its matrix.
@@ -1315,7 +1435,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
             level, fill(nanT, kx), vnames, n, K, :penalised, λ, df, maximum(Sii), a, b, c,
             vp, nanT, false, bnds, nanT, nanT, _no_bias(T)...)
         return bias === nothing ? r : _with_bias(r, bias.ℛ, nanT, (nanT, nanT), T[], T[];
-                                                 refK = bias.refK)
+                                                 refK = bias.refK, pil = bias.pilot.info)
     end
     V = _polyval(vp, ρ)
     se = V > 0 ? sqrt(V) / abs(b - 2ρ * a) : nanT
@@ -1327,7 +1447,7 @@ function _root_rho_penalised(y::Vector{T}, Z::Matrix{T}, Ws::SparseMatrixCSC{T},
     lin, χ = _bias_parts(M, d, Z, Ws, bias)
     bbar = bias.ℛ * lin + bias.ℛ^2 * χ
     return _with_bias(r, bias.ℛ, bbar, _bias_ci(ρ, se, V, bbar, bias.α), T[], T[];
-                      refK = bias.refK)
+                      refK = bias.refK, pil = bias.pilot.info)
 end
 
 end # module

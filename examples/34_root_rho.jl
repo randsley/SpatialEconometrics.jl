@@ -10,9 +10,10 @@
 # reports two intervals: the Wald interval and the test-inversion set.
 #
 # Section 4 fits a penalised smoother (tensor_pspline) in place of the projection,
-# section 5 its bias-aware interval, with λ chosen by the interval's length, and
+# section 5 its bias-aware interval, with λ chosen by the interval's length,
 # section 6 the same on a reference basis, for an f outside the span of the basis,
-# and section 7 the basis chosen by the interval's length too.
+# section 7 the basis chosen by the interval's length too, and section 8 runs the
+# bias-aware interval on real data: the Portuguese municipalities and parishes.
 #
 # Run: julia --project=. examples/34_root_rho.jl
 # ---------------------------------------------------------------------------
@@ -140,3 +141,69 @@ rg = root_rho(y, X, W; basis = [p.basis for p in pss], penalty = [p.penalty for 
 for (j, k) in enumerate((6, 10, 15))
     @printf("  k = %2d: shortest half-length %.3f\n", k, minimum(rg.halflength_grid[rg.basis_grid .== j]))
 end
+
+# ── 8. Real data: is the Portuguese spatial lag a spillover, or a trend? ───
+#
+# Purchasing power across the 278 mainland municipalities, and log income per
+# taxpayer across the 2,882 mainland parishes, each with a SAR lag over queen
+# contiguity and a smooth surface f(u, v) of the centroid (notebook 11,
+# section 7). Both regions fill neither their bounding box nor a square, so a
+# tensor_pspline over the box has basis functions with no unit: [X, basis] is
+# rank-deficient and the projection pilot cannot run. The smoother is the pilot
+# instead (THEORY.md, Lemma 13 and Proposition 7″; pilot = :auto chooses it).
+#
+# ℛ is stated as "f is no rougher than m times the surface the smoother
+# finds", with ℛ̂ = √(ψ̂′Ωψ̂) from the fit at λ = 1, for m = 1, 2, 4. That is an
+# assumption scaled by the data, not an estimate with a guarantee: report the
+# multiples, as here.
+#
+# Data credits (conditions of the licences): Source: Statistics Portugal (INE),
+# indicators 0014580, 0014581, 0014582, 0013189, 0012909 (municipalities, 2023)
+# and 0011866, 0012273, 0012295, 0012328, 0012748 (parishes, 2021). Informação
+# geográfica cedida pela Direção-Geral do Território (CAOP, CC-BY-4.0).
+# Details: notebooks/data/portugal_*_PROVENANCE.md.
+
+const PT = joinpath(@__DIR__, "..", "notebooks", "data")
+splitq(l) = [strip(s, '"') for s in split(l, r",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")]
+function readpt(f)
+    ls = filter(!isempty, strip.(readlines(joinpath(PT, f))))
+    h = splitq(ls[1]); rs = splitq.(ls[2:end])
+    Dict(h[j] => [r[j] for r in rs] for j in eachindex(h))
+end
+
+function bias_aware_table(label, y, X, W, u, v; k, lambdas = [0.1, 1.0, 10.0, 100.0])
+    ps = tensor_pspline(u, v; k)
+    Z = hcat(X, ps.basis); K = size(Z, 2); kx = size(X, 2)
+    Ωt = zeros(K, K); Ωt[(kx + 1):end, (kx + 1):end] = ps.penalty
+    r1 = root_rho(y, X, W; ps..., lambda = 1.0)
+    ψ = (Z' * Z + Ωt) \ (Z' * (y .- r1.rho .* (W * y)))
+    ℛ̂ = sqrt(dot(ψ, Ωt * ψ))
+    @printf("\n%s: n = %d, k = %d, K = %d, rank [X, basis] = %d, ℛ̂ = %.3f\n", label,
+            length(y), k, K, rank(Z), ℛ̂)
+    println("   ℛ      λ chosen    df     ρ̂      bias-aware interval   b̄/√V̂")
+    for m in (1, 2, 4)
+        r = root_rho(y, X, W; ps..., lambda = lambdas, roughness = m * ℛ̂)
+        @printf("  %d·ℛ̂    %6.3g    %6.1f   %.3f    [%+.3f, %+.3f]      %.2f\n", m, r.lambda,
+                r.df, r.rho, r.ci_bias_aware..., r.bias_bound / sqrt(r.vhat))
+    end
+end
+
+dm = readpt("portugal_municipalities.csv"); cm = readpt("portugal_municipalities_centroids.csv")
+keep = findall(dm["mainland"] .== "true")
+@assert cm["dico"] == dm["dico"][keep]
+lon = parse.(Float64, cm["lon"]); lat = parse.(Float64, cm["lat"])
+Wm, _ = read_gal(joinpath(PT, "portugal_municipalities_queen.gal"))
+bias_aware_table("Municipalities", parse.(Float64, dm["purchasing_power"][keep]),
+                 hcat(log.(parse.(Float64, dm["density"][keep])),
+                      parse.(Float64, dm["ageing_ratio"][keep])), Wm,
+                 (lon .- mean(lon)) .* 111.32 .* cosd(mean(lat)), (lat .- mean(lat)) .* 110.57;
+                 k = 12)
+
+dp = readpt("portugal_parishes.csv"); cp = readpt("portugal_parishes_centroids.csv")
+@assert cp["dicofre"] == dp["dicofre"]
+pnum(c) = parse.(Float64, dp[c])
+Wp, _ = read_gal(joinpath(PT, "portugal_parishes_queen.gal"))
+bias_aware_table("Parishes", log.(pnum("income_2021")),
+                 hcat(log.(pnum("population") ./ pnum("area_km2")), pnum("unemployment"),
+                      pnum("illiteracy")), Wp,
+                 parse.(Float64, cp["x_m"]) ./ 1000, parse.(Float64, cp["y_m"]) ./ 1000; k = 24)
