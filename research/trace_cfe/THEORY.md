@@ -3595,7 +3595,72 @@ left out no unit.)
   no-surface value) and errors resampled from the residuals, and fit the
   same λ path. If `ρ̂` drifts with λ when the truth has a fixed `ρ₀`,
   the drift is the method. If it is flat, the drift in the data is
-  evidence about the lag.
+  evidence about the lag. Done the same day: the next section.
+
+## The placebo on the Dutch districts (2026-11-26)
+
+`tc_netherlands_placebo.jl` (output committed): the income design, `k` =
+24, on the real geometry and `W`. The truth is `y* = (I − ρ₀W)⁻¹(μ + ε*)`.
+Here `μ = Zψ` is the penalised fit of the real y at `λ_true` and `ρ₀`, and
+`ε*` is a wild (Rademacher) bootstrap of that fit's residuals, scaled by
+`√(n/(n − df))`, so the spatially clustered variance is kept. Each draw
+is fitted at λ = 100, 10, 1, 0.1, with R = 100 draws per cell. The design
+and the decision rules were fixed in the script's header before the run.
+A check that the truth uses the same smoother: `tr S` by hand at λ = 1 is
+108.62, the same as `root_rho`'s `df`.
+
+Mean `ρ̂` (Monte Carlo se 0.003 to 0.005), with the CS coverage of `ρ₀`
+in brackets:
+
+| fit λ | A: smooth truth, λ_true = 100, ρ₀ = 0.490 | B: rough truth, λ_true = 0.1, ρ₀ = 0.339 | C: no lag, λ_true = 1, ρ₀ = 0 | data |
+|---|---|---|---|---|
+| 100 | 0.507 (0.89) | 0.528 (0.00) | 0.259 (0.00) | 0.490 |
+| 10 | 0.497 (0.96) | 0.470 (0.02) | 0.142 (0.01) | 0.436 |
+| 1 | 0.496 (0.96) | 0.405 (0.39) | 0.043 (0.85) | 0.381 |
+| 0.1 | 0.497 (0.93) | 0.356 (0.90) | 0.005 (0.97) | 0.339 |
+| Δ = ρ̂(100) − ρ̂(0.1) | 0.010 (se 0.0013) | 0.172 (se 0.0022) | 0.253 (se 0.0025) | 0.151 |
+
+Against the pre-set rules:
+
+- **A passed.** |Δ| = 0.010 < 0.03. Under a smooth truth, `ρ̂` does not
+  fall as the fit's `df` grows from 22 to 207. Reading (ii), that the
+  method pulls `ρ̂` down by itself, is rejected on this geometry.
+- **B failed as written.** The rule asked each placebo mean to be within
+  0.03 of the data path. The differences are +0.038, +0.034, +0.024 and
+  +0.017, so two of four miss. The shape is reproduced (Δ 0.172 against
+  0.151), but the placebo path lies above the data at every λ. That is in
+  the direction that a true `ρ` below 0.339, or a truth rougher than the
+  λ = 0.1 fit, would give. This run does not tell which.
+- **C (descriptive).** With no lag at all, a smooth trend makes a spurious
+  `ρ̂` = 0.26 at λ = 100, and its CS never covers 0. At λ = 0.1 the mean is
+  0.005, and the CS covers 0 in 97% of draws.
+
+What this shows:
+
+- **The drift in the data is smoothing bias, not an artefact.** The
+  drift appears only when the truth is rougher than the fit. A trend that
+  the fit leaves in the error loads on `Wy` and pushes `ρ̂` up (cells B and
+  C). When the fit is at least as flexible as the truth, `ρ̂` stays flat
+  (cell A).
+- **Fitting at the true λ is not enough.** The bias at `λ = λ_true` is
+  +0.017 (A), +0.017 (B) and +0.043 (C), and the CS coverage is 0.89, 0.90
+  and 0.85. The smoother shrinks the true surface, and the part it leaves
+  out acts as a small rough trend. One step more flexible than the truth
+  removes most of it (A at λ = 10 and below: +0.006 to +0.007, coverage
+  0.93 to 0.96; C at λ = 0.1: +0.005, 0.97). This is the shrinkage bias
+  that the bias-aware interval prices (Lemma 13). It agrees with that
+  interval choosing λ = 0.1 on every real-data run.
+- **So the flexible end is the one to report, and it is an upper value.**
+  The data path has not levelled off at λ = 0.1. Under reading (i), the
+  truth is then at least as rough as the λ = 0.1 fit, and the placebo
+  says `ρ̂` at a fit that is not more flexible than the truth is biased
+  upward. So 0.339 is more likely too high than too low. The statement
+  that allows for this is the bias-aware interval, [0.216, 0.462] at
+  `4ℛ̂`, whose lower end is far from 0.
+- **Limits.** Each truth is a fitted surface, so it lies in the span of
+  the basis. A truth outside it (Lemma 5's case) was not tried. The errors
+  are a wild bootstrap, so they keep each unit's variance but not any
+  spatial correlation in `ε`. There was one design (income) and one `k`.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
@@ -3834,8 +3899,10 @@ linear in `y`.
    heteroskedastic constant of item 3 is the one that matters. (c) `ρ̂`
    drifted down as `df` grew, with no plateau up to `df` 226; a rule for
    where to stop is open. The Dutch runs (third and fourth) show the same
-   drift for income and for house value. The placebo proposed in "A fourth
-   real-data run" would tell whether the method itself makes it.
+   drift for income and for house value. The placebo ("The placebo on the
+   Dutch districts") shows that the method does not make it under a smooth
+   truth. It is smoothing bias under a rough truth, so the flexible end is
+   an upper value. A stopping rule is still open.
 
 ## References
 

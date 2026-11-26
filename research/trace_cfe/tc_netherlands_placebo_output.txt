@@ -1,0 +1,24 @@
+Placebo on the 2021 Dutch districts, income design, k = 24, n = 3027, R = 100 per cell
+check: tr S at λ = 1 by hand 108.62, root_rho's df 108.62
+
+cell A (smooth truth): λ_true = 100 (df 22.3), ρ₀ = 0.490, residual sd 0.1117  (611s)
+  λ = 100   mean ρ̂ 0.507 (MC se 0.0030)  sd 0.030  bias +0.017  CS covers ρ₀ 0.89   data path 0.490
+  λ = 10    mean ρ̂ 0.497 (MC se 0.0031)  sd 0.031  bias +0.007  CS covers ρ₀ 0.96   data path 0.436
+  λ = 1     mean ρ̂ 0.496 (MC se 0.0034)  sd 0.034  bias +0.006  CS covers ρ₀ 0.96   data path 0.381
+  λ = 0.1   mean ρ̂ 0.497 (MC se 0.0038)  sd 0.038  bias +0.007  CS covers ρ₀ 0.93   data path 0.339
+  Δ = mean ρ̂(100) − mean ρ̂(0.1) = 0.010 (MC se 0.0013); data Δ = 0.151
+
+cell B (rough truth): λ_true = 0.1 (df 207.3), ρ₀ = 0.339, residual sd 0.1022  (638s)
+  λ = 100   mean ρ̂ 0.528 (MC se 0.0026)  sd 0.026  bias +0.189  CS covers ρ₀ 0.00   data path 0.490
+  λ = 10    mean ρ̂ 0.470 (MC se 0.0030)  sd 0.030  bias +0.131  CS covers ρ₀ 0.02   data path 0.436
+  λ = 1     mean ρ̂ 0.405 (MC se 0.0033)  sd 0.033  bias +0.066  CS covers ρ₀ 0.39   data path 0.381
+  λ = 0.1   mean ρ̂ 0.356 (MC se 0.0036)  sd 0.036  bias +0.017  CS covers ρ₀ 0.90   data path 0.339
+  Δ = mean ρ̂(100) − mean ρ̂(0.1) = 0.172 (MC se 0.0022); data Δ = 0.151
+
+cell C (no lag): λ_true = 1 (df 108.6), ρ₀ = 0.000, residual sd 0.1096  (600s)
+  λ = 100   mean ρ̂ 0.259 (MC se 0.0031)  sd 0.031  bias +0.259  CS covers ρ₀ 0.00   data path 0.490
+  λ = 10    mean ρ̂ 0.142 (MC se 0.0038)  sd 0.038  bias +0.142  CS covers ρ₀ 0.01   data path 0.436
+  λ = 1     mean ρ̂ 0.043 (MC se 0.0044)  sd 0.044  bias +0.043  CS covers ρ₀ 0.85   data path 0.381
+  λ = 0.1   mean ρ̂ 0.005 (MC se 0.0048)  sd 0.048  bias +0.005  CS covers ρ₀ 0.97   data path 0.339
+  Δ = mean ρ̂(100) − mean ρ̂(0.1) = 0.253 (MC se 0.0025); data Δ = 0.151
+
