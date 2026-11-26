@@ -1,0 +1,14 @@
+cell E5: truth k = 24, λ_true = 1 (df 108.6), ρ₀ = 0.000, λ_e = 0.5, n = 3027, R = 150; fits k = 24
+  ... 25 draws, 0s
+  ... 50 draws, 0s
+  ... 75 draws, 0s
+  ... 100 draws, 0s
+  ... 125 draws, 0s
+  ... 150 draws, 0s
+done in 11238s; ℛ̂ over draws: mean 0.966, sd 0.071
+  λ = 100   mean ρ̂ 0.510 (MC se 0.0027)  sd 0.033  bias +0.510  CS covers ρ₀ 0.000
+  λ = 10    mean ρ̂ 0.457 (MC se 0.0030)  sd 0.037  bias +0.457  CS covers ρ₀ 0.000
+  λ = 1     mean ρ̂ 0.415 (MC se 0.0034)  sd 0.042  bias +0.415  CS covers ρ₀ 0.000
+  λ = 0.1   mean ρ̂ 0.397 (MC se 0.0039)  sd 0.048  bias +0.397  CS covers ρ₀ 0.000
+  bias-aware, 1·ℛ̂: covers ρ₀ 0.000 (MC se 0.000)  mean length 0.175  mean ρ̂ 0.397  λ chosen 0.1×149, 1.0×1
+  bias-aware, 4·ℛ̂: covers ρ₀ 0.000 (MC se 0.000)  mean length 0.249  mean ρ̂ 0.397  λ chosen 0.1×150

@@ -3661,6 +3661,74 @@ What this shows:
   the basis. A truth outside it (Lemma 5's case) was not tried. The errors
   are a wild bootstrap, so they keep each unit's variance but not any
   spatial correlation in `ε`. There was one design (income) and one `k`.
+  The next section tests the first two limits.
+
+## The second placebo: a rougher truth and correlated errors (2026-11-26)
+
+`tc_netherlands_placebo2.jl` (one output file per cell,
+`tc_netherlands_placebo2_<cell>.txt`): the income design again, with fits
+at `k` = 24. Each draw adds the bias-aware interval with ℛ = m·ℛ̂ (m = 1,
+4), where ℛ̂ is the roughness of that draw's λ = 1 fit, as on the real
+data. R = 150 per cell. The cells and the rules were fixed in the header
+before the run. (The progress lines in the output print "0s": a slip in
+the script, corrected after the run. The "done in" times are right.)
+
+| cell | truth | `ρ₀` | `ρ̂` at λ = 100 / 1 / 0.1 | CS at 0.1 | bias-aware 1·ℛ̂ | bias-aware 4·ℛ̂ |
+|---|---|---|---|---|---|---|
+| B | `k` 24, λ 0.1 | 0.339 | 0.532 / 0.408 / 0.359 | 0.900 | 0.920 | **0.993** |
+| C | `k` 24, λ 1 | 0 | 0.259 / 0.044 / 0.007 | 0.967 | 0.967 | **0.993** |
+| D | `k` 32, λ 0.1 (outside the fits' basis) | 0.300 | 0.531 / 0.420 / 0.375 | 0.347 | 0.400 | **0.927** |
+| E2 | as C, errors `(I − 0.2W)⁻¹ε` | 0 | 0.346 / 0.175 / 0.146 | 0.160 | 0.173 | **0.553** |
+| E5 | as C, errors `(I − 0.5W)⁻¹ε` | 0 | 0.510 / 0.415 / 0.397 | 0.000 | 0.000 | **0.000** |
+| real data | | | 0.490 / 0.381 / 0.339 | | | |
+
+(Coverage of `ρ₀`, Monte Carlo se at most 0.041. The bias-aware interval
+chose λ = 0.1 in 1,499 of 1,500 fits.)
+
+Against the pre-set rules:
+
+- **Rule 1 passed.** At `4ℛ̂` the bias-aware interval covers `ρ₀` in 0.993,
+  0.993 and 0.927 of draws in B, C and D (the bar was 0.91). This includes
+  D, whose truth is outside the basis and rougher than any fit. At `1ℛ̂` it
+  fails there (0.400): ℛ̂ from a λ = 1 fit understates the roughness of
+  such a truth, and a multiple of about 4 was needed. The 4ℛ̂ intervals
+  are 0.26 to 0.32 long.
+- **Rule 2 (D).** At λ = 0.1 the bias is +0.075 (ρ̂ 0.375 for ρ₀ =
+  0.300). That is the size by which the flexible end can overstate `ρ`
+  when the trend is rougher than the basis.
+- **Rule 3 failed: correlated errors pass for a lag.** With no lag at
+  all, errors that follow a spatial autoregression give `ρ̂` = 0.146 at
+  λ_e = 0.2 (E2) and 0.397 at λ_e = 0.5 (E5) at the flexible end. The
+  bias-aware interval covers the true 0 in 0.553 and 0.000 of draws. E5's
+  path, 0.510 / 0.415 / 0.397, is close to the real data's,
+  0.490 / 0.381 / 0.339.
+
+What this shows:
+
+- **The reason is in the assumptions, not the code.** The theory assumes
+  independent errors (A4 in "The test-inversion set when K/n → θ > 0",
+  and Lemma 13's setting). The moment `E ε′C(ρ₀)ε = 0` uses
+  `diag C = 0`, which gives zero mean only when `E εᵢεⱼ = 0` for `i ≠ j`.
+  Under `ε = (I − λ_eW)⁻¹η`, `E ε′Cε = tr(C Σ_ε) ≠ 0`, and the root moves.
+  The bias-aware interval prices bias from the surface, not this.
+- **So "the lag survives" must be qualified on all four real-data runs.**
+  `root_rho` measures spatial dependence that a smooth surface does not
+  absorb, whether it comes from `ρWy` or from `ε`. The Dutch income data
+  are consistent with a lag of about 0.3 under independent errors (cells B
+  and D) and also with no lag and error correlation near 0.5 (E5). This
+  run does not tell them apart. The residuals' Moran's I of `e²`
+  (z ≈ 13) shows clustered variance, which is not itself correlation of
+  `ε`, but it is a warning sign.
+- **What could tell them apart** (not done). A lag passes `X` to the
+  neighbours, and error correlation does not. So an instrumental-variable
+  estimate of `ρ` with instruments `WX, W²X` and the surface as controls
+  (the first step of Kelejian & Prucha's GS2SLS) stays consistent under
+  SAR errors, and should be near 0 in E2 and E5. Its strength on the real
+  data, with a flexible surface absorbing much of `WX`'s variation, is
+  the open question. A first step is to measure it in E5 and on the data.
+- **Documentation gap.** The `root_rho` docstring does not say that the
+  errors must be independent across units. It should say so, and say
+  that spatially correlated errors are read as a lag.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
@@ -3903,6 +3971,10 @@ linear in `y`.
    Dutch districts") shows that the method does not make it under a smooth
    truth. It is smoothing bias under a rough truth, so the flexible end is
    an upper value. A stopping rule is still open.
+   The second placebo: the bias-aware interval at 4ℛ̂ covers even a truth
+   outside the basis (0.927), but spatially correlated errors with no lag
+   pass for a lag (E5: ρ̂ 0.397, coverage 0). Every real-data "the lag
+   survives" is conditional on independent errors.
 
 ## References
 
@@ -3949,6 +4021,11 @@ others have not been read.
   *Probability Theory and Related Fields*, 75, 261–277. doi:10.1007/BF00354037
 - Hall, P., & Heyde, C. C. (1980). *Martingale Limit Theory and Its
   Application*. Academic Press. doi:10.1016/C2013-0-10818-5
+- Kelejian, H. H., & Prucha, I. R. (1998). A generalized spatial two-stage
+  least squares procedure for estimating a spatial autoregressive model
+  with autoregressive disturbances. *Journal of Real Estate Finance and
+  Economics*, 17(1), 99–121. doi:10.1023/A:1007707430416 (cited for its
+  first step, instruments `WX, W²X`; not read for this note)
 - Kelejian, H. H., & Prucha, I. R. (2001). On the asymptotic distribution of
   the Moran I test statistic with applications. *Journal of Econometrics*,
   104(2), 219–257. doi:10.1016/S0304-4076(01)00064-1
