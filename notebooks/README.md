@@ -45,6 +45,12 @@ dependencies, in parallel. The real-data notebooks (`04`, `05`, `11`–`13`) the
 `data/` from the clone, or download the same files from that release. So a
 notebook outside a clone runs against the release, not against `master`.
 
+**Checking them.** `python -I notebooks/check_notebooks.py [--jobs N]` runs each
+numbered notebook's code cells in order, as one script in its own process,
+against the clone, and exits non-zero if any notebook fails. CI runs it on
+Julia 1.10 and 1 at every push. Locally all 13 take about 6 minutes. The Pluto
+notebooks are not included: they need Pluto and PlutoUI.
+
 ## Worked analyses
 
 | Notebook | What it covers | Colab |

@@ -120,12 +120,39 @@ jobs:
           SE_TEST_PROGRESS: '1'
         run: julia --project=ext-test-env test/runtests.jl
 
+  # The 13 Jupyter notebooks run against this commit: check_notebooks.py joins
+  # each one's code cells into a script and runs it in its own process from
+  # notebooks/, where the setup cell finds the clone and the data helper reads
+  # notebooks/data. Nothing ran them before 2026-11-26, so an API change could
+  # break a notebook unseen. 1.10 is included because the 2026-11-17 check
+  # found three notebook bugs that only 1.10 showed (ROADMAP, Colab row).
+  # Locally all 13 take about 6 minutes, notebook 11 the longest at 75 s.
+  # The Pluto notebooks are not run: they need Pluto and PlutoUI.
+  notebooks:
+    name: Notebooks - Julia ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.10', '1']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: x64
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Run every notebook's code cells
+        run: python3 -I notebooks/check_notebooks.py --jobs 2
+
   # drift-check.yml in randsley/spatial-econometrics-book names
   # `repository_dispatch: [package-updated]` as its real trigger, but nothing
   # sent that event until 2026-11-06: the book's only live trigger was its
   # Monday cron, so a breaking change here could sit undetected in the
   # published book for up to seven days. This job sends it, and only after
-  # both test jobs are green, so the book never re-executes against a commit
+  # the test jobs and the notebooks are green, so the book never re-executes against a commit
   # this repository already knows is broken.
   #
   # The default GITHUB_TOKEN cannot dispatch to another repository, so this
@@ -135,7 +162,7 @@ jobs:
   # not a reason to call this package's own CI red.
   notify-book:
     name: Tell the book the package changed
-    needs: [test, extensions]
+    needs: [test, extensions, notebooks]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     env:
