@@ -3833,7 +3833,9 @@ linear in `y`.
    errors are heteroskedastic with spatially clustered variance, so the
    heteroskedastic constant of item 3 is the one that matters. (c) `ρ̂`
    drifted down as `df` grew, with no plateau up to `df` 226; a rule for
-   where to stop is open.
+   where to stop is open. The Dutch runs (third and fourth) show the same
+   drift for income and for house value. The placebo proposed in "A fourth
+   real-data run" would tell whether the method itself makes it.
 
 ## References
 
