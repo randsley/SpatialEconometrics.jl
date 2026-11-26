@@ -125,6 +125,7 @@ end
 
 const R = parse(Int, get(ENV, "IVB_R", "500"))   # a smaller R only for a smoke test
 const B1 = 399
+const SEED = parse(Int, get(ENV, "IVB_SEED", "0"))   # 0 reproduces the exploratory run (f2a834d)
 z = 1.959963984540054
 Z24, Ω24 = design(24); Z32, Ω32 = design(32)
 S = smoother(Z24, Ω24, 0.1)
@@ -136,8 +137,8 @@ cells = (("B", Z24, Ω24, 0.1, 0.339, 0.0), ("C", Z24, Ω24, 1.0, 0.0, 0.0), ("D
 for (name, Zt, Ωtt, λt, ρ0, λe) in cells
     μ, e, _ = truth(Zt, Ωtt, λt, ρ0)
     Fρ = lu(sparse(I - ρ0 * W)); Fe = lu(sparse(I - λe * W))
-    rng = MersenneTwister(2026_11_26 + hash(name) % 10_000)
-    rngb = MersenneTwister(4242 + hash(name) % 10_000)
+    rng = MersenneTwister(2026_11_26 + hash(name) % 10_000 + SEED)
+    rngb = MersenneTwister(4242 + hash(name) % 10_000 + SEED)
     wre = zeros(Bool, R, length(LS)); ana = zeros(Bool, R, length(LS)); est = zeros(R)
     t = @elapsed for rep in 1:R
         ys = Fρ \ (μ .+ Fe \ (e .* rand(rng, (-1.0, 1.0), n)))
@@ -167,7 +168,7 @@ for (k, ρrr) in ((24, 0.339), (16, 0.380))
     Wy = W * y; yt = y .- Sk * y; wt = Wy .- Sk * Wy
     for L in LS
         b, G = BLK[L]
-        rng = MersenneTwister(999 + k + round(Int, L))
+        rng = MersenneTwister(999 + k + round(Int, L) + SEED)
         ps = [wre_p(yt, wt, MHk, QHk, b, G, r, 999, rng)[1] for r in GRID]
         ρ, se = iv(yt, wt, QHk, b, G)
         acc = GRID[ps .> 0.05]
