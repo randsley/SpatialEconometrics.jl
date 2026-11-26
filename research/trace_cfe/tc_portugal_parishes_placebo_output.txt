@@ -1,0 +1,23 @@
+n = 2882 parishes, k = 24, R = 100 per cell
+data: root_rho at λ = 0.1: ρ̂ 0.428 (df 225.6)
+
+cell N2: λ_true = 1 (df 112.7), ρ₀ = 0.00, λ_e = 0.2  (537s)
+  λ = 100   mean ρ̂ 0.314 (MC se 0.0023)  sd 0.023  CS covers ρ₀ 0.00
+  λ = 10    mean ρ̂ 0.245 (MC se 0.0027)  sd 0.027  CS covers ρ₀ 0.00
+  λ = 1     mean ρ̂ 0.184 (MC se 0.0032)  sd 0.032  CS covers ρ₀ 0.00
+  λ = 0.1   mean ρ̂ 0.155 (MC se 0.0036)  sd 0.036  CS covers ρ₀ 0.01
+cell N5: λ_true = 1 (df 112.7), ρ₀ = 0.00, λ_e = 0.5  (539s)
+  λ = 100   mean ρ̂ 0.487 (MC se 0.0023)  sd 0.023  CS covers ρ₀ 0.00
+  λ = 10    mean ρ̂ 0.450 (MC se 0.0025)  sd 0.025  CS covers ρ₀ 0.00
+  λ = 1     mean ρ̂ 0.421 (MC se 0.0028)  sd 0.028  CS covers ρ₀ 0.00
+  λ = 0.1   mean ρ̂ 0.407 (MC se 0.0032)  sd 0.032  CS covers ρ₀ 0.00
+cell N7: λ_true = 1 (df 112.7), ρ₀ = 0.00, λ_e = 0.7  (582s)
+  λ = 100   mean ρ̂ 0.636 (MC se 0.0024)  sd 0.024  CS covers ρ₀ 0.00
+  λ = 10    mean ρ̂ 0.617 (MC se 0.0025)  sd 0.025  CS covers ρ₀ 0.00
+  λ = 1     mean ρ̂ 0.602 (MC se 0.0027)  sd 0.027  CS covers ρ₀ 0.00
+  λ = 0.1   mean ρ̂ 0.594 (MC se 0.0032)  sd 0.032  CS covers ρ₀ 0.00
+cell L: λ_true = 0.1 (df 225.6), ρ₀ = 0.43, λ_e = 0.0  (628s)
+  λ = 100   mean ρ̂ 0.557 (MC se 0.0018)  sd 0.018  CS covers ρ₀ 0.00
+  λ = 10    mean ρ̂ 0.526 (MC se 0.0021)  sd 0.021  CS covers ρ₀ 0.01
+  λ = 1     mean ρ̂ 0.488 (MC se 0.0024)  sd 0.024  CS covers ρ₀ 0.27
+  λ = 0.1   mean ρ̂ 0.449 (MC se 0.0028)  sd 0.028  CS covers ρ₀ 0.91

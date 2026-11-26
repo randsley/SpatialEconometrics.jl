@@ -3902,6 +3902,29 @@ under the plan this is final: the formal real-data reading is not made.
   surface does not absorb, and on these data the IV cannot split it into
   a lag and error correlation with a validated interval.
 
+## The placebo on the Portuguese parishes (2026-11-26)
+
+`tc_portugal_parishes_placebo.jl` (output committed), for notebook 11's
+new section 8. It uses notebook 11's parish design (`n` = 2,882, `k` = 24),
+R = 100 per cell, with the rules for what the notebook may say fixed in the
+header before the run. At λ = 0.1 the data give `ρ̂` = 0.428.
+
+| world | mean `ρ̂` at λ = 100 / 1 / 0.1 | CS covers the truth at 0.1 |
+|---|---|---|
+| no lag, λ_e = 0.2 | 0.314 / 0.184 / 0.155 | 0.01 |
+| no lag, λ_e = 0.5 | 0.487 / 0.421 / 0.407 | 0.00 |
+| no lag, λ_e = 0.7 | 0.636 / 0.602 / 0.594 | 0.00 |
+| lag 0.43, independent errors | 0.557 / 0.488 / 0.449 | 0.91 |
+
+Against the rules: λ_e = 0.5 and 0.7 pass for a lag (mean ≥ 0.2, coverage
+of 0 below one half), and λ_e = 0.2 is reported without that claim (0.155
+< 0.2). Of the three, 0.7 is the smallest λ_e whose mean reaches 0.43 (0.5
+gives 0.407). The lag cell recovers 0.43 within 0.05 (0.449), so the
+notebook uses the placebo. The parish map behaves like the Dutch one:
+correlated errors with no lag reproduce the data's `ρ̂`. Note that
+the no-lag paths are flatter in λ than the lag path, as in the Dutch E5
+cell. This is not a test, since a lag under a rough trend also drifts.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
