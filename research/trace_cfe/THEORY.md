@@ -3728,7 +3728,85 @@ What this shows:
   the open question. A first step is to measure it in E5 and on the data.
 - **Documentation gap.** The `root_rho` docstring does not say that the
   errors must be independent across units. It should say so, and say
-  that spatially correlated errors are read as a lag.
+  that spatially correlated errors are read as a lag. Done the same day
+  (AUDIT 39, a28a11e).
+
+## An instrumental-variable check: lag or correlated errors? (2026-11-26)
+
+`tc_iv_check.jl` (output committed). The estimator is written in the
+script, not the package. Partial `[X, basis]` out with `root_rho`'s
+penalised smoother `S` (`X` is unpenalised, so `SX = X` exactly), then
+instrument `M Wy` with `M[WX, W²X]` (q = 10), `M = I − S`. Under SAR
+errors the instruments stay valid, so `ρ̂_IV` should not read error
+correlation as a lag (Kelejian & Prucha, 1998, first step). The variance
+is a Conley-type spatial HAC (Bartlett kernel on centroid distances,
+cut-offs 10 and 25 km, 37 and 169 neighbours per unit), and HC0. `F` is
+the first stage's robust Wald statistic per instrument (25 km). Part 1
+repeats the second placebo's truths with R = 500 per cell. Part 2 is the
+real data. The rules were fixed in the header before any run. Part 2 is
+deterministic, and a 3-draw smoke test had already printed it before the
+full run. The rules were not changed after it.
+
+Part 1, at `k` = 24 (MC se of the means ≤ 0.0045):
+
+| cell | `ρ₀` | `ρ̂_IV` at λ = 100 / 1 / 0.1 | sd at 0.1 | median F at 0.1 | 25 km covers `ρ₀` at 0.1 | `root_rho` at 0.1 (second placebo) |
+|---|---|---|---|---|---|---|
+| B rough truth | 0.339 | 0.263 / 0.252 / 0.332 | 0.059 | 142 | 0.924 | 0.359 |
+| C no lag | 0 | −0.059 / −0.027 / 0.006 | 0.072 | 139 | 0.910 | 0.007 |
+| D outside the basis | 0.300 | 0.317 / 0.177 / 0.225 | 0.065 | 123 | 0.708 | 0.375 |
+| E2 SAR errors 0.2 | 0 | −0.047 / −0.015 / 0.020 | 0.078 | 129 | 0.882 | 0.146 |
+| E5 SAR errors 0.5 | 0 | −0.016 / 0.009 / 0.044 | 0.086 | 94 | 0.856 | 0.397 |
+
+Against the rules (`k` = 24, λ = 0.1):
+
+- **Rule 1 passed.** `|mean ρ̂_IV|` is 0.020 (E2) and 0.044 (E5), below
+  0.05, where `root_rho` gave 0.146 and 0.397. The IV does not read error
+  correlation as a lag, though E5's +0.044 is 11 MC se from 0.
+- **Rule 2 passed in B (−0.007) and failed in D (−0.075).** When the
+  truth is rougher than the basis, the IV is biased down by about as much
+  as `root_rho` is biased up (+0.075).
+- **Rule 3 failed in every cell.** The 25 km interval covers 0.708 to
+  0.924, against the bar of 0.93. HC0 covers 0.736, 0.898 and 0.822 in D,
+  E2 and E5, so it does not cover either. The
+  shortfall in C, with independent errors, means the HAC itself
+  understates the variance at these cut-offs. Bias adds to it in D and E5.
+- **Rule 4's reading is not made**, as fixed in advance.
+
+Part 2, the real data (`k` = 24; `k` = 16 in brackets):
+
+| λ | `ρ̂_IV` | 25 km interval | F | `root_rho` |
+|---|---|---|---|---|
+| 100 | 0.220 (0.301) | [−0.030, 0.469] ([0.049, 0.552]) | 52 (49) | 0.490 (0.508) |
+| 10 | 0.065 (0.076) | [−0.186, 0.317] | 69 (61) | 0.436 (0.457) |
+| 1 | 0.098 (0.011) | [−0.160, 0.356] | 89 (78) | 0.381 (0.408) |
+| 0.1 | 0.134 (−0.011) | [−0.120, 0.388] ([−0.248, 0.227]) | 109 (91) | 0.339 (0.380) |
+
+What this shows, with the rules' verdict that the reading is not formal:
+
+- **The instruments are strong but the estimate is imprecise.** F is 50
+  to 140 everywhere, but the sd of `ρ̂_IV` is 0.06 to 0.09, 1.5 to 2.3
+  times `root_rho`'s. Its intervals on the data are about 0.5 long and, given
+  rule 3, too short if anything. With a flexible surface, WX's local
+  variation is what is left to identify `ρ`.
+- **On the data the IV is well below `root_rho`.** It is 0.134 against
+  0.339 at `k` = 24, and −0.011 against 0.380 at `k` = 16. Both readings
+  stay open: the 25 km interval at `k` = 24 contains 0 and 0.339. The
+  `k` = 16 interval, [−0.248, 0.227], excludes `root_rho`'s 0.380.
+  Part 1 says the IV can be biased down by about 0.075 under a rough
+  truth (D), which does not close that gap. So the data lean towards a
+  part of `root_rho`'s `ρ̂` being error correlation rather than a lag,
+  but without the coverage that rule 3 required.
+- **The limit is information, not the estimator.** Under a SARAR model
+  with one `W`, the lag and the error correlation are told apart only by
+  how `X` passes to the neighbours. That is the IV's information, whatever
+  estimator uses it. A sharper answer needs either a better variance (a
+  HAC that covers in C; a Bartlett HAC at a fixed cut-off undercovered
+  here) or more information: a second outcome, a panel, or an
+  `X` with more local variation.
+
+Open: an interval that covers here (a larger or data-driven cut-off, a
+wild bootstrap of the IV under the null with spatial blocks, or a
+SARAR-type joint moment that estimates `λ_e`). No change to `root_rho`.
 
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 

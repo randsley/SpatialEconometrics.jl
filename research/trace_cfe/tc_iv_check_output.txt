@@ -1,0 +1,33 @@
+n = 3027; kernel non-zeros per unit: c = 0 km: 1, c = 10 km: 37, c = 25 km: 169
+
+PART 1: placebo, fits at k = 24, R = 500 per cell
+cell B: truth df 207.3, ρ₀ = 0.339, λ_e = 0.0  (14s)
+  λ = 100   mean ρ̂_IV +0.263 (MC se 0.0036)  sd 0.081  bias -0.076  median F 64.2  covers ρ₀: HC0 0.714, 10 km 0.760, 25 km 0.772
+  λ = 1     mean ρ̂_IV +0.252 (MC se 0.0026)  sd 0.059  bias -0.087  median F 114.0  covers ρ₀: HC0 0.718, 10 km 0.716, 25 km 0.676
+  λ = 0.1   mean ρ̂_IV +0.332 (MC se 0.0026)  sd 0.059  bias -0.007  median F 141.6  covers ρ₀: HC0 0.944, 10 km 0.928, 25 km 0.924
+cell C: truth df 108.6, ρ₀ = 0.000, λ_e = 0.0  (14s)
+  λ = 100   mean ρ̂_IV -0.059 (MC se 0.0033)  sd 0.073  bias -0.059  median F 83.4  covers ρ₀: HC0 0.856, 10 km 0.882, 25 km 0.894
+  λ = 1     mean ρ̂_IV -0.027 (MC se 0.0030)  sd 0.067  bias -0.027  median F 134.5  covers ρ₀: HC0 0.922, 10 km 0.914, 25 km 0.914
+  λ = 0.1   mean ρ̂_IV +0.006 (MC se 0.0032)  sd 0.072  bias +0.006  median F 139.4  covers ρ₀: HC0 0.936, 10 km 0.924, 25 km 0.910
+cell D: truth df 307.2, ρ₀ = 0.300, λ_e = 0.0  (13s)
+  λ = 100   mean ρ̂_IV +0.317 (MC se 0.0038)  sd 0.084  bias +0.017  median F 66.2  covers ρ₀: HC0 0.828, 10 km 0.924, 25 km 0.914
+  λ = 1     mean ρ̂_IV +0.177 (MC se 0.0029)  sd 0.066  bias -0.123  median F 104.9  covers ρ₀: HC0 0.462, 10 km 0.518, 25 km 0.490
+  λ = 0.1   mean ρ̂_IV +0.225 (MC se 0.0029)  sd 0.065  bias -0.075  median F 122.9  covers ρ₀: HC0 0.736, 10 km 0.742, 25 km 0.708
+cell E2: truth df 108.6, ρ₀ = 0.000, λ_e = 0.2  (13s)
+  λ = 100   mean ρ̂_IV -0.047 (MC se 0.0036)  sd 0.081  bias -0.047  median F 83.0  covers ρ₀: HC0 0.864, 10 km 0.884, 25 km 0.896
+  λ = 1     mean ρ̂_IV -0.015 (MC se 0.0032)  sd 0.072  bias -0.015  median F 125.8  covers ρ₀: HC0 0.918, 10 km 0.922, 25 km 0.910
+  λ = 0.1   mean ρ̂_IV +0.020 (MC se 0.0035)  sd 0.078  bias +0.020  median F 128.8  covers ρ₀: HC0 0.898, 10 km 0.894, 25 km 0.882
+cell E5: truth df 108.6, ρ₀ = 0.000, λ_e = 0.5  (13s)
+  λ = 100   mean ρ̂_IV -0.016 (MC se 0.0045)  sd 0.102  bias -0.016  median F 62.2  covers ρ₀: HC0 0.842, 10 km 0.906, 25 km 0.904
+  λ = 1     mean ρ̂_IV +0.009 (MC se 0.0037)  sd 0.082  bias +0.009  median F 92.1  covers ρ₀: HC0 0.894, 10 km 0.928, 25 km 0.914
+  λ = 0.1   mean ρ̂_IV +0.044 (MC se 0.0039)  sd 0.086  bias +0.044  median F 94.0  covers ρ₀: HC0 0.822, 10 km 0.868, 25 km 0.856
+
+PART 2: the real data
+  k = 16, λ = 100   ρ̂_IV +0.301  95%: HC0 [+0.174, +0.428]  10 km [+0.043, +0.558]  25 km [+0.049, +0.552]  F 49.1   root_rho 0.508
+  k = 16, λ = 10    ρ̂_IV +0.076  95%: HC0 [-0.052, +0.205]  10 km [-0.160, +0.312]  25 km [-0.160, +0.312]  F 60.8   root_rho 0.457
+  k = 16, λ = 1     ρ̂_IV +0.011  95%: HC0 [-0.118, +0.139]  10 km [-0.219, +0.240]  25 km [-0.223, +0.244]  F 78.0   root_rho 0.408
+  k = 16, λ = 0.1   ρ̂_IV -0.011  95%: HC0 [-0.142, +0.121]  10 km [-0.244, +0.223]  25 km [-0.248, +0.227]  F 90.5   root_rho 0.380
+  k = 24, λ = 100   ρ̂_IV +0.220  95%: HC0 [+0.092, +0.347]  10 km [-0.035, +0.475]  25 km [-0.030, +0.469]  F 52.3   root_rho 0.490
+  k = 24, λ = 10    ρ̂_IV +0.065  95%: HC0 [-0.061, +0.192]  10 km [-0.178, +0.309]  25 km [-0.186, +0.317]  F 69.1   root_rho 0.436
+  k = 24, λ = 1     ρ̂_IV +0.098  95%: HC0 [-0.024, +0.220]  10 km [-0.146, +0.342]  25 km [-0.160, +0.356]  F 88.7   root_rho 0.381
+  k = 24, λ = 0.1   ρ̂_IV +0.134  95%: HC0 [+0.014, +0.254]  10 km [-0.102, +0.370]  25 km [-0.120, +0.388]  F 108.9   root_rho 0.339
