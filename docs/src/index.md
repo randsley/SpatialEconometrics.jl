@@ -10,7 +10,7 @@ sparse linear algebra, multiple dispatch and automatic differentiation.
 
 ```@raw html
 <div class="se-badges">
-  <span class="se-badge se-badge-accent">v0.7.0</span>
+  <span class="se-badge se-badge-accent">v0.8.0</span>
   <span class="se-badge">33 submodules</span>
   <span class="se-badge">4,139 tests</span>
   <span class="se-badge">Julia 1.10+</span>

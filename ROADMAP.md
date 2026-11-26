@@ -1,18 +1,16 @@
 # SpatialEconometrics.jl — Development Roadmap
 
-> **Current version:** 0.7.0, tagged `v0.7.0` on 2026-11-24. It adds to
-> `v0.6.0` (tagged 2026-11-19) the `RootRho` submodule: `root_rho`, Jin &
-> Lee's REsd with a growing basis and a test-inversion set, a penalised
-> smoother (`tensor_pspline`), and a bias-aware interval under a roughness
-> bound (`basis_roughness`), with λ and the basis chosen by its length and
-> a finer reference basis for `f` outside the estimation basis (#13's
-> research item, `research/trace_cfe/THEORY.md`; AUDIT, the `root_rho`
-> entries). Docstring references are completed, and the test suite is one
-> file per testset. No tag is registered.
+> **Current version:** 0.8.0, tagged `v0.8.0` on 2026-11-26. It adds to
+> `v0.7.0` (tagged 2026-11-24): `root_rho`'s `vhat_worst_bias`, the HC2
+> `V̂`'s worst-case bias, with a `skewness` bound (THEORY.md, Lemmas 7–12
+> and Proposition 6″); the penalised smoother without a full-rank basis,
+> found on the Portuguese municipalities (AUDIT 37); and real data for it,
+> the 2,882 mainland Portuguese parishes in `notebooks/data`, with
+> notebook 11's section 7. No tag is registered.
 >
-> 33 submodules, 4,391 test assertions in 69 top-level testsets with both
-> package extensions installed and 4,356 (plus 2 broken markers) without
-> them, measured on 2026-11-24 on Julia 1.13.4, and without them on 1.10.14.
+> 33 submodules, 4,406 test assertions in 69 top-level testsets with both
+> package extensions installed and 4,371 (plus 2 broken markers) without
+> them, measured on 2026-11-26 on Julia 1.13.4, and without them on 1.10.14.
 > 34 examples, 20 notebooks, 2 package extensions, CI/CD and
 > 68 Documenter.jl pages. **Phases 4, 5, 6, 6B, 6C and 7A are complete.** Item #10 (Performance) closed on 2026-10-30 with its scope
 > reduced on measured grounds and may be revisited. Phase 6C, the GWR
@@ -1814,6 +1812,7 @@ crossed the rule: it is not a projection any more but a tagged release
 | **v0.7.0** (tagged 2026-11-24, = the row above) | 33 | 4,355 ¶¹³ | 30,203 |
 | **master** (+ `root_rho`'s `vhat_worst_bias`, Lemmas 7–10 and Proposition 6″) | 33 | 4,372 ¶¹⁴ | 30,275 |
 | **master** (+ `root_rho(...; skewness)`, Lemmas 11–12) | 33 | 4,391 ¶¹⁵ | 30,345 |
+| **v0.8.0** (tagged 2026-11-26; + the smoother without a full-rank basis, AUDIT 37) | 33 | 4,406 ¶¹⁶ | 30,385 |
 | — | | | |
 | **v1.0.0** (Phases 6C–8) | 29–31 | ~4,100 | ~26,500 |
 
@@ -1994,8 +1993,14 @@ versions draw different designs from the same seed (worst case −0.0367 and
 −0.0345). On 1.13, seeds 52_002 and 52_003 gave z = +0.30 and +0.82. The
 `src/` count rose by 70, all in `RootRho.jl`.
 
-Measured on master: 33 submodules plus the umbrella across 30,345 lines of
-`src/`, 12,248 lines of tests, 5,397 lines of examples across 34 scripts,
+¶¹⁶ Measured locally on 2026-11-26 for `v0.8.0`: 4,406 passed on Julia 1.13.4
+with both extensions, and 4,371 plus 2 broken on 1.10.14 without them, both
+15 above ¶¹⁵: testset 47h (the penalised smoother on a triangle, where the
+basis is rank-deficient; AUDIT 37). Its assertions hold with margins of at
+least 1e6×. The `src/` count rose by 40, all in `RootRho.jl`.
+
+Measured on `v0.8.0`: 33 submodules plus the umbrella across 30,385 lines of
+`src/`, 12,303 lines of tests, 5,397 lines of examples across 34 scripts,
 398 lines of package extensions, 68 documentation pages and 20 notebooks
 (13 Jupyter, 7 Pluto).
 
