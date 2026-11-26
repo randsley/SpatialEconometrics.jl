@@ -1,0 +1,67 @@
+n = 3027 districts; extent 260 km (E–W) × 304 km (N–S)
+W queen: links 8359, neighbours per unit 1–22 (mean 5.52)
+
+====================================================================================================
+INCOME: y = log mean income per inhabitant 2021; X = log density, % owner-occupied, % non-Western, % 65+, % under 15
+y: median 3.360, range 2.708–4.399 (min: Uilenstede, Kronenburg (Amstelveen); max: Grachtengordel-Zuid (Amsterdam))
+
+ML SAR, no surface: ρ̂ 0.687 (se 0.014), β̂ +0.01244, +0.003842, -0.000566, -0.002622, -0.0109
+root_rho, no surface: ρ̂ 0.673, CS [0.637, 0.710]
+
+k = 16: K = 261, rank [X, basis] = 168, 93 basis functions with no unit
+  λ = 100   df   17.2  max Sᵢᵢ 0.051  ρ̂ 0.508  CS [0.460, 0.555]  (4s)
+  λ = 10    df   33.7  max Sᵢᵢ 0.067  ρ̂ 0.457  CS [0.407, 0.508]  (1s)
+  λ = 1     df   69.5  max Sᵢᵢ 0.210  ρ̂ 0.408  CS [0.355, 0.462]  (1s)
+  λ = 0.1   df  116.3  max Sᵢᵢ 0.493  ρ̂ 0.380  CS [0.324, 0.437]  (1s)
+  bias-aware, ℛ̂ = 1.042 (the surface at λ = 1):
+    1·ℛ̂: λ 0.1, ρ̂ 0.380, interval [0.323, 0.437], b̄/√V̂ 0.22, pilot penalised (left out 0); half-lengths 0.057 0.074 0.148 0.357 (9s)
+    2·ℛ̂: λ 0.1, ρ̂ 0.380, interval [0.317, 0.443], b̄/√V̂ 0.53, pilot penalised (left out 0); half-lengths 0.063 0.111 0.267 0.698 (6s)
+    4·ℛ̂: λ 0.1, ρ̂ 0.380, interval [0.292, 0.468], b̄/√V̂ 1.43, pilot penalised (left out 0); half-lengths 0.088 0.203 0.543 1.451 (7s)
+k = 24: K = 581, rank [X, basis] = 343, 237 basis functions with no unit
+  λ = 100   df   22.3  max Sᵢᵢ 0.053  ρ̂ 0.490  CS [0.441, 0.538]  (2s)
+  λ = 10    df   47.8  max Sᵢᵢ 0.110  ρ̂ 0.436  CS [0.384, 0.487]  (2s)
+  λ = 1     df  108.6  max Sᵢᵢ 0.350  ρ̂ 0.381  CS [0.326, 0.437]  (2s)
+  λ = 0.1   df  207.3  max Sᵢᵢ 0.759  ρ̂ 0.339  CS [0.279, 0.399]  (2s)
+  bias-aware, ℛ̂ = 1.200 (the surface at λ = 1):
+    1·ℛ̂: λ 0.1, ρ̂ 0.339, interval [0.275, 0.402], b̄/√V̂ 0.37, pilot penalised (left out 0); half-lengths 0.064 0.089 0.179 0.443 (9s)
+    2·ℛ̂: λ 0.1, ρ̂ 0.339, interval [0.262, 0.416], b̄/√V̂ 0.88, pilot penalised (left out 0); half-lengths 0.077 0.141 0.338 0.896 (9s)
+    4·ℛ̂: λ 0.1, ρ̂ 0.339, interval [0.216, 0.462], b̄/√V̂ 2.39, pilot penalised (left out 0); half-lengths 0.123 0.279 0.729 1.958 (9s)
+
+Residual diagnostics: penalised k = 24, λ = 1
+  residual skewness 1.08, excess kurtosis 7.52
+  Moran's I of e²: Global Moran's I Test (asymptotic)
+  I = 0.144870    E[I] = -0.000330    z = 13.3175    p = 0.0000
+
+  largest |standardised residuals|: Uilenstede, Kronenburg (Amstelveen) -9.6, Wijk 00 Zuidwestelijk deel der gemeente (Wassenaar) +6.7, Grachtengordel-Zuid (Amsterdam) +6.3, Zuidas (Amsterdam) +5.9, Willemspark (Amsterdam) +5.8, Buitengebied Noord (Amstelveen) +5.7
+====================================================================================================
+HOUSE: y = log mean WOZ value 2021; X = log density, % owner-occupied, % non-Western
+y: median 5.684, range 4.727–7.288 (min: Heechterp & Schieringen (Leeuwarden); max: Wijk 02 Buitenwijken (Huizen))
+
+ML SAR, no surface: ρ̂ 0.728 (se 0.012), β̂ -0.0214, +0.006791, +0.004124
+root_rho, no surface: ρ̂ 0.712, CS [0.686, 0.740]
+
+k = 16: K = 259, rank [X, basis] = 166, 93 basis functions with no unit
+  λ = 100   df   15.3  max Sᵢᵢ 0.027  ρ̂ 0.488  CS [0.452, 0.524]  (1s)
+  λ = 10    df   31.7  max Sᵢᵢ 0.067  ρ̂ 0.393  CS [0.355, 0.431]  (1s)
+  λ = 1     df   67.5  max Sᵢᵢ 0.210  ρ̂ 0.313  CS [0.272, 0.354]  (1s)
+  λ = 0.1   df  114.4  max Sᵢᵢ 0.493  ρ̂ 0.275  CS [0.231, 0.319]  (1s)
+  bias-aware, ℛ̂ = 2.216 (the surface at λ = 1):
+    1·ℛ̂: λ 0.1, ρ̂ 0.275, interval [0.227, 0.323], b̄/√V̂ 0.44, pilot penalised (left out 0); half-lengths 0.048 0.078 0.204 0.582 (6s)
+    2·ℛ̂: λ 0.1, ρ̂ 0.275, interval [0.215, 0.335], b̄/√V̂ 1.04, pilot penalised (left out 0); half-lengths 0.060 0.131 0.393 1.165 (6s)
+    4·ℛ̂: λ 0.1, ρ̂ 0.275, interval [0.176, 0.373], b̄/√V̂ 2.75, pilot penalised (left out 0); half-lengths 0.099 0.267 0.825 2.423 (6s)
+k = 24: K = 579, rank [X, basis] = 341, 237 basis functions with no unit
+  λ = 100   df   20.3  max Sᵢᵢ 0.038  ρ̂ 0.455  CS [0.418, 0.492]  (2s)
+  λ = 10    df   45.8  max Sᵢᵢ 0.109  ρ̂ 0.359  CS [0.320, 0.399]  (2s)
+  λ = 1     df  106.7  max Sᵢᵢ 0.350  ρ̂ 0.281  CS [0.239, 0.322]  (2s)
+  λ = 0.1   df  205.4  max Sᵢᵢ 0.759  ρ̂ 0.226  CS [0.181, 0.272]  (2s)
+  bias-aware, ℛ̂ = 2.382 (the surface at λ = 1):
+    1·ℛ̂: λ 0.1, ρ̂ 0.226, interval [0.170, 0.282], b̄/√V̂ 0.77, pilot penalised (left out 0); half-lengths 0.056 0.096 0.225 0.683 (9s)
+    2·ℛ̂: λ 0.1, ρ̂ 0.226, interval [0.147, 0.305], b̄/√V̂ 1.78, pilot penalised (left out 0); half-lengths 0.079 0.171 0.445 1.395 (9s)
+    4·ℛ̂: λ 0.1, ρ̂ 0.226, interval [0.081, 0.371], b̄/√V̂ 4.63, pilot penalised (left out 0); half-lengths 0.145 0.362 0.975 2.998 (9s)
+
+Residual diagnostics: penalised k = 24, λ = 1
+  residual skewness 0.75, excess kurtosis 3.03
+  Moran's I of e²: Global Moran's I Test (asymptotic)
+  I = 0.157774    E[I] = -0.000330    z = 13.9395    p = 0.0000
+
+  largest |standardised residuals|: Amstel III/Bullewijk (Amsterdam) -5.8, Wijk 02 Buitenwijken (Huizen) +5.6, Wijk 00 Zuidwestelijk deel der gemeente (Wassenaar) +5.5, Wijk 05 Breukeleveen (Wijdemeren) +5.1, Wijk 02 Aerdenhout (Bloemendaal) +5.1, Apollobuurt (Amsterdam) +4.8

@@ -3529,6 +3529,74 @@ interval chooses λ = 0.1 in all six.)
   Aerdenhout +5.0 standard deviations). So item 3, a usable
   heteroskedastic constant, binds harder here.
 
+## A fourth real-data run: Dutch income on the 2021 districts (2026-11-26)
+
+`tc_netherlands_income.jl`: is the drift of the third run a property of
+house prices or of the method? Two outcomes on the same districts and the
+same `W`, both designs fixed before any fit. The districts are those of
+CBS's Wijk- en Buurtkaart 2021, with every attribute from the final
+StatLine table 85039NED (corrected 2024-12-20). The map's own income
+columns were frozen before CBS published income, and are filled for 54% of
+land districts. StatLine's are filled for 96%. There are 3,027 districts
+in one queen component (notebooks/data, `netherlands_districts_2021*`;
+credit in the script and the provenance file).
+
+- **income**: y = log mean income per inhabitant (2021); X = log density,
+  % owner-occupied, % with a non-Western migration background, % aged 65
+  or over, % under 15.
+- **house**: y = log mean WOZ value (2021); X = log density,
+  % owner-occupied, % non-Western (the third run's design, with the 2021
+  migration category).
+
+`ρ̂` (queen):
+
+| fit | income, k = 16 | income, k = 24 | house, k = 16 | house, k = 24 |
+|---|---|---|---|---|
+| ML SAR, no surface | 0.687 | | 0.728 | |
+| `root_rho`, no surface | 0.673, CS [0.637, 0.710] | | 0.712, CS [0.686, 0.740] | |
+| smoother, λ = 100 | 0.508 (df 17.2) | 0.490 (df 22.3) | 0.488 (df 15.3) | 0.455 (df 20.3) |
+| smoother, λ = 10 | 0.457 (df 33.7) | 0.436 (df 47.8) | 0.393 (df 31.7) | 0.359 (df 45.8) |
+| smoother, λ = 1 | 0.408 (df 69.5) | 0.381 (df 108.6) | 0.313 (df 67.5) | 0.281 (df 106.7) |
+| smoother, λ = 0.1 | 0.380 (df 116.3) | 0.339 (df 207.3) | 0.275 (df 114.4) | 0.226 (df 205.4) |
+| bias-aware, `ℛ = ℛ̂` | [0.323, 0.437] | [0.275, 0.402] | [0.227, 0.323] | [0.170, 0.282] |
+| bias-aware, `ℛ = 2ℛ̂` | [0.317, 0.443] | [0.262, 0.416] | [0.215, 0.335] | [0.147, 0.305] |
+| bias-aware, `ℛ = 4ℛ̂` | [0.292, 0.468] | [0.216, 0.462] | [0.176, 0.373] | [0.081, 0.371] |
+
+(`ℛ̂` = 1.04 and 1.20 for income, 2.22 and 2.38 for house value. The
+bias-aware interval chooses λ = 0.1 in all twelve, and the smoother pilot
+left out no unit.)
+
+- **The drift is not specific to house prices.** Income drifts too, from
+  0.490 to 0.339 at `k` = 24, and does not level off: −0.042 from λ = 1
+  to 0.1, against −0.055 for house value. So all three income or house
+  designs on irregular regions (the parishes, the 2021 districts twice)
+  show a `ρ̂` that falls as the surface's `df` rises. That is what a
+  spillover absorbed by a flexible surface would look like. It is also
+  what a lag that the surface cannot tell apart from short-range trend
+  would look like. The data alone do not separate the two. At `k` = 24 the
+  knots are 11 to 13 km apart (260 and 304 km over 23 intervals). Queen
+  neighbours' centroids are a median 3.3 km apart (quartiles 1.9 and
+  4.8 km).
+- **The size differs.** The surface takes about half of the no-surface
+  `ρ̂` for income (0.673 to 0.339) and about two-thirds for house value
+  (0.712 to 0.226). Every income interval is bounded well away from 0
+  ([0.216, 0.462] at `4ℛ̂`). The house intervals exclude 0 too, but only
+  just at `4ℛ̂`, `k` = 24 ([0.081, 0.371]).
+- **Consistent with the third run.** House value on the 2021 districts
+  gives 0.226 at `k` = 24, λ = 0.1, against 0.269 on the 2023 districts
+  (155 more districts, a different migration variable, a different year).
+- **The errors.** Income residuals are skewed (1.08) and heavy-tailed
+  (excess kurtosis 7.5), with Moran's I of `e²` z = 13.3. The largest is
+  Uilenstede, Kronenburg (Amstelveen), a student-housing district, at −9.6
+  standard deviations. House residuals: skewness 0.75, excess kurtosis 3.0,
+  z = 13.9.
+- **What would separate the two readings** (not done): a placebo on this
+  geometry. Draw y from the fitted `f` with a known `ρ₀` (0 and the
+  no-surface value) and errors resampled from the residuals, and fit the
+  same λ path. If `ρ̂` drifts with λ when the truth has a fixed `ρ₀`,
+  the drift is the method. If it is flat, the drift in the data is
+  evidence about the lag.
+
 ## Comparison with Armstrong & Kolesár (read 2026-11-24)
 
 Read from the arXiv full texts: Armstrong & Kolesár (2021), §1, §2, §4.1
